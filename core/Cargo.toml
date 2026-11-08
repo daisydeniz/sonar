@@ -1,0 +1,17 @@
+[workspace]
+resolver = "2"
+members = ["crates/sonar-core", "crates/sonar-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "LicenseRef-Proprietary"
+publish = false
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+opt-level = 2   # keep DSP/tests fast in debug builds

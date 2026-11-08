@@ -1,0 +1,9 @@
+[package]
+name = "sonar-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "Sonar core: scan, analysis, index and search for local sample libraries."
+
+[dependencies]
