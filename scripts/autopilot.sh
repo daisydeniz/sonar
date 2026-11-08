@@ -17,10 +17,10 @@ if [[ -z "${SONAR_CAFFEINATED:-}" ]] && command -v caffeinate >/dev/null; then
   SONAR_CAFFEINATED=1 exec caffeinate -i "$0" "$@"
 fi
 
-MAX_ITER="${MAX_ITER:-40}"
+MAX_ITER="${MAX_ITER:-200}"
 MAX_TURNS="${MAX_TURNS:-300}"
 BACKOFF_SECS="${BACKOFF_SECS:-900}"   # wait after an error (e.g. usage limit)
-MAX_FAILS="${MAX_FAILS:-3}"
+MAX_FAILS="${MAX_FAILS:-24}"     # 24 × 15 min ≈ 6 h: rides out usage-limit windows
 
 PERM_ARGS=(--permission-mode acceptEdits)
 if [[ "${SONAR_YOLO:-0}" == "1" ]]; then

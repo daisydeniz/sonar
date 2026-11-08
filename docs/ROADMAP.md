@@ -2,10 +2,12 @@
 
 The autonomous loop works top to bottom. Rules:
 - Pick the **first** unchecked task whose dependencies are done.
-- `[HUMAN]` tasks are never done by agents: skip them, and make sure they are
-  listed under "Needs human" in `docs/STATUS.md`.
+- `[HUMAN]` tasks are never done by agents and never block the loop: skip
+  them and keep them listed under "Needs human" in `docs/STATUS.md`. The
+  founder does not approve tasks; he tests at the end (M8).
 - A task is checked `[x]` only when its acceptance criteria (AC) pass and
-  `scripts/check.sh` is green. Append the commit hash: `[x] … (abc1234)`.
+  `scripts/check.sh` is green and the task branch is merged into `main`.
+  Append the commit hash: `[x] … (abc1234)`.
 - Agents may split a task into sub-tasks (T1.2a, T1.2b) or add tasks, but must
   not delete or reorder existing ones. Scope changes → ADR in DECISIONS.md.
 
@@ -64,7 +66,6 @@ Owner tags map to subagents in `.claude/agents/`.
 - [ ] T6.7 (swift-ui) Drag & drop out to DAW/Finder (file URLs), multi-select.
 - [ ] T6.8 (swift-ui) Organize: favorites, collections, tags, overrides for BPM/key/category, hide.
 - [ ] T6.9 (swift-ui) Duplicates view (exact + near via aspect vectors).
-- [ ] T6.10 [HUMAN] Founder tests drag & drop into Ableton Live and preview feel; files issues in STATUS.md.
 
 ## M7 — Polish & release
 - [ ] T7.1 (reviewer) Full perf + robustness pass (1M synthetic files, corrupt files, offline drives). Fix findings.
@@ -72,6 +73,9 @@ Owner tags map to subagents in `.claude/agents/`.
 - [ ] T7.3 (architect) Release pipeline script: universal build, codesign, notarize, DMG, Sparkle updates (keys via env). 
 - [ ] T7.4 [HUMAN] Apple Developer ID, notarization credentials, Paddle/Lemon Squeezy account, pricing.
 - [ ] T7.5 (swift-ui) Licensing: trial + license key validation (offline-friendly) behind a provider-agnostic interface.
+
+## M8 — Founder acceptance (end of MVP)
+- [ ] T8.1 [HUMAN] Founder tests the app end to end on his library: scan, search, similarity, preview feel, drag & drop into Ableton Live. Findings become new tasks.
 
 ## Future (do not start)
 v1.x: record-to-search, 2D map, tempo-synced preview, kit builder, `.als` project map.

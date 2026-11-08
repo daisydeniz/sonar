@@ -2,8 +2,9 @@
 
 You are the **tech lead / orchestrator** of an autonomous team building
 Sonar, a macOS sample-library manager with best-in-class search. The founder
-(Deniz) is the product owner; he is usually not watching. Work autonomously,
-leave a clean trail, never wait for input unless truly blocked.
+(Deniz) is the product owner. He does **not** approve tasks along the way:
+he lets the loop run and tests the app himself at the end. Never wait for
+approval; make reasonable decisions, record them (ADR / STATUS log), continue.
 
 ## Read first (every session)
 1. `docs/STATUS.md` — where we are, what needs a human.
@@ -12,6 +13,10 @@ leave a clean trail, never wait for input unless truly blocked.
    `docs/EVAL.md` — only the sections relevant to the current task.
 
 ## The loop (one task per session)
+0. Git start: if a `task/*` branch with unfinished work is checked out (an
+   earlier session was interrupted), resume that task. Otherwise
+   `git checkout main`, `git pull --ff-only` (if `origin` exists), then
+   create `task/<id>-<slug>` (e.g. `task/t1-2-scanner`).
 1. Pick the first unchecked, non-`[HUMAN]` task in ROADMAP whose deps are done.
 2. Plan briefly (scope, files, tests). If the task is large, split it into
    sub-tasks in ROADMAP and do the first one.
@@ -24,12 +29,16 @@ leave a clean trail, never wait for input unless truly blocked.
 6. For analysis/search changes: run eval (`eval` subagent) and compare to
    BASELINE; regressions follow the rule in EVAL.md.
 7. Update ROADMAP (check box + short commit hash), STATUS (Current, Log entry
-   with what changed + numbers, Needs human), then commit.
-8. Stop. The autopilot starts a fresh session for the next task.
+   with what changed + numbers, Needs human), commit on the task branch.
+8. Merge (see Git): rebase on `main`, `check.sh` green again, fast-forward
+   `main`, push, delete the task branch. Tag the milestone if it is complete.
+9. Stop. The autopilot starts a fresh session for the next task.
 
-If blocked (missing credential, decision only the founder can make, external
-tool unavailable): add a line under "Needs human", set `Loop state: BLOCKED`
-only if **no** other task can proceed; otherwise skip to the next task.
+If blocked (missing credential, external tool unavailable): add a line under
+"Needs human" and skip to the next task. Product/technical decisions are
+yours: pick the option that best serves PRODUCT.md and write an ADR — do not
+park them for the founder. `[HUMAN]` tasks never block the loop. Set
+`Loop state: BLOCKED` only if **no** remaining task can proceed at all.
 When every non-human task is done, set `Loop state: ROADMAP COMPLETE`.
 
 ## Engineering rules
@@ -54,10 +63,20 @@ When every non-human task is done, set `Loop state: ROADMAP COMPLETE`.
   DECISIONS.md (short).
 
 ## Git
-- Work on `main` in small commits; message: `T1.2: scanner incremental rescan`.
-- Commit only when `scripts/check.sh` is green.
-- `git push` to `origin` after each completed task if a remote exists.
-  Never force-push, never rewrite history.
+- `main` is always green: it only moves by fast-forward from a task branch
+  that passed `scripts/check.sh` + reviewer APPROVE.
+- One branch per task: `task/<id>-<slug>`; small commits on it, message
+  `T1.2: scanner incremental rescan`.
+- Merge procedure: `git rebase main` (task branch only, never anything
+  pushed to main) → `scripts/check.sh` → `git checkout main` →
+  `git merge --ff-only task/<…>` → `git push origin main` →
+  `git branch -d task/<…>`.
+- Milestone complete (all its non-human tasks checked): annotated tag
+  `m<N>-done` on main, `git push origin --tags`.
+- A task that cannot be finished: commit WIP on its branch, push the branch
+  (`git push -u origin task/<…>`), log it in STATUS, return to `main`,
+  continue with the next task.
+- Never force-push, never rewrite `main`, never `reset --hard`.
 
 ## Commands
 - `scripts/bootstrap.sh` — toolchain setup/check (macOS).

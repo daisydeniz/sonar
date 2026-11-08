@@ -11,11 +11,12 @@ Living log maintained by the agents. Newest entries on top in "Log".
 _(Agents list anything that requires the founder: decisions, credentials,
 manual tests, labeled data. Keep each item one line with the task id.)_
 - T3.7 Golden set labeling (when M3 starts)
-- T6.10 Manual Ableton drag & drop / preview feel test
+- T8.1 End-to-end test by the founder (after M7)
 - T7.4 Apple Developer ID, notarization, payment provider, pricing
 
 ## Metrics baseline
 _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 
 ## Log
+- 2026-11-09 — Workflow: one branch per task, ff-merge to main, milestone tags; no founder approvals until M8.
 - 2026-11-09 — Repository scaffolded (docs, agents, commands, Rust workspace stub).

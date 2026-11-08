@@ -29,5 +29,7 @@ scripts/autopilot.sh          # otonom döngü (her görev = yeni Claude oturumu
 Durdurma: `Ctrl-C`. Tek görev: `claude` → `/next` (veya `/next T1.2`).
 
 ## Senden beklenenler
-`docs/STATUS.md` → "Needs human": golden set etiketleme (T3.7), Ableton testi (T6.10),
-Apple Developer / ödeme / fiyat (T7.4).
+Ara onay yok: döngü kendi karar verir, kararları `docs/DECISIONS.md` ve `docs/STATUS.md`'ye yazar.
+Her görev ayrı branch'te (`task/...`) yapılır, yeşilse `main`'e fast-forward merge + push; milestone bitince `mN-done` etiketi.
+Sona kalanlar (`docs/STATUS.md` → "Needs human"): uçtan uca test (T8.1), Apple Developer / ödeme / fiyat (T7.4).
+Opsiyonel: golden set etiketleme (T3.7) arama kalitesini ölçmeyi güçlendirir.
