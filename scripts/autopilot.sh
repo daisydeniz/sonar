@@ -28,6 +28,24 @@ if [[ "${SONAR_YOLO:-0}" == "1" ]]; then
   PERM_ARGS=(--dangerously-skip-permissions)
 fi
 
+# Claude Code ignores .claude/settings.json allow rules until the folder is
+# trusted (interactive trust dialog). Fail fast instead of burning a session.
+trust_ok() {
+  python3 - "$(pwd -P)" <<'PY'
+import json, os, sys
+try:
+    data = json.load(open(os.path.expanduser("~/.claude.json")))
+except Exception:
+    sys.exit(1)
+sys.exit(0 if data.get("projects", {}).get(sys.argv[1], {}).get("hasTrustDialogAccepted") else 1)
+PY
+}
+if [[ "${SONAR_SKIP_TRUST_CHECK:-0}" != "1" ]] && ! trust_ok; then
+  echo "✗ This folder is not trusted by Claude Code yet, so its permission rules are ignored."
+  echo "  Fix (once): run 'claude' in $(pwd -P), accept the trust prompt, type /exit, then rerun this script."
+  exit 3
+fi
+
 PROMPT='Run the /next command (one iteration of the build loop). If slash commands are unavailable, read .claude/commands/next.md and follow it exactly.'
 
 mkdir -p logs
