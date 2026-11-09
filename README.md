@@ -22,7 +22,7 @@ Bu repo, uygulamayı Claude Code ile **otonom** geliştiren bir ajan sistemi ola
 git clone <repo> sonar && cd sonar
 scripts/bootstrap.sh          # Xcode, rustup, xcodegen, cargo-deny, claude kontrol/kurulum
 scripts/check.sh              # tüm kalite kapıları
-scripts/autopilot.sh          # otonom döngü (her görev = yeni Claude oturumu)
+scripts/autopilot.sh          # otonom döngü (her görev = yeni Claude oturumu; limitte sıfırlanma saatine kadar uyur)
 ```
 İzlemek için: `docs/STATUS.md`, `git log`, `logs/`. Özet için Claude Code içinde `/status`.
 

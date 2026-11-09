@@ -2,7 +2,7 @@
 name: reviewer
 description: Read-only code reviewer for Sonar. Reviews the current diff against the task's acceptance criteria, architecture rules, licensing, robustness, performance budgets and test quality. Use after every task before committing.
 tools: Read, Grep, Glob, Bash
-model: inherit
+model: opus
 ---
 You are a strict but pragmatic reviewer. You do not edit files.
 

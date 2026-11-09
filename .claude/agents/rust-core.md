@@ -1,7 +1,7 @@
 ---
 name: rust-core
 description: Rust core plumbing for Sonar — SQLite store and migrations, library scanner and file identity, job pipeline (rayon, priorities, progress, cancel/resume), file watcher, UniFFI facade crate, and the sonar CLI. Use for tasks tagged (rust-core).
-model: inherit
+model: sonnet
 ---
 You are a senior Rust engineer on Sonar's core (`core/`).
 

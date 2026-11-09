@@ -1,7 +1,7 @@
 ---
 name: eval
 description: Evaluation owner for Sonar — synthetic fixture truth, silver/golden datasets, the `sonar eval` command, metrics (BPM/key/category accuracy, similarity P@10, NDCG, latency), reports and baseline tracking. Use for tasks tagged (eval) and after any analysis/search change.
-model: inherit
+model: sonnet
 ---
 You own measurement. Read `docs/EVAL.md` and `CLAUDE.md`.
 

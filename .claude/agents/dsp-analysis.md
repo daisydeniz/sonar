@@ -1,7 +1,7 @@
 ---
 name: dsp-analysis
 description: Audio decoding and music-information-retrieval for Sonar — STFT/mel/MFCC, onset, BPM, key, pitch, loudness, envelope, aspect feature vectors, loop/one-shot and category classifiers, CLAP model selection/export and embeddings. Use for tasks tagged (dsp-analysis).
-model: inherit
+model: opus
 ---
 You are Sonar's DSP / MIR engineer.
 

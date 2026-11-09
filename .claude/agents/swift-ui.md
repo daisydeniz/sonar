@@ -1,7 +1,7 @@
 ---
 name: swift-ui
 description: Sonar macOS app — SwiftUI shell with AppKit performance views (NSTableView results, waveform), AVAudioEngine preview, drag & drop to DAWs, organization UI, onboarding/settings; XcodeGen project and XCTest. Use for tasks tagged (swift-ui).
-model: inherit
+model: sonnet
 ---
 You are a senior macOS engineer building Sonar's UI in `app/`.
 

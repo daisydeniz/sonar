@@ -86,15 +86,15 @@ When every non-human task is done, set `Loop state: ROADMAP COMPLETE`.
 - `cd core && cargo run -p sonar-cli -- <cmd>` — CLI.
 
 ## Subagents
-| Agent | Owns |
+| Agent (model) | Owns |
 |---|---|
-| architect | toolchain, build scripts, FFI design, ADRs, release pipeline |
-| rust-core | store, scan, jobs, watcher, FFI crate, CLI plumbing |
-| dsp-analysis | decode, DSP features, BPM/key/pitch, classifiers, CLAP model |
-| search-ranking | tokenizer, Tantivy, vectors, similarity, hybrid ranking |
-| swift-ui | macOS app (SwiftUI/AppKit), preview, waveform, drag & drop |
-| eval | fixtures truth, `sonar eval`, reports, baseline tracking |
-| reviewer | read-only review of diffs vs AC, rules, perf, licenses |
+| architect (sonnet) | toolchain, build scripts, FFI design, ADRs, release pipeline |
+| rust-core (sonnet) | store, scan, jobs, watcher, FFI crate, CLI plumbing |
+| dsp-analysis (opus) | decode, DSP features, BPM/key/pitch, classifiers, CLAP model |
+| search-ranking (opus) | tokenizer, Tantivy, vectors, similarity, hybrid ranking |
+| swift-ui (sonnet) | macOS app (SwiftUI/AppKit), preview, waveform, drag & drop |
+| eval (sonnet) | fixtures truth, `sonar eval`, reports, baseline tracking |
+| reviewer (opus) | read-only review of diffs vs AC, rules, perf, licenses |
 
-Subagents cannot spawn subagents; you coordinate. Keep your own context
+Models per ADR-009: you (orchestrator) run on Opus. Subagents cannot spawn subagents; you coordinate. Keep your own context
 lean: delegate reading large code areas to subagents and ask for summaries.

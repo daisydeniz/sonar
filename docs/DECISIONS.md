@@ -74,3 +74,13 @@ decoded + error → error; valid header with 0 frames → Ok, empty; 0-byte file
 packets, ≤ 64 Mi source frames buffered. Every call runs under
 `catch_unwind` (symphonia-format-riff 0.6.1 has a u16 overflow panic on a
 crafted WAV header in debug builds).
+
+## ADR-009 — Model mix for the agent team (usage budget)
+Accepted (2026-11-09). Founder is on the Pro plan; usage limits, not model
+quality, were the bottleneck (1–4 tasks per 5-hour window). Orchestrator
+(autopilot `--model opus`), reviewer, dsp-analysis and search-ranking stay on
+Opus — they own correctness and the product's differentiators. rust-core,
+swift-ui, eval and architect run on Sonnet (well-specified engineering under
+the same gates: fmt, clippy, tests, cargo deny, eval, Opus review). If review
+finds repeated quality issues from a Sonnet agent, move it back to Opus and
+note it here.
