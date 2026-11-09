@@ -7,4 +7,10 @@ publish.workspace = true
 description = "Sonar core: scan, analysis, index and search for local sample libraries."
 
 [dependencies]
+serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+hound.workspace = true
+tempfile.workspace = true

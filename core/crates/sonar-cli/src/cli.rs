@@ -5,6 +5,8 @@
 //! gate exists", so an `eval` subcommand must only be added together with
 //! `--fixtures --check` support.
 
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 /// `sonar` — headless access to every Sonar core feature.
@@ -28,6 +30,25 @@ pub struct Cli {
 pub enum Command {
     /// Print the core library version.
     Version,
+
+    /// Generate synthetic WAV fixtures plus a `fixtures.json` truth manifest.
+    ///
+    /// Output is deterministic for a given seed. Truth is only in the
+    /// manifest; file names are neutral. See docs/EVAL.md.
+    Fixtures {
+        /// Output directory (created if missing; existing fixtures are overwritten).
+        dir: PathBuf,
+        /// PRNG seed for noise content (0..=2^53-1, exact in any JSON reader).
+        #[arg(
+            long,
+            default_value_t = sonar_core::fixtures::DEFAULT_SEED,
+            value_parser = clap::value_parser!(u64).range(..=sonar_core::fixtures::MAX_SEED)
+        )]
+        seed: u64,
+        /// Skip the > 5 min file (faster; for quick local runs).
+        #[arg(long)]
+        skip_long: bool,
+    },
 }
 
 #[cfg(test)]
@@ -49,5 +70,40 @@ mod tests {
                 command: Command::Version
             })
         ));
+    }
+
+    #[test]
+    fn parses_fixtures_with_defaults_and_flags() {
+        let cli = Cli::try_parse_from(["sonar", "fixtures", "/tmp/fx"]).map_err(|e| e.to_string());
+        assert!(matches!(
+            cli,
+            Ok(Cli {
+                command: Command::Fixtures {
+                    seed: sonar_core::fixtures::DEFAULT_SEED,
+                    skip_long: false,
+                    ..
+                }
+            })
+        ));
+        let cli = Cli::try_parse_from(["sonar", "fixtures", "x", "--seed", "9", "--skip-long"])
+            .map_err(|e| e.to_string());
+        assert!(matches!(
+            cli,
+            Ok(Cli {
+                command: Command::Fixtures {
+                    seed: 9,
+                    skip_long: true,
+                    ..
+                }
+            })
+        ));
+        assert!(Cli::try_parse_from(["sonar", "fixtures"]).is_err());
+        let max = sonar_core::fixtures::MAX_SEED;
+        let ok = max.to_string();
+        let too_big = (max + 1).to_string();
+        assert!(Cli::try_parse_from(["sonar", "fixtures", "x", "--seed", ok.as_str()]).is_ok());
+        assert!(
+            Cli::try_parse_from(["sonar", "fixtures", "x", "--seed", too_big.as_str()]).is_err()
+        );
     }
 }

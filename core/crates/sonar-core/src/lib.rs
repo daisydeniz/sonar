@@ -5,6 +5,7 @@
 //! feature headless so it can be tested and benchmarked without UI.
 
 pub mod error;
+pub mod fixtures;
 
 pub use error::{Error, Result};
 

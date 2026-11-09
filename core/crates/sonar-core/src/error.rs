@@ -29,12 +29,31 @@ pub enum Error {
     /// The operation was stopped through its cancellation flag.
     #[error("operation cancelled")]
     Cancelled,
+
+    /// A JSON document at `path` (e.g. a fixture manifest) could not be
+    /// serialized or parsed.
+    #[error("invalid JSON at {}", path.display())]
+    Json {
+        /// File the JSON was read from or written to.
+        path: PathBuf,
+        /// Underlying serde_json error (includes line/column when parsing).
+        #[source]
+        source: serde_json::Error,
+    },
 }
 
 impl Error {
     /// Builds an [`Error::Io`] that records which path failed.
     pub fn io(path: impl Into<PathBuf>, source: io::Error) -> Self {
         Self::Io {
+            path: path.into(),
+            source,
+        }
+    }
+
+    /// Builds an [`Error::Json`] that records which path failed.
+    pub fn json(path: impl Into<PathBuf>, source: serde_json::Error) -> Self {
+        Self::Json {
             path: path.into(),
             source,
         }
@@ -77,6 +96,17 @@ mod tests {
     fn cancelled_has_no_source() {
         assert!(Error::Cancelled.source().is_none());
         assert_eq!(Error::Cancelled.to_string(), "operation cancelled");
+    }
+
+    #[test]
+    fn json_error_names_path_and_keeps_source() {
+        let parse = serde_json::from_str::<u32>("not json");
+        let Err(source) = parse else {
+            panic!("expected a parse error");
+        };
+        let err = Error::json("/tmp/fixtures.json", source);
+        assert_eq!(err.to_string(), "invalid JSON at /tmp/fixtures.json");
+        assert!(err.source().is_some());
     }
 
     #[test]

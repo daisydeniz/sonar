@@ -67,6 +67,44 @@ fn logs_go_to_stderr_not_stdout() {
 }
 
 #[test]
+fn fixtures_writes_manifest_and_files() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let dir = tmp.path().join("fx");
+    let dir_s = dir.to_str().expect("utf-8 temp path");
+    let out = sonar(&["fixtures", dir_s, "--seed", "3", "--skip-long"]);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = stdout(&out);
+    assert!(
+        text.contains("wrote ") && text.contains("fixtures.json"),
+        "{text}"
+    );
+
+    let json = std::fs::read(dir.join("fixtures.json")).expect("manifest written");
+    let manifest: serde_json::Value = serde_json::from_slice(&json).expect("valid JSON");
+    assert_eq!(manifest["seed"], 3);
+    let fixtures = manifest["fixtures"].as_array().expect("fixtures array");
+    assert!(fixtures.len() > 100, "{} fixtures", fixtures.len());
+    for f in fixtures {
+        let rel = f["path"].as_str().expect("path");
+        assert!(dir.join(rel).is_file(), "{rel} missing");
+    }
+}
+
+#[test]
+fn fixtures_into_a_file_path_fails_cleanly() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let file = tmp.path().join("occupied");
+    std::fs::write(&file, b"x").expect("write");
+    let out = sonar(&["fixtures", file.to_str().expect("utf-8"), "--skip-long"]);
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("generating fixtures"));
+}
+
+#[test]
 fn invalid_rust_log_falls_back_to_default() {
     let out = Command::new(env!("CARGO_BIN_EXE_sonar"))
         .arg("version")
