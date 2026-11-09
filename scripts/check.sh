@@ -5,6 +5,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 step() { printf '\n▶ %s\n' "$*"; }
+# shellcheck source=lib/env.sh
+source "$ROOT/scripts/lib/env.sh"
 
 cd "$ROOT/core"
 step "rustfmt";  cargo fmt --all --check

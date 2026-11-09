@@ -11,6 +11,9 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
+# Rust toolchain on PATH for the Claude sessions (they run cargo directly).
+# shellcheck source=lib/env.sh
+source "$ROOT/scripts/lib/env.sh"
 
 # Keep the Mac awake while the loop runs.
 if [[ -z "${SONAR_CAFFEINATED:-}" ]] && command -v caffeinate >/dev/null; then
