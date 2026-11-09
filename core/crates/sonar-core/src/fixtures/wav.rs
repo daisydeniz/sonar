@@ -190,8 +190,9 @@ pub fn encode(spec: &WavSpec, samples: &[f32]) -> Encoded {
     }
 }
 
-/// `round(x · (2^(bits−1) − 1))` clamped to the signed `bits` range.
-fn quantize(x: f32, bits: u32) -> i32 {
+/// `round(x · (2^(bits−1) − 1))` clamped to the signed `bits` range
+/// (`bits` ≤ 24).
+pub(super) fn quantize(x: f32, bits: u32) -> i32 {
     let max = f64::from((1i32 << (bits - 1)) - 1);
     (f64::from(x) * max).round().clamp(-max - 1.0, max) as i32
 }

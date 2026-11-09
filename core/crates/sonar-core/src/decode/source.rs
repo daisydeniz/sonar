@@ -14,6 +14,7 @@ use symphonia::core::codecs::audio::{AudioCodecId, AudioDecoder, AudioDecoderOpt
 use symphonia::core::codecs::CodecParameters;
 use symphonia::core::errors::Error as SymError;
 use symphonia::core::formats::probe::Hint;
+use symphonia::core::formats::well_known::{FORMAT_ID_MP1, FORMAT_ID_MP2, FORMAT_ID_MP3};
 use symphonia::core::formats::{FormatOptions, FormatReader, TrackType};
 use symphonia::core::io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
@@ -55,6 +56,9 @@ pub(super) struct Opened {
     pub container: String,
     /// Playable frames declared by the container, if any.
     pub declared_frames: Option<u64>,
+    /// The demuxer reports `Packet::dur` *before* gapless trimming
+    /// (symphonia 0.6.1 MPEG audio; see [`super::stream::valid_ticks`]).
+    pub dur_includes_trim: bool,
 }
 
 /// Opens and probes `path`. Errors: [`Error::Io`] if the file cannot be
@@ -128,13 +132,18 @@ pub(super) fn open_source(path: &Path, source: Box<dyn MediaSource>) -> Result<O
             ));
         }
     }
-    let bit_depth = params.bits_per_sample.or_else(|| float_bits(params.codec));
+    let bit_depth = params
+        .bits_per_sample
+        .or_else(|| float_bits(params.codec))
+        .or_else(|| alac_bits(params.codec, params.extra_data.as_deref()));
 
     let decoder = symphonia::default::get_codecs()
         .make_audio_decoder(params, &AudioDecoderOptions::default())
         .map_err(|e| map_error(path, e))?;
     let codec = decoder.codec_info().short_name.to_owned();
-    let container = format.format_info().short_name.to_owned();
+    let info = format.format_info();
+    let container = info.short_name.to_owned();
+    let dur_includes_trim = [FORMAT_ID_MP1, FORMAT_ID_MP2, FORMAT_ID_MP3].contains(&info.format);
 
     Ok(Opened {
         format,
@@ -147,6 +156,7 @@ pub(super) fn open_source(path: &Path, source: Box<dyn MediaSource>) -> Result<O
         codec,
         container,
         declared_frames,
+        dur_includes_trim,
     })
 }
 
@@ -165,6 +175,28 @@ fn float_bits(codec: AudioCodecId) -> Option<u32> {
         | CODEC_ID_PCM_F64BE_PLANAR => Some(64),
         _ => None,
     }
+}
+
+/// ALAC bit depth from the magic cookie (symphonia's MP4 demuxer leaves
+/// `bits_per_sample` unset). Parsed from the front like Apple's ALAC
+/// decoder (`ALACDecoder::Init`, "magic cookie" description): an optional
+/// 12-byte `frma` atom, then an optional 12-byte `alac` atom header, then
+/// the 24-byte `ALACSpecificConfig` (anything after it, e.g. a `chan`
+/// atom or a terminator, is ignored). `bitDepth` is its byte 5 and must be
+/// 16, 20, 24 or 32.
+fn alac_bits(codec: AudioCodecId, extra: Option<&[u8]>) -> Option<u32> {
+    if codec != codec_ids::CODEC_ID_ALAC {
+        return None;
+    }
+    let mut cookie = extra?;
+    for tag in [b"frma", b"alac"] {
+        if cookie.get(4..8) == Some(&tag[..]) {
+            cookie = cookie.get(12..)?;
+        }
+    }
+    let cookie = cookie.get(..24)?;
+    let bits = u32::from(cookie[5]);
+    [16, 20, 24, 32].contains(&bits).then_some(bits)
 }
 
 /// Converts a packet duration in `time_base` ticks to frames at `rate`.
@@ -249,6 +281,27 @@ mod tests {
         assert_eq!(float_bits(codec_ids::CODEC_ID_PCM_F32LE), Some(32));
         assert_eq!(float_bits(codec_ids::CODEC_ID_PCM_F64BE), Some(64));
         assert_eq!(float_bits(codec_ids::CODEC_ID_PCM_S16LE), None);
+    }
+
+    #[test]
+    fn alac_bit_depth_comes_from_the_cookie() {
+        let mut cookie = vec![0u8; 24];
+        cookie[5] = 24;
+        let alac = codec_ids::CODEC_ID_ALAC;
+        assert_eq!(alac_bits(alac, Some(&cookie)), Some(24));
+        let frma = [&12u32.to_be_bytes()[..], b"frma", b"alac"].concat();
+        let alac_hdr = [&36u32.to_be_bytes()[..], b"alac", &[0; 4]].concat();
+        let wrapped = [frma, alac_hdr, cookie.clone()].concat();
+        assert_eq!(wrapped.len(), 48);
+        assert_eq!(alac_bits(alac, Some(&wrapped)), Some(24));
+        // Trailing data (a `chan` atom, a terminator) is ignored.
+        let trailing = [cookie.clone(), vec![0, 0, 0, 8, 0, 0, 0, 0]].concat();
+        assert_eq!(alac_bits(alac, Some(&trailing)), Some(24));
+        cookie[5] = 7;
+        assert_eq!(alac_bits(alac, Some(&cookie)), None);
+        assert_eq!(alac_bits(alac, Some(&[16; 5])), None);
+        assert_eq!(alac_bits(alac, None), None);
+        assert_eq!(alac_bits(codec_ids::CODEC_ID_FLAC, Some(&[16; 24])), None);
     }
 
     #[test]

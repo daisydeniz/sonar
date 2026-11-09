@@ -1,10 +1,13 @@
 //! Synthetic, seeded audio fixtures with exact truth (`sonar fixtures`).
 //!
-//! [`generate`] writes WAV files into group subdirectories plus a
+//! [`generate`] writes audio files into group subdirectories plus a
 //! `fixtures.json` [`Manifest`] that documents every truth value (tempo,
-//! key, note, category, levels, corrupt-file expectations). File names are
-//! neutral; truth lives only in the manifest. The fixtures tier of
-//! `docs/EVAL.md` evaluates DSP against it.
+//! key, note, category, levels, container/codec, corrupt-file
+//! expectations). Most groups are WAV; the `containers` group covers every
+//! other scanner extension with hand-written, dependency-free writers
+//! ([`aiff`], [`flac`], [`m4a`] (ALAC), [`mp3`], [`ogg`] (Vorbis) — each
+//! module cites its spec). File names are neutral; truth lives only in the
+//! manifest. The fixtures tier of `docs/EVAL.md` evaluates DSP against it.
 //!
 //! Determinism: the same seed and crate version produce byte-identical
 //! files and manifest on the same platform/toolchain — a hand-rolled PRNG
@@ -14,29 +17,37 @@
 //! content (noise, snare/hat noise, random corrupt bytes) depends on the
 //! seed; tonal and tempo content is seed-independent.
 
+pub mod aiff;
+pub mod bits;
 pub mod catalog;
+pub mod containers;
 pub mod corrupt;
 pub mod drums;
+pub mod encode;
+pub mod flac;
 pub mod legend;
+pub mod m4a;
 pub mod manifest;
+pub mod mp3;
 pub mod music;
+pub mod ogg;
 pub mod oneshot;
+pub mod pcm;
 pub mod render;
 pub mod rng;
 pub mod spec;
 pub mod synth;
+pub mod truth;
 pub mod wav;
 
 use std::path::{Path, PathBuf};
 
 pub use manifest::{Fixture, Manifest};
+pub use pcm::Pcm;
 
 use catalog::catalog;
 use legend::fields_legend;
-use manifest::{Format, FormatTag, Generator, SampleKind, Truth, SCHEMA_VERSION};
-use rng::SplitMix64;
-use spec::Body;
-use wav::{encode, WavSpec};
+use manifest::{Generator, SCHEMA_VERSION};
 
 use crate::{Error, Result};
 
@@ -76,43 +87,19 @@ pub fn generate(dir: &Path, opts: &FixtureOptions) -> Result<Manifest> {
     create_dir(dir)?;
     let mut fixtures = Vec::new();
     for spec in catalog(opts.include_long) {
-        let mut rng = SplitMix64::for_stream(opts.seed, &spec.path);
-        let (bytes, format, truth) = match &spec.body {
-            Body::Audio {
-                spec: wav,
-                content,
-                peak_dbfs,
-            } => {
-                let (mut audio, mut truth) = render::render(content, wav, &mut rng);
-                if let Some(p) = peak_dbfs {
-                    audio.normalize_peak(*p);
-                }
-                let enc = encode(wav, &audio.interleave());
-                truth.is_silent = Some(enc.levels.is_silent());
-                truth.peak_dbfs = enc.levels.peak_dbfs().map(round3);
-                truth.rms_dbfs = enc.levels.rms_dbfs().map(round3);
-                (enc.bytes, Some(format_of(wav, enc.num_frames)), truth)
-            }
-            Body::Corrupt(kind) => {
-                let truth = Truth {
-                    corrupt: Some(kind.truth()),
-                    ..Truth::default()
-                };
-                (kind.build(&mut rng), None, truth)
-            }
-        };
+        let built = encode::build(&spec, opts.seed)?;
         let path = file_path(dir, &spec.path);
         if let Some(parent) = path.parent() {
             create_dir(parent)?;
         }
-        std::fs::write(&path, &bytes).map_err(|e| Error::io(&path, e))?;
+        std::fs::write(&path, &built.bytes).map_err(|e| Error::io(&path, e))?;
         fixtures.push(Fixture {
             path: spec.path,
             group: spec.group,
             description: spec.description,
-            bytes: bytes.len() as u64,
-            format,
-            truth,
+            bytes: built.bytes.len() as u64,
+            format: built.format,
+            truth: built.truth,
         });
     }
     fixtures.sort_by(|a, b| a.path.cmp(&b.path));
@@ -134,6 +121,18 @@ pub fn generate(dir: &Path, opts: &FixtureOptions) -> Result<Manifest> {
     Ok(manifest)
 }
 
+/// The integer samples stored in the lossless fixture at `path` (relative,
+/// `/`-separated) when generated with `seed`, for bit-exact decoder tests:
+/// `Some` for AIFF, FLAC, ALAC and integer WAV entries; `None` for float
+/// WAV, lossy, corrupt or unknown paths. A decoder must return each sample
+/// `q` as `q / 2^(bits−1)`.
+pub fn stored_pcm(path: &str, seed: u64) -> Option<Pcm> {
+    catalog(true)
+        .iter()
+        .find(|f| f.path == path)
+        .and_then(|f| encode::stored_pcm(f, seed))
+}
+
 fn create_dir(dir: &Path) -> Result<()> {
     std::fs::create_dir_all(dir).map_err(|e| Error::io(dir, e))
 }
@@ -141,40 +140,6 @@ fn create_dir(dir: &Path) -> Result<()> {
 /// Joins a `/`-separated relative path onto `dir` component by component.
 fn file_path(dir: &Path, rel: &str) -> PathBuf {
     rel.split('/').fold(dir.to_path_buf(), |p, c| p.join(c))
-}
-
-fn format_of(spec: &WavSpec, num_frames: u64) -> Format {
-    let format_tag = if spec.extensible {
-        FormatTag::Extensible
-    } else if spec.sample_format.is_float() {
-        FormatTag::IeeeFloat
-    } else {
-        FormatTag::Pcm
-    };
-    Format {
-        sample_rate: spec.sample_rate,
-        channels: spec.channels,
-        bit_depth: spec.sample_format.bits(),
-        sample_format: if spec.sample_format.is_float() {
-            SampleKind::Float
-        } else {
-            SampleKind::Int
-        },
-        format_tag,
-        num_frames,
-        duration_s: music::round6(num_frames as f64 / f64::from(spec.sample_rate)),
-    }
-}
-
-/// Rounds to 3 decimals (0.001 dB) for stable, readable manifest values.
-/// `-0.0` is normalised to `0.0` so the manifest never prints `-0.0`.
-fn round3(x: f64) -> f64 {
-    let r = (x * 1e3).round() / 1e3;
-    if r == 0.0 {
-        0.0
-    } else {
-        r
-    }
 }
 
 #[cfg(test)]
@@ -188,14 +153,6 @@ mod tests {
         assert!(o.include_long);
     }
 
-    #[test]
-    fn round3_never_yields_negative_zero() {
-        let r = round3(-0.0003);
-        assert_eq!(r, 0.0);
-        assert!(r.is_sign_positive());
-        assert_eq!(round3(-1.23456), -1.235);
-    }
-
     // Compile-time check: the default seed is accepted by the CLI cap.
     const _: () = assert!(DEFAULT_SEED <= MAX_SEED);
 
@@ -203,6 +160,16 @@ mod tests {
     fn file_path_splits_components() {
         let p = file_path(Path::new("/x"), "loops/loop_001.wav");
         assert_eq!(p, Path::new("/x").join("loops").join("loop_001.wav"));
+    }
+
+    #[test]
+    fn stored_pcm_only_for_integer_lossless_entries() {
+        let cat = catalog(false);
+        let find = |ext: &str| cat.iter().find(|f| f.path.ends_with(ext)).unwrap();
+        let pcm = stored_pcm(&find(".flac").path, DEFAULT_SEED).unwrap();
+        assert!(pcm.frames() > 0);
+        assert!(stored_pcm(&find(".mp3").path, DEFAULT_SEED).is_none());
+        assert!(stored_pcm("containers/nope.flac", DEFAULT_SEED).is_none());
     }
 
     #[test]

@@ -174,12 +174,22 @@ fn scan_fixtures_then_rescan_all() {
     let manifest: serde_json::Value =
         serde_json::from_slice(&std::fs::read(lib.join("fixtures.json")).expect("manifest"))
             .expect("json");
+    // Every fixture has a scanner extension (wav, aif, aiff, flac, ...).
     let wavs = manifest["fixtures"]
         .as_array()
         .expect("fixtures")
         .iter()
-        .filter(|f| f["path"].as_str().is_some_and(|p| p.ends_with(".wav")))
+        .filter(|f| {
+            f["path"].as_str().is_some_and(|p| {
+                p.rsplit_once('.')
+                    .is_some_and(|(_, e)| sonar_core::scan::AUDIO_EXTENSIONS.contains(&e))
+            })
+        })
         .count();
+    assert_eq!(
+        wavs,
+        manifest["fixtures"].as_array().expect("fixtures").len()
+    );
     assert!(wavs > 100, "{wavs}");
 
     let out = sonar_in(&home, &["scan", lib_s]);

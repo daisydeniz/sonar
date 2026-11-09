@@ -1,15 +1,17 @@
 //! The fixture catalog: every file `sonar fixtures` writes, as data.
 //!
-//! File names are neutral (`<group>/<prefix>_NNN.wav`); truth lives only in
-//! the manifest. Formats rotate through [`SPREAD`] so every group exercises
-//! several rates/depths/channel counts.
+//! File names are neutral (`<group>/<prefix>_NNN.<ext>`); truth lives only
+//! in the manifest. Formats rotate through [`SPREAD`] so every group
+//! exercises several rates/depths/channel counts. Non-WAV containers are
+//! listed in [`containers`](super::containers).
 
+use super::containers::containers;
 use super::corrupt::CorruptKind;
 use super::drums::Pattern;
 use super::manifest::{Group, Kind, NoiseColor};
 use super::music::Key;
 use super::oneshot::{DrumHit, HatParams, KickParams, SnareParams};
-use super::spec::{Body, Content, FixtureSpec};
+use super::spec::{Body, Builder, Content, FixtureSpec};
 use super::wav::{SampleFormat, WavSpec};
 
 use NoiseColor::{Pink, White};
@@ -141,39 +143,6 @@ pub const CLICK_LOOPS: [(f64, u32, u32); 4] =
 /// Length of the long fixture (> 5 min).
 pub const LONG_SECS: f64 = 310.0;
 
-/// Appends entries for one group, numbering files `<group>/<prefix>_NNN.wav`.
-struct Builder {
-    out: Vec<FixtureSpec>,
-    group: Group,
-    prefix: &'static str,
-}
-
-impl Builder {
-    fn group(&mut self, group: Group, prefix: &'static str) {
-        self.group = group;
-        self.prefix = prefix;
-    }
-
-    fn add(&mut self, spec: WavSpec, content: Content, peak: Option<f64>, desc: impl Into<String>) {
-        let body = Body::Audio {
-            spec,
-            content,
-            peak_dbfs: peak,
-        };
-        self.push(body, desc.into());
-    }
-
-    fn push(&mut self, body: Body, description: String) {
-        let n = self.out.iter().filter(|f| f.group == self.group).count();
-        self.out.push(FixtureSpec {
-            path: format!("{}/{}_{n:03}.wav", self.group.dir(), self.prefix),
-            group: self.group,
-            description,
-            body,
-        });
-    }
-}
-
 fn spread(i: usize) -> WavSpec {
     SPREAD[i % SPREAD.len()]
 }
@@ -184,17 +153,14 @@ fn sine(midi: u8, secs: f64, kind: Kind) -> Content {
 
 /// The full catalog in a fixed order. `include_long` adds the > 5 min file.
 pub fn catalog(include_long: bool) -> Vec<FixtureSpec> {
-    let mut b = Builder {
-        out: Vec::new(),
-        group: Group::Tonal,
-        prefix: "tone",
-    };
+    let mut b = Builder::new();
     tonal(&mut b);
     loops(&mut b);
     oneshots(&mut b);
     noise(&mut b);
     edge(&mut b, include_long);
     formats(&mut b);
+    containers(&mut b);
     b.group(Group::Corrupt, "bad");
     for k in CorruptKind::ALL {
         b.push(Body::Corrupt(k), k.description().to_owned());
@@ -372,7 +338,8 @@ mod tests {
                 "{}",
                 f.path
             );
-            assert!(f.path.ends_with(".wav"));
+            let wav = f.path.ends_with(".wav");
+            assert_eq!(wav, f.group != Group::Containers, "{}", f.path);
         }
     }
 
@@ -387,7 +354,8 @@ mod tests {
             .iter()
             .filter(|f| f.group == Group::Formats)
             .filter_map(|f| match &f.body {
-                Body::Audio { spec, .. } if !spec.extensible => {
+                Body::Audio { spec, store, .. } if !spec.extensible => {
+                    assert_eq!(*store, crate::fixtures::spec::Store::Wav);
                     Some((spec.sample_rate, spec.channels, spec.sample_format.bits()))
                 }
                 _ => None,

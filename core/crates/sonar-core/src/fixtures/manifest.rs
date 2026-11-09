@@ -3,17 +3,25 @@
 //! The manifest is the **only** place truth lives (file names are neutral).
 //! Schema documented in `docs/EVAL.md` ("Fixture manifest") and, per field,
 //! in the manifest's own `fields` legend
-//! ([`fields_legend`](super::legend::fields_legend)).
+//! ([`fields_legend`](super::legend::fields_legend)). Truth types live in
+//! [`truth`](super::truth) and are re-exported here.
 
 use std::collections::BTreeMap;
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
+pub use super::truth::{
+    Category, ChordTruth, CorruptTruth, Expect, KeyTruth, Kind, Mode, NoiseColor, Truth,
+};
 use crate::{Error, Result};
 
 /// Bumped on any incompatible change to the manifest layout.
-pub const SCHEMA_VERSION: u32 = 1;
+///
+/// 2: `format.container`, `format.codec` and `format.lossless` added;
+/// `format.bit_depth`, `sample_format` and `format_tag` became optional;
+/// new group `containers`.
+pub const SCHEMA_VERSION: u32 = 2;
 
 /// Top-level manifest document.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -78,13 +86,29 @@ pub enum Group {
     Noise,
     /// Silence, very short, very long, extreme levels.
     Edge,
-    /// The A4 sine in every bit depth × rate × channel combination.
+    /// The A4 sine in every bit depth × rate × channel combination (WAV).
     Formats,
+    /// Every non-WAV container the scanner accepts (AIFF, FLAC, M4A/ALAC,
+    /// MP3, Ogg Vorbis).
+    Containers,
     /// Deliberately broken files.
     Corrupt,
 }
 
 impl Group {
+    /// Every group, in catalog order.
+    pub const ALL: [Group; 9] = [
+        Self::Tonal,
+        Self::Chords,
+        Self::Loops,
+        Self::Oneshots,
+        Self::Noise,
+        Self::Edge,
+        Self::Formats,
+        Self::Containers,
+        Self::Corrupt,
+    ];
+
     /// Directory name (same as the serialized name).
     pub fn dir(self) -> &'static str {
         match self {
@@ -95,6 +119,7 @@ impl Group {
             Self::Noise => "noise",
             Self::Edge => "edge",
             Self::Formats => "formats",
+            Self::Containers => "containers",
             Self::Corrupt => "corrupt",
         }
     }
@@ -121,20 +146,74 @@ pub struct Fixture {
 /// Audio format of a valid fixture.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Format {
+    /// File container.
+    pub container: Container,
+    /// Audio codec inside the container.
+    pub codec: Codec,
+    /// `true`: decoding must reproduce the written samples bit-exactly.
+    /// `false` (lossy): sample-level truth does not apply; only rate,
+    /// channels, exact length and the declared level truth (digital
+    /// silence for every lossy fixture) are checked.
+    pub lossless: bool,
     /// Frames per second (Hz).
     pub sample_rate: u32,
     /// Channel count.
     pub channels: u16,
-    /// Bits per sample (16, 24 or 32).
-    pub bit_depth: u16,
-    /// Integer PCM or IEEE float.
-    pub sample_format: SampleKind,
-    /// WAV format tag family.
-    pub format_tag: FormatTag,
-    /// Frames in the `data` chunk.
+    /// Bits per sample (16, 24 or 32); absent for lossy codecs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bit_depth: Option<u16>,
+    /// Integer PCM or IEEE float; absent for lossy codecs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sample_format: Option<SampleKind>,
+    /// WAV format tag family; WAV only.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format_tag: Option<FormatTag>,
+    /// Playable frames: for lossy codecs after removing encoder priming
+    /// and padding (what a gapless decoder returns).
     pub num_frames: u64,
     /// `num_frames / sample_rate` (s).
     pub duration_s: f64,
+}
+
+/// File container (matches the file extension family).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Container {
+    /// RIFF/WAVE (`.wav`).
+    Wav,
+    /// AIFF (`.aif`, `.aiff`).
+    Aiff,
+    /// Native FLAC (`.flac`).
+    Flac,
+    /// MPEG audio elementary stream (`.mp3`).
+    Mp3,
+    /// Ogg (`.ogg`).
+    Ogg,
+    /// ISO base media / MPEG-4 audio (`.m4a`).
+    M4a,
+}
+
+/// Audio codec.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Codec {
+    /// Uncompressed PCM (integer or float).
+    Pcm,
+    /// FLAC.
+    Flac,
+    /// Apple Lossless.
+    Alac,
+    /// MPEG-1/2 Audio Layer III.
+    Mp3,
+    /// Vorbis I.
+    Vorbis,
+}
+
+impl Codec {
+    /// `true` for codecs that reproduce samples bit-exactly.
+    pub fn is_lossless(self) -> bool {
+        matches!(self, Self::Pcm | Self::Flac | Self::Alac)
+    }
 }
 
 /// Sample representation.
@@ -159,164 +238,6 @@ pub enum FormatTag {
     Extensible,
 }
 
-/// Truth values; every field is optional and omitted when not applicable.
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
-pub struct Truth {
-    /// What kind of sound this is.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub kind: Option<Kind>,
-    /// Instrument/sound category.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub category: Option<Category>,
-    /// Tempo (beats per minute) of a loop.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bpm: Option<f64>,
-    /// Whole bars in the loop.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub bars: Option<u32>,
-    /// Beats per bar (time signature numerator, quarter-note beats).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub beats_per_bar: Option<u32>,
-    /// Musical key.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub key: Option<KeyTruth>,
-    /// Chords in time order.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub chords: Option<Vec<ChordTruth>>,
-    /// MIDI note number of the fundamental (69 = A4).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub note_midi: Option<u8>,
-    /// Scientific pitch name, e.g. `"F#3"` (C4 = MIDI 60).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub note_name: Option<String>,
-    /// Fundamental frequency (Hz).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub pitch_hz: Option<f64>,
-    /// Noise spectrum.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub noise_color: Option<NoiseColor>,
-    /// Sample peak of the written samples (dBFS); absent for silence.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub peak_dbfs: Option<f64>,
-    /// RMS of the written samples (dBFS); absent for silence.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rms_dbfs: Option<f64>,
-    /// Every written sample is exactly zero.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub is_silent: Option<bool>,
-    /// Present only for deliberately corrupt files.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub corrupt: Option<CorruptTruth>,
-}
-
-/// Sound kind.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Kind {
-    /// Sustained pitched tone (not a loop, not percussive).
-    Tone,
-    /// Single hit / note with a decaying envelope.
-    OneShot,
-    /// Tempo-synced, seamlessly loopable musical phrase.
-    Loop,
-    /// Noise (steady or burst).
-    Noise,
-    /// Digital silence.
-    Silence,
-}
-
-/// Sound category (fixture vocabulary; mapped to classifier labels by eval).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Category {
-    /// Kick drum.
-    Kick,
-    /// Snare drum.
-    Snare,
-    /// Closed hi-hat.
-    HatClosed,
-    /// Open hi-hat.
-    HatOpen,
-    /// Drum loop.
-    Drums,
-    /// Metronome click loop.
-    Click,
-    /// Pitched synth (plucks, chord loops, pads).
-    Synth,
-    /// Pure sine test tone.
-    Sine,
-    /// Noise.
-    Noise,
-}
-
-/// Major or minor (keys and triads).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Mode {
-    /// Major.
-    Major,
-    /// Minor.
-    Minor,
-}
-
-/// Key truth.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct KeyTruth {
-    /// Tonic, canonical spelling (C C# D Eb E F F# G Ab A Bb B).
-    pub tonic: String,
-    /// Tonic pitch class, 0 = C … 11 = B.
-    pub tonic_pc: u8,
-    /// Mode.
-    pub mode: Mode,
-}
-
-/// One chord of a progression.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ChordTruth {
-    /// Chord symbol: root + `"m"` for minor, e.g. `"F#m"`, `"Bb"`.
-    pub symbol: String,
-    /// Root, canonical spelling.
-    pub root: String,
-    /// Triad quality.
-    pub quality: Mode,
-    /// Roman numeral relative to the key (`"V"` is major in minor keys).
-    pub roman: String,
-    /// Start time (s).
-    pub start_s: f64,
-    /// Length (s).
-    pub duration_s: f64,
-}
-
-/// Noise spectrum.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum NoiseColor {
-    /// Flat spectrum.
-    White,
-    /// −3 dB/octave.
-    Pink,
-}
-
-/// Truth for a corrupt file.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct CorruptTruth {
-    /// Machine-readable defect id, e.g. `"truncated_header"`.
-    pub reason: String,
-    /// What a robust decoder must do.
-    pub expect: Expect,
-}
-
-/// Required decoder behaviour on a corrupt file. In every case the decoder
-/// must not panic, hang, or allocate unboundedly.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Expect {
-    /// Must return an error.
-    Error,
-    /// May return an error or decode some/all of the audio.
-    ErrorOrPartial,
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -327,39 +248,46 @@ mod tests {
 
     #[test]
     fn enums_serialize_snake_case() {
-        assert_eq!(s(&Kind::OneShot), "\"one_shot\"");
-        assert_eq!(s(&Category::HatClosed), "\"hat_closed\"");
-        assert_eq!(s(&Expect::ErrorOrPartial), "\"error_or_partial\"");
         assert_eq!(s(&FormatTag::IeeeFloat), "\"ieee_float\"");
         assert_eq!(s(&SampleKind::Float), "\"float\"");
+        assert_eq!(s(&Container::M4a), "\"m4a\"");
+        assert_eq!(s(&Codec::Vorbis), "\"vorbis\"");
     }
 
     #[test]
     fn group_dir_matches_serialized_name() {
-        for g in [
-            Group::Tonal,
-            Group::Chords,
-            Group::Loops,
-            Group::Oneshots,
-            Group::Noise,
-            Group::Edge,
-            Group::Formats,
-            Group::Corrupt,
-        ] {
+        for g in Group::ALL {
             assert_eq!(s(&g), format!("\"{}\"", g.dir()));
         }
     }
 
     #[test]
-    fn empty_truth_serializes_to_empty_object_and_round_trips() {
-        assert_eq!(s(&Truth::default()), "{}");
-        let t = Truth {
-            kind: Some(Kind::Loop),
-            bpm: Some(122.5),
-            ..Truth::default()
+    fn lossless_codecs() {
+        assert!(Codec::Pcm.is_lossless() && Codec::Flac.is_lossless() && Codec::Alac.is_lossless());
+        assert!(!Codec::Mp3.is_lossless() && !Codec::Vorbis.is_lossless());
+    }
+
+    #[test]
+    fn optional_format_fields_are_omitted() {
+        let f = Format {
+            container: Container::Mp3,
+            codec: Codec::Mp3,
+            lossless: false,
+            sample_rate: 44_100,
+            channels: 2,
+            bit_depth: None,
+            sample_format: None,
+            format_tag: None,
+            num_frames: 10,
+            duration_s: 0.0,
         };
-        let back: Truth = serde_json::from_str(&s(&t)).unwrap();
-        assert_eq!(back, t);
+        let json = s(&f);
+        assert!(
+            !json.contains("bit_depth") && !json.contains("format_tag"),
+            "{json}"
+        );
+        let back: Format = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, f);
     }
 
     #[test]

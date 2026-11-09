@@ -1,13 +1,14 @@
 //! End-to-end tests of fixture generation: manifest completeness, files vs
-//! manifest (read back with `hound`, an independent WAV parser) and
-//! determinism.
+//! manifest (WAV read back with `hound`, an independent parser; other
+//! lossless containers checked against the stored integer samples; every
+//! file's magic bytes against its declared container) and determinism.
 
 use std::collections::BTreeSet;
 use std::io::BufReader;
 use std::path::Path;
 
-use sonar_core::fixtures::manifest::{Expect, Group, Kind, Mode, SampleKind};
-use sonar_core::fixtures::{generate, FixtureOptions, Manifest, MANIFEST_FILE};
+use sonar_core::fixtures::manifest::{Container, Expect, Format, Group, Kind, Mode, SampleKind};
+use sonar_core::fixtures::{generate, stored_pcm, FixtureOptions, Manifest, MANIFEST_FILE};
 
 fn opts(seed: u64, include_long: bool) -> FixtureOptions {
     FixtureOptions { seed, include_long }
@@ -55,30 +56,71 @@ fn read_samples(path: &Path) -> (hound::WavSpec, u32, Vec<f64>) {
     (spec, frames, samples)
 }
 
+/// Extension and magic bytes agree with the declared container.
+fn check_container(path: &str, fmt: &Format, b: &[u8]) {
+    let ext = path.rsplit_once('.').map_or("", |(_, e)| e);
+    let (want, magic_ok) = match ext {
+        "wav" => (Container::Wav, &b[..4] == b"RIFF" && &b[8..12] == b"WAVE"),
+        "aif" | "aiff" => (Container::Aiff, &b[..4] == b"FORM" && &b[8..12] == b"AIFF"),
+        "flac" => (Container::Flac, &b[..4] == b"fLaC"),
+        "mp3" => (Container::Mp3, b[0] == 0xFF && b[1] & 0xE0 == 0xE0),
+        "ogg" => (Container::Ogg, &b[..4] == b"OggS"),
+        "m4a" => (Container::M4a, &b[4..8] == b"ftyp"),
+        other => panic!("{path}: unexpected extension {other}"),
+    };
+    assert_eq!(fmt.container, want, "{path}");
+    assert!(magic_ok, "{path}: magic bytes do not match {want:?}");
+    assert_eq!(fmt.lossless, fmt.codec.is_lossless(), "{path}");
+    assert_eq!(fmt.lossless, fmt.bit_depth.is_some(), "{path}");
+    assert_eq!(fmt.format_tag.is_some(), want == Container::Wav, "{path}");
+}
+
+/// Stored samples as f64 full scale (ints divided by 2^(bits−1)), checked
+/// against `fmt`; `None` for lossy files.
+fn stored_samples(dir: &Path, m: &Manifest, path: &str, fmt: &Format) -> Option<Vec<f64>> {
+    if fmt.container == Container::Wav {
+        let (spec, frames, samples) = read_samples(&dir.join(path));
+        assert_eq!(spec.sample_rate, fmt.sample_rate, "{path}");
+        assert_eq!(spec.channels, fmt.channels, "{path}");
+        assert_eq!(Some(spec.bits_per_sample), fmt.bit_depth, "{path}");
+        let is_float = spec.sample_format == hound::SampleFormat::Float;
+        let want_float = fmt.sample_format == Some(SampleKind::Float);
+        assert_eq!(is_float, want_float, "{path}");
+        assert_eq!(u64::from(frames), fmt.num_frames, "{path}");
+        return Some(samples);
+    }
+    if !fmt.lossless {
+        return None;
+    }
+    let pcm = stored_pcm(path, m.seed).unwrap_or_else(|| panic!("{path}: no stored pcm"));
+    assert_eq!(pcm.sample_rate, fmt.sample_rate, "{path}");
+    assert_eq!(pcm.channels, fmt.channels, "{path}");
+    assert_eq!(Some(pcm.bits), fmt.bit_depth, "{path}");
+    assert_eq!(fmt.sample_format, Some(SampleKind::Int), "{path}");
+    assert_eq!(pcm.frames() as u64, fmt.num_frames, "{path}");
+    let scale = pcm.scale();
+    Some(pcm.samples.iter().map(|&q| f64::from(q) / scale).collect())
+}
+
 fn check_files_match_manifest(dir: &Path, m: &Manifest) {
     for f in &m.fixtures {
         let path = dir.join(&f.path);
-        let meta = std::fs::metadata(&path).unwrap_or_else(|e| panic!("{}: {e}", f.path));
-        assert_eq!(meta.len(), f.bytes, "{}", f.path);
+        let bytes = std::fs::read(&path).unwrap_or_else(|e| panic!("{}: {e}", f.path));
+        assert_eq!(bytes.len() as u64, f.bytes, "{}", f.path);
         let Some(fmt) = &f.format else {
             assert_eq!(f.group, Group::Corrupt, "{} has no format", f.path);
             continue;
         };
-        let (spec, frames, samples) = read_samples(&path);
-        assert_eq!(spec.sample_rate, fmt.sample_rate, "{}", f.path);
-        assert_eq!(spec.channels, fmt.channels, "{}", f.path);
-        assert_eq!(spec.bits_per_sample, fmt.bit_depth, "{}", f.path);
-        let is_float = spec.sample_format == hound::SampleFormat::Float;
-        assert_eq!(
-            is_float,
-            fmt.sample_format == SampleKind::Float,
-            "{}",
-            f.path
-        );
-        assert_eq!(u64::from(frames), fmt.num_frames, "{}", f.path);
+        check_container(&f.path, fmt, &bytes);
         let dur = fmt.num_frames as f64 / f64::from(fmt.sample_rate);
         assert!((dur - fmt.duration_s).abs() < 1e-6, "{}", f.path);
 
+        let Some(samples) = stored_samples(dir, m, &f.path, fmt) else {
+            // Lossy fixtures are digital silence: no level values.
+            assert_eq!(f.truth.is_silent, Some(true), "{}", f.path);
+            assert!(f.truth.peak_dbfs.is_none() && f.truth.rms_dbfs.is_none());
+            continue;
+        };
         let peak = samples.iter().fold(0.0f64, |a, x| a.max(x.abs()));
         assert_eq!(f.truth.is_silent, Some(peak == 0.0), "{}", f.path);
         match f.truth.peak_dbfs {
@@ -164,7 +206,7 @@ fn check_manifest_contents(m: &Manifest) {
         .fixtures
         .iter()
         .filter_map(|f| f.format.as_ref())
-        .map(|x| (x.bit_depth, x.sample_rate, x.channels))
+        .filter_map(|x| Some((x.bit_depth?, x.sample_rate, x.channels)))
         .collect();
     for bits in [16, 24, 32] {
         for rate in [44_100, 48_000, 96_000] {
@@ -190,7 +232,17 @@ fn check_manifest_contents(m: &Manifest) {
         .iter()
         .map(|f| format!("{:?}", f.group))
         .collect();
-    assert_eq!(groups.len(), 8);
+    assert_eq!(groups.len(), Group::ALL.len());
+
+    // Every scanner extension is represented.
+    let exts: BTreeSet<&str> = m
+        .fixtures
+        .iter()
+        .filter_map(|f| f.path.rsplit_once('.').map(|(_, e)| e))
+        .collect();
+    for ext in sonar_core::scan::AUDIO_EXTENSIONS {
+        assert!(exts.contains(ext), "no .{ext} fixture");
+    }
     for f in &m.fixtures {
         if f.truth.kind == Some(Kind::OneShot) {
             assert!(f.truth.bpm.is_none(), "{}", f.path);
