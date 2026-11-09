@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M0
-- Next task: T0.3
+- Next task: T0.4
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
@@ -24,6 +24,7 @@ manual tests, labeled data. Keep each item one line with the task id.)_
 _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 
 ## Log
+- 2026-11-09 — T0.3: `sonar fixtures <dir> [--seed N ≤ 2^53−1] [--skip-long]` → 115 files (tonal 22, formats 20 incl. all 18 depth×rate×channel combos + 2 extensible, loops 17 at 70–175 BPM incl. 122.5 and a 3/4 click loop, chords 16 keys (8 maj/8 min), corrupt 15 (11 `error`, 4 `error_or_partial`), oneshots 12, edge 9 (5 ms, 15 ms, 310 s, 0/1-frame, −60 dBFS, clipped), noise 4) + `fixtures.json` with a `fields` legend; ~104 MB, 4.8 s in a debug build. Hand-written WAV writer + SplitMix64 (byte-identical on the same platform); filenames neutral, truth only in manifest; schema in EVAL.md "Fixture manifest". Deps: serde, serde_json; dev: hound, tempfile. 72 tests (tests add ~12 s). Reviewer APPROVE; nits fixed.
 - 2026-11-09 — T0.2: workspace deps anyhow 1.0.104, clap 4.6.7 (derive), thiserror 2.0.21, tracing 0.1.44, tracing-subscriber 0.3.23; `core/deny.toml` (permissive allow list, crates.io only; ADR-004 amended for Unicode-3.0 + LLVM-exception). CLI now clap-based (`sonar version`), core `Error`/`Result` via thiserror; 13 tests. check.sh green; deny runs `licenses bans sources` (advisories skipped: needs network). Known warn: duplicate `syn` 2/3 (tracing-attributes).
 - 2026-11-09 — T0.1: bootstrap.sh exits 0 (idempotent). rustup was missing → now installed via Homebrew; new `scripts/lib/env.sh` puts rustup/cargo on PATH for bootstrap, check and autopilot; version capture fails loudly. check.sh green (deny/eval/xcode stages not active yet).
 - 2026-11-09 — Workflow: one branch per task, ff-merge to main, milestone tags; no founder approvals until M8.
