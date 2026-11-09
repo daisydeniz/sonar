@@ -14,12 +14,15 @@ use symphonia::core::codecs::audio::{AudioCodecId, AudioDecoder, AudioDecoderOpt
 use symphonia::core::codecs::CodecParameters;
 use symphonia::core::errors::Error as SymError;
 use symphonia::core::formats::probe::Hint;
-use symphonia::core::formats::well_known::{FORMAT_ID_MP1, FORMAT_ID_MP2, FORMAT_ID_MP3};
+use symphonia::core::formats::well_known::{
+    FORMAT_ID_ISOMP4, FORMAT_ID_MP1, FORMAT_ID_MP2, FORMAT_ID_MP3,
+};
 use symphonia::core::formats::{FormatOptions, FormatReader, TrackType};
 use symphonia::core::io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions};
 use symphonia::core::meta::MetadataOptions;
 use symphonia::core::units::TimeBase;
 
+use super::gapless::{self, Gapless};
 use crate::{Error, Result};
 
 /// Lowest accepted source sample rate (Hz).
@@ -59,6 +62,9 @@ pub(super) struct Opened {
     /// The demuxer reports `Packet::dur` *before* gapless trimming
     /// (symphonia 0.6.1 MPEG audio; see [`super::stream::valid_ticks`]).
     pub dur_includes_trim: bool,
+    /// Encoder priming/padding of an MP4 file (symphonia ignores it, see
+    /// [`super::gapless`]); [`Opened::declared_frames`] already reflects it.
+    pub gapless: Option<Gapless>,
 }
 
 /// Opens and probes `path`. Errors: [`Error::Io`] if the file cannot be
@@ -66,7 +72,19 @@ pub(super) struct Opened {
 /// codecs, [`Error::Decode`] for damaged headers or out-of-limit values.
 pub(super) fn open(path: &Path) -> Result<Opened> {
     let file = File::open(path).map_err(|e| Error::io(path, e))?;
-    open_source(path, Box::new(file))
+    let mut src = open_source(path, Box::new(file))?;
+    if src.format.format_info().format == FORMAT_ID_ISOMP4 {
+        if let Some(g) = gapless::read_isomp4(path, src.sample_rate, src.track_id) {
+            // The demuxer counts every sample of the media; the playable
+            // length is what is left after the edit.
+            src.declared_frames = src.declared_frames.map(|raw| {
+                let after = raw.saturating_sub(g.start);
+                g.len.map_or(after, |l| after.min(l))
+            });
+            src.gapless = Some(g);
+        }
+    }
+    Ok(src)
 }
 
 /// [`open`] on an arbitrary byte source; `path` names it in errors and
@@ -157,6 +175,7 @@ pub(super) fn open_source(path: &Path, source: Box<dyn MediaSource>) -> Result<O
         container,
         declared_frames,
         dur_includes_trim,
+        gapless: None,
     })
 }
 

@@ -50,6 +50,10 @@ pub struct Truth {
     /// Every written sample is exactly zero.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub is_silent: Option<bool>,
+    /// Lossy streams with a burst: frame of the playable stream (after
+    /// gapless trimming) at which the burst's window starts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub burst_start_frame: Option<u64>,
     /// Present only for deliberately corrupt files.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub corrupt: Option<CorruptTruth>,

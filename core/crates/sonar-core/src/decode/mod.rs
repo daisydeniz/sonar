@@ -22,6 +22,7 @@
 //! Empty files: a valid header with zero frames decodes to `Ok` with no
 //! samples and `num_frames == 0`; a zero-byte file is an error.
 
+mod gapless;
 mod mix;
 mod resample;
 pub mod source;

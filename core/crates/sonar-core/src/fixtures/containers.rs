@@ -5,10 +5,13 @@
 //! Lossless files (AIFF, FLAC, ALAC) carry real content with full truth
 //! and must decode bit-exactly; the content is chosen to exercise each
 //! encoder's code paths (FLAC CONSTANT/VERBATIM/FIXED subframes, ALAC full
-//! and partial frames). Lossy files (MP3, Ogg Vorbis) are digital silence:
-//! they verify container parsing, rate/channels and exact gapless length
-//! (encoder delay/padding, Ogg end trim), not sample values.
+//! and partial frames). Lossy files (MP3, Ogg Vorbis, AAC-LC) are digital
+//! silence: they verify container parsing, rate/channels and exact gapless
+//! length (encoder delay/padding, Ogg end trim, AAC `elst`/`iTunSMPB`), not
+//! sample values. One AAC file adds a single burst at a known frame to
+//! prove priming is trimmed from the start.
 
+use super::aac::{AacSpec, Tags};
 use super::drums::Pattern;
 use super::manifest::{Group, Kind, NoiseColor};
 use super::spec::{Body, Builder, Content, LossyCodec, Store};
@@ -71,6 +74,41 @@ pub(super) fn containers(b: &mut Builder) {
             frames,
         };
         b.push_ext(body, desc, ext);
+    }
+    aac(b);
+}
+
+/// AAC-LC in `.m4a` with encoder priming (2112 frames). Declared lengths
+/// are not multiples of 1024, so the end padding is non-trivial.
+fn aac(b: &mut Builder) {
+    let spec = |sample_rate, channels, frames, tags, burst_unit| AacSpec {
+        sample_rate,
+        channels,
+        frames,
+        tags,
+        burst_unit,
+    };
+    let cases = [
+        (
+            spec(44_100, 2, 44_100, Tags::Both, None),
+            "digital silence 1 s, AAC-LC 44.1 kHz stereo, priming 2112 via elst + iTunSMPB",
+        ),
+        (
+            spec(48_000, 1, 12_345, Tags::ElstOnly, None),
+            "digital silence 0.257 s, AAC-LC 48 kHz mono, priming 2112 via elst only",
+        ),
+        (
+            spec(32_000, 1, 20_000, Tags::SmpbOnly, None),
+            "digital silence 0.625 s, AAC-LC 32 kHz mono, priming 2112 via iTunSMPB only",
+        ),
+        (
+            spec(44_100, 1, 20_000, Tags::Both, Some(5)),
+            "silence with one 355 Hz AAC window starting at frame 3008 of the \
+             playable stream (access unit 5 minus 2112 priming), AAC-LC 44.1 kHz mono",
+        ),
+    ];
+    for (spec, desc) in cases {
+        b.push_ext(Body::Aac(spec), desc.to_owned(), "m4a");
     }
 }
 

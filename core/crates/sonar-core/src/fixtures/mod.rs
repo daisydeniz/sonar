@@ -5,7 +5,8 @@
 //! key, note, category, levels, container/codec, corrupt-file
 //! expectations). Most groups are WAV; the `containers` group covers every
 //! other scanner extension with hand-written, dependency-free writers
-//! ([`aiff`], [`flac`], [`m4a`] (ALAC), [`mp3`], [`ogg`] (Vorbis) — each
+//! ([`aiff`], [`flac`], [`m4a`] (ALAC), [`aac`] (AAC-LC with priming),
+//! [`mp3`], [`ogg`] (Vorbis) — each
 //! module cites its spec). File names are neutral; truth lives only in the
 //! manifest. The fixtures tier of `docs/EVAL.md` evaluates DSP against it.
 //!
@@ -17,6 +18,7 @@
 //! content (noise, snare/hat noise, random corrupt bytes) depends on the
 //! seed; tonal and tempo content is seed-independent.
 
+pub mod aac;
 pub mod aiff;
 pub mod bits;
 pub mod catalog;
@@ -29,6 +31,7 @@ pub mod legend;
 pub mod m4a;
 pub mod manifest;
 pub mod mp3;
+pub mod mp4box;
 pub mod music;
 pub mod ogg;
 pub mod oneshot;

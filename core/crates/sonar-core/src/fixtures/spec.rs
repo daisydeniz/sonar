@@ -2,6 +2,7 @@
 //! written. The list itself lives in [`catalog`](super::catalog) and
 //! [`containers`](super::containers).
 
+use super::aac::AacSpec;
 use super::corrupt::CorruptKind;
 use super::drums::Pattern;
 use super::manifest::{Group, Kind, NoiseColor};
@@ -139,6 +140,9 @@ pub enum Body {
         /// Playable frames (after gapless trimming).
         frames: u64,
     },
+    /// A valid AAC-LC stream in `.m4a` with encoder priming (digital
+    /// silence, or silence plus one burst).
+    Aac(AacSpec),
     /// A deliberately broken file.
     Corrupt(CorruptKind),
 }

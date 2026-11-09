@@ -22,6 +22,10 @@
 //!   its header declares);
 //! - if nothing at all was decoded and an error occurred, the caller gets
 //!   that error instead of an empty result.
+//!
+//! MP4 priming ([`super::gapless`]): the leading `start` frames of the
+//! decoded stream are dropped and the total is capped at the edit's length,
+//! so the counted length is `min(raw − start, len)` on both paths.
 
 use std::io::ErrorKind;
 use std::path::Path;
@@ -68,6 +72,17 @@ pub(super) fn run(
     cancel: Option<&AtomicBool>,
 ) -> Result<Outcome> {
     let mut out = Outcome::default();
+    // Priming (MP4 edit list / iTunSMPB): `skip` leading frames are decoded
+    // like any other and dropped at the end, so they do not count towards
+    // the window. A zero window (length probe) decodes nothing at all.
+    let skip = src
+        .gapless
+        .map_or(0, |g| usize::try_from(g.start).unwrap_or(0));
+    let keep = if keep == 0 {
+        0
+    } else {
+        keep.saturating_add(skip)
+    };
     let mut decoded_frames = 0u64;
     let mut ticks_past_window = 0u64;
     let mut consecutive_errors = 0u32;
@@ -142,6 +157,15 @@ pub(super) fn run(
 
     let past = ticks_to_frames(ticks_past_window, src.time_base, src.sample_rate);
     out.total_frames = decoded_frames.saturating_add(past);
+    if let Some(g) = src.gapless {
+        // Drop the priming from the front, the padding from the end.
+        out.total_frames = out.total_frames.saturating_sub(g.start);
+        if let Some(len) = g.len {
+            out.total_frames = out.total_frames.min(len);
+        }
+        mono.drain(..skip.min(mono.len()));
+        mono.truncate(usize::try_from(out.total_frames).unwrap_or(usize::MAX));
+    }
     let short = src.declared_frames.is_some_and(|n| out.total_frames < n);
     if short && out.problem.is_none() {
         note(&mut out, "stream shorter than its header declares".into());
@@ -187,9 +211,41 @@ pub(super) fn valid_ticks(packet: &Packet, dur_includes_trim: bool) -> u64 {
 
 #[cfg(test)]
 mod tests {
+    use super::super::source::open_source;
     use super::*;
     use symphonia::core::packet::PacketBuilder;
     use symphonia::core::units::{Duration, Timestamp};
+
+    /// Upstream pin (symphonia 0.6.1): the MP4 demuxer ignores the edit list
+    /// and `iTunSMPB`, so an AAC file reports and decodes every sample of
+    /// the media, priming and padding included. If this fails, symphonia
+    /// trims itself: drop `decode::gapless` and its use in
+    /// `source::open` (priming would otherwise be removed twice).
+    #[test]
+    fn symphonia_isomp4_ignores_priming_metadata() {
+        use crate::fixtures::aac::{encode, AacSpec, Tags};
+        use std::io::Cursor;
+        let spec = AacSpec {
+            sample_rate: 44_100,
+            channels: 1,
+            frames: 20_000,
+            tags: Tags::Both,
+            burst_unit: None,
+        };
+        let bytes = encode(&spec).unwrap();
+        let mut src = open_source(Path::new("x.m4a"), Box::new(Cursor::new(bytes))).unwrap();
+        assert_eq!(
+            src.declared_frames,
+            Some(22 * 1024),
+            "untrimmed media length"
+        );
+        let p = src.format.next_packet().unwrap().unwrap();
+        assert_eq!(
+            (p.dur.get(), p.trim_start.get(), p.trim_end.get()),
+            (1024, 0, 0)
+        );
+        assert!(src.gapless.is_none(), "open_source does not read priming");
+    }
 
     /// Upstream pin (symphonia 0.6.1): `trimmed_dur` sets correct trims but
     /// an untrimmed `dur`. If this fails, symphonia fixed it: drop the

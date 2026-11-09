@@ -9,7 +9,7 @@ use super::rng::SplitMix64;
 use super::spec::{Body, Content, FixtureSpec, LossyCodec, Store};
 use super::synth::Audio;
 use super::wav::{Levels, WavSpec};
-use super::{aiff, flac, m4a, mp3, music, ogg, wav};
+use super::{aac, aiff, flac, m4a, mp3, music, ogg, wav};
 use crate::{Error, Result};
 
 /// A fixture ready to be written.
@@ -92,6 +92,36 @@ pub fn build(spec: &FixtureSpec, seed: u64) -> Result<Built> {
                 format_tag: None,
                 num_frames: *frames,
                 duration_s: music::round6(*frames as f64 / f64::from(*sample_rate)),
+            };
+            Ok(Built {
+                bytes,
+                format: Some(format),
+                truth,
+            })
+        }
+        Body::Aac(aac_spec) => {
+            let bytes = aac::encode(aac_spec).ok_or_else(|| Error::UnsupportedFormat {
+                path: spec.path.clone().into(),
+                reason: format!("AAC writer: unsupported {aac_spec:?}"),
+            })?;
+            let burst = aac_spec.burst_start_frame();
+            let truth = Truth {
+                kind: burst.is_none().then_some(Kind::Silence),
+                is_silent: Some(burst.is_none()),
+                burst_start_frame: burst,
+                ..Truth::default()
+            };
+            let format = Format {
+                container: Container::M4a,
+                codec: Codec::Aac,
+                lossless: false,
+                sample_rate: aac_spec.sample_rate,
+                channels: aac_spec.channels,
+                bit_depth: None,
+                sample_format: None,
+                format_tag: None,
+                num_frames: aac_spec.frames,
+                duration_s: music::round6(aac_spec.frames as f64 / f64::from(aac_spec.sample_rate)),
             };
             Ok(Built {
                 bytes,
@@ -235,7 +265,9 @@ mod tests {
                 }
                 None => {
                     assert!(!fmt.lossless, "{}", spec.path);
-                    assert_eq!(built.truth.is_silent, Some(true), "{}", spec.path);
+                    // Lossy: digital silence, except a burst file.
+                    let silent = built.truth.burst_start_frame.is_none();
+                    assert_eq!(built.truth.is_silent, Some(silent), "{}", spec.path);
                 }
             }
         }

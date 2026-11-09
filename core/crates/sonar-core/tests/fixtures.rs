@@ -116,8 +116,10 @@ fn check_files_match_manifest(dir: &Path, m: &Manifest) {
         assert!((dur - fmt.duration_s).abs() < 1e-6, "{}", f.path);
 
         let Some(samples) = stored_samples(dir, m, &f.path, fmt) else {
-            // Lossy fixtures are digital silence: no level values.
-            assert_eq!(f.truth.is_silent, Some(true), "{}", f.path);
+            // Lossy fixtures are digital silence (no level values), except
+            // the AAC burst, whose truth is its burst start frame.
+            let silent = f.truth.burst_start_frame.is_none();
+            assert_eq!(f.truth.is_silent, Some(silent), "{}", f.path);
             assert!(f.truth.peak_dbfs.is_none() && f.truth.rms_dbfs.is_none());
             continue;
         };

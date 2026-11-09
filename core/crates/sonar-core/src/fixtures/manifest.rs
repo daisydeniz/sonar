@@ -207,6 +207,8 @@ pub enum Codec {
     Mp3,
     /// Vorbis I.
     Vorbis,
+    /// AAC-LC (`.m4a`).
+    Aac,
 }
 
 impl Codec {
@@ -265,6 +267,7 @@ mod tests {
     fn lossless_codecs() {
         assert!(Codec::Pcm.is_lossless() && Codec::Flac.is_lossless() && Codec::Alac.is_lossless());
         assert!(!Codec::Mp3.is_lossless() && !Codec::Vorbis.is_lossless());
+        assert!(!Codec::Aac.is_lossless());
     }
 
     #[test]

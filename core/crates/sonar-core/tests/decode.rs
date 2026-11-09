@@ -13,7 +13,7 @@ use std::time::Instant;
 use sonar_core::decode::{
     decode_file, DecodeOptions, Decoder, ANALYSIS_RATE, DEFAULT_MAX_ANALYSIS_SECS,
 };
-use sonar_core::fixtures::manifest::{Container, Expect, Fixture, Group};
+use sonar_core::fixtures::manifest::{Codec, Container, Expect, Fixture, Group};
 use sonar_core::fixtures::{generate, stored_pcm, FixtureOptions, Manifest};
 use sonar_core::Error;
 
@@ -213,7 +213,7 @@ fn lossy_fixtures_decode_to_silence_at_native_rate() {
     let mut n = 0;
     for f in audio(&manifest) {
         let fmt = f.format.as_ref().unwrap();
-        if fmt.lossless {
+        if fmt.lossless || f.truth.is_silent != Some(true) {
             continue;
         }
         let opts = DecodeOptions {
@@ -228,4 +228,125 @@ fn lossy_fixtures_decode_to_silence_at_native_rate() {
         n += 1;
     }
     assert!(n >= 4, "{n} lossy fixtures");
+}
+
+/// Lossy (non-silent) AAC burst: the 2112 priming frames are trimmed from
+/// the *start*. The burst is access unit 5, i.e. decoded-stream frame 5120;
+/// after trimming it starts at `truth.burst_start_frame` = 3008. A decoder that
+/// kept the priming would be 2112 frames late.
+#[test]
+fn aac_burst_onset_proves_priming_is_trimmed_from_the_start() {
+    let (tmp, manifest) = small_set();
+    let mut n = 0;
+    for f in audio(&manifest) {
+        let Some(onset) = f.truth.burst_start_frame else {
+            continue;
+        };
+        let fmt = f.format.as_ref().unwrap();
+        let opts = DecodeOptions {
+            target_rate: fmt.sample_rate,
+            max_analysis_secs: None,
+            ..DecodeOptions::default()
+        };
+        let d = decode_file(&tmp.path().join(&f.path), &opts).unwrap();
+        assert_eq!(d.samples.len() as u64, fmt.num_frames, "{}", f.path);
+        let peak = d.samples.iter().fold(0.0f32, |m, x| m.max(x.abs()));
+        assert!(peak > 0.1, "{}: burst peak {peak}", f.path);
+        // The sine window rises from 0: 1 % of the peak is reached within
+        // a few dozen frames of the window start.
+        let first = d.samples.iter().position(|x| x.abs() > 0.01 * peak);
+        let first = first.unwrap() as u64;
+        assert!(
+            first.abs_diff(onset) <= 64,
+            "{}: {first} vs {onset}",
+            f.path
+        );
+        // Nothing before the burst: priming (or padding) is not in the output.
+        assert!(
+            d.samples[..(onset - 64) as usize].iter().all(|&x| x == 0.0),
+            "{}",
+            f.path
+        );
+        // Not trimmed from the start would put the onset 2112 frames late.
+        assert!(first.abs_diff(onset + 2112) > 1000, "{}", f.path);
+        n += 1;
+    }
+    assert_eq!(n, 1, "exactly one burst fixture");
+}
+
+/// The windowed decode is the exact prefix of the full decode for AAC with
+/// priming too (priming is dropped before the window is applied), and the
+/// length stays exact when frames past the window are only counted.
+#[test]
+fn aac_analysis_window_is_a_prefix_of_the_full_decode() {
+    let (tmp, manifest) = small_set();
+    let mut n = 0;
+    for f in audio(&manifest) {
+        let fmt = f.format.as_ref().unwrap();
+        if fmt.codec != Codec::Aac || f.truth.burst_start_frame.is_none() {
+            continue;
+        }
+        let path = tmp.path().join(&f.path);
+        let at = |secs: Option<f64>| DecodeOptions {
+            target_rate: fmt.sample_rate,
+            max_analysis_secs: secs,
+            ..DecodeOptions::default()
+        };
+        let full = decode_file(&path, &at(None)).unwrap();
+        // 0.2 s = 8,820 frames: covers the burst start (3,008), ends inside it.
+        let part = decode_file(&path, &at(Some(0.2))).unwrap();
+        assert_eq!(part.samples.len(), 8_820);
+        assert_eq!(part.samples[..], full.samples[..8_820], "{}", f.path);
+        assert!(part.truncated_for_analysis && !part.partial, "{}", f.path);
+        assert_eq!(part.source.num_frames, fmt.num_frames, "{}", f.path);
+
+        // Same through the resampler (44.1 kHz → 22.05 kHz analysis rate).
+        let at = |secs| DecodeOptions {
+            max_analysis_secs: secs,
+            ..DecodeOptions::default()
+        };
+        let full = decode_file(&path, &at(None)).unwrap();
+        let part = decode_file(&path, &at(Some(0.2))).unwrap();
+        assert_eq!(part.sample_rate, ANALYSIS_RATE);
+        assert_eq!(part.samples.len(), 4_410);
+        assert_eq!(part.samples[..], full.samples[..4_410], "{}", f.path);
+        assert!(full.samples.iter().any(|&x| x != 0.0));
+        n += 1;
+    }
+    assert_eq!(n, 1);
+}
+
+/// An edit list whose priming is at least the whole stream leaves nothing
+/// playable: a valid empty result, not an error and not `partial`.
+#[test]
+fn aac_priming_longer_than_the_stream_decodes_to_nothing() {
+    use sonar_core::fixtures::aac::{encode, AacSpec, Tags};
+    let spec = AacSpec {
+        sample_rate: 44_100,
+        channels: 1,
+        frames: 1_000,
+        tags: Tags::ElstOnly,
+        burst_unit: None,
+    };
+    let mut bytes = encode(&spec).unwrap();
+    // elst body: version/flags, entry count, segment_duration, media_time.
+    let at = bytes.windows(4).position(|w| w == b"elst").unwrap() + 4 + 4 + 4 + 4;
+    assert_eq!(&bytes[at..at + 4], &2112u32.to_be_bytes());
+    bytes[at..at + 4].copy_from_slice(&5_000u32.to_be_bytes()); // stream is 4,096
+    let tmp = tempfile::tempdir().unwrap();
+    let path = tmp.path().join("x.m4a");
+    std::fs::write(&path, bytes).unwrap();
+    for secs in [Some(0.0), Some(30.0), None] {
+        let opts = DecodeOptions {
+            max_analysis_secs: secs,
+            ..DecodeOptions::default()
+        };
+        let d = decode_file(&path, &opts).unwrap();
+        assert_eq!(d.source.num_frames, 0, "{secs:?}");
+        assert!(
+            d.samples.is_empty() && !d.partial,
+            "{secs:?}: {:?}",
+            d.problem
+        );
+    }
 }

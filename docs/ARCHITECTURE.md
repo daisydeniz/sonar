@@ -47,6 +47,11 @@ pitch, onset, tempo, key, envelope), `features` (aspect vectors),
 model, hybrid ranking), `dupes`, `jobs` (pipeline, priorities, cancellation,
 progress), `eval`.
 
+Decode gapless: AAC/M4A priming and padding come from the edit list
+(`elst`, ISO/IEC 14496-12 / ffmpeg semantics: `segment_duration` honoured,
+unlike Apple's reader) or `iTunSMPB`; symphonia's `isomp4` ignores both, so
+`decode::gapless` reads them (MP3 uses the LAME tag via symphonia).
+
 ### Preferred dependencies (permissive licenses only)
 `symphonia` (decode), `rubato` (resample), `rustfft`/`realfft`, `rayon`,
 `rusqlite` (bundled), `tantivy`, `usearch` (or SIMD brute force),

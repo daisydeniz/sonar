@@ -17,20 +17,33 @@ Golden files (local, in `$SONAR_GOLDEN_DIR`):
 Templates: `eval/golden/*.example.*`.
 
 ## Fixture manifest
-`sonar fixtures <dir> [--seed N] [--skip-long]` writes 131 files (~105 MB,
+`sonar fixtures <dir> [--seed N] [--skip-long]` writes 135 files (~105 MB,
 ~5.5 s in a debug build) into `tonal/ chords/ loops/ oneshots/ noise/ edge/
 formats/ containers/ corrupt/` plus `<dir>/fixtures.json`. All groups but
-`containers/` are WAV. `containers/` (16 files, ~1 MB) covers every other
+`containers/` are WAV. `containers/` (20 files, ~1 MB) covers every other
 scanner extension with hand-written, dependency-free writers: AIFF (`.aif`
-and `.aiff`), FLAC (RFC 9639), ALAC in `.m4a` (ISO/IEC 14496-12), MP3
-(ISO/IEC 11172-3 / 13818-3 frames + Xing/Info + LAME tag with encoder
+and `.aiff`), FLAC (RFC 9639), ALAC in `.m4a` (ISO/IEC 14496-12), AAC-LC in
+`.m4a` (ISO/IEC 14496-3 raw access units, `esds`, 2112 frames of priming),
+MP3 (ISO/IEC 11172-3 / 13818-3 frames + Xing/Info + LAME tag with encoder
 delay/padding) and Ogg Vorbis (Vorbis I + RFC 3533, end-trimming granule
 positions). Lossless ones carry real content and full truth; **lossy ones
 are digital silence** (`format.lossless: false`): sample-level truth does
 not apply, they check container parsing, rate/channels and exact gapless
-length only (known limits: being silent, they cannot show that priming is
-trimmed from the start rather than the end; `.m4a` is ALAC only, no
-AAC-with-priming yet, see T1.3b). File names are neutral (`loops/loop_006.wav`,
+length only. The one exception is the AAC burst file: silence plus a single
+hand-encoded MDCT coefficient (bin 16, ≈ 355 Hz, one access unit) whose
+window starts at `truth.burst_start_frame` = 3008 of the playable stream (access
+unit 5 = decoded frame 5120, minus the 2112 priming), which proves priming
+is trimmed from the *start*: the first non-zero decoded sample must be at
+the onset (±64 frames for a 1 % threshold on the rising sine window; an
+untrimmed decoder is 2112 late). The four AAC files cover priming given as
+`elst` + `iTunSMPB`, `elst` only and `iTunSMPB` only (declared lengths are
+not multiples of 1024, so end padding is non-trivial). Cross-checked with
+Apple `afinfo`/`afconvert`: valid/priming/remainder frames and the burst
+(first non-zero sample 3008, peak 0.25) match exactly, except that Apple
+ignores the end of an edit list (the `elst`-only file decodes to 13,248
+frames there, `segment_duration` honoured here per ISO/IEC 14496-12 and as
+ffmpeg does). Known gap: symphonia 0.6.1 ignores both tags; `decode::gapless`
+reads them itself and a test pins the upstream behaviour. File names are neutral (`loops/loop_006.wav`,
 `containers/clip_009.mp3`); **truth lives only in the manifest**. Same seed +
 same `sonar-core` version ⇒ byte-identical output on the same
 platform/toolchain (hand-rolled SplitMix64, one stream per file path,
@@ -48,7 +61,7 @@ Fields that do not apply are omitted (never `null`).
 
 | Field | Meaning (unit) |
 |---|---|
-| `format.container` / `codec` | `wav`\|`aiff`\|`flac`\|`mp3`\|`ogg`\|`m4a` / `pcm`\|`flac`\|`alac`\|`mp3`\|`vorbis` |
+| `format.container` / `codec` | `wav`\|`aiff`\|`flac`\|`mp3`\|`ogg`\|`m4a` / `pcm`\|`flac`\|`alac`\|`mp3`\|`vorbis`\|`aac` |
 | `format.lossless` | `true`: decoders must return every int sample `q` as `q/2^(bits−1)` bit-exactly; `false`: lossy, no sample-level truth |
 | `format.sample_rate` / `channels` / `bit_depth` | Hz / count / 16, 24, 32 (`bit_depth` absent for lossy) |
 | `format.sample_format` / `format_tag` | `int`\|`float` (absent for lossy) / `pcm`\|`ieee_float`\|`extensible` (WAV only) |
@@ -62,6 +75,7 @@ Fields that do not apply are omitted (never `null`).
 | `truth.noise_color` | `white` \| `pink` (Paul Kellet filter) |
 | `truth.peak_dbfs` / `rms_dbfs` | dBFS measured on the **written** samples (ints scaled by `1/2^(bits−1)`; full-scale sine RMS = −3.01 dBFS); absent for digital silence |
 | `truth.is_silent` | every sample is exactly 0 |
+| `truth.burst_start_frame` | AAC burst file only: playable-stream frame where the burst window starts (frames) |
 | `truth.corrupt {reason, expect}` | defect id (e.g. `truncated_header`) and required decoder behaviour |
 
 Spelling: one pitch-class table everywhere — `C C# D Eb E F F# G Ab A Bb
