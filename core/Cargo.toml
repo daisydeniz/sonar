@@ -8,6 +8,15 @@ edition = "2021"
 license = "LicenseRef-Proprietary"
 publish = false
 
+# Shared third-party versions. Crates opt in with `x.workspace = true`.
+# Licenses must satisfy ADR-004 (enforced by `cargo deny`, see deny.toml).
+[workspace.dependencies]
+anyhow = "1.0.104"
+clap = { version = "4.6.7", features = ["derive"] }
+thiserror = "2.0.21"
+tracing = "0.1.44"
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["env-filter", "fmt", "ansi", "std"] }
+
 [profile.release]
 lto = "thin"
 codegen-units = 1

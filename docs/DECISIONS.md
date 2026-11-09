@@ -23,6 +23,9 @@ Accepted. Closed-source commercial product → MIT/Apache/BSD/ISC/Zlib/MPL-2.0
 (file-level) only. No GPL/AGPL (aubio, Essentia, libKeyFinder). Enforced with
 `cargo deny`. ML model weights must also allow commercial redistribution;
 record model + license in this log before shipping.
+Amendment (T0.2): also allowed `Apache-2.0 WITH LLVM-exception` and
+`Unicode-3.0` (Unicode data tables, e.g. `unicode-ident`). Allow list lives in
+`core/deny.toml`; any new license needs an amendment here first.
 
 ## ADR-005 — MVP scope: Sononym parity + natural-language search
 Accepted. Preset search moves to v2. See docs/PRODUCT.md.

@@ -4,6 +4,10 @@
 //! talks to it through the UniFFI facade crate; the `sonar` CLI exposes every
 //! feature headless so it can be tested and benchmarked without UI.
 
+pub mod error;
+
+pub use error::{Error, Result};
+
 /// Version of the core library, shown in the app and CLI.
 pub fn version() -> &'static str {
     env!("CARGO_PKG_VERSION")
