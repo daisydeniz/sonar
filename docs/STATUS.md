@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M0
-- Next task: T0.2
+- Next task: T0.3
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
@@ -24,6 +24,7 @@ manual tests, labeled data. Keep each item one line with the task id.)_
 _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 
 ## Log
+- 2026-11-09 — T0.2: workspace deps anyhow 1.0.104, clap 4.6.7 (derive), thiserror 2.0.21, tracing 0.1.44, tracing-subscriber 0.3.23; `core/deny.toml` (permissive allow list, crates.io only; ADR-004 amended for Unicode-3.0 + LLVM-exception). CLI now clap-based (`sonar version`), core `Error`/`Result` via thiserror; 13 tests. check.sh green; deny runs `licenses bans sources` (advisories skipped: needs network). Known warn: duplicate `syn` 2/3 (tracing-attributes).
 - 2026-11-09 — T0.1: bootstrap.sh exits 0 (idempotent). rustup was missing → now installed via Homebrew; new `scripts/lib/env.sh` puts rustup/cargo on PATH for bootstrap, check and autopilot; version capture fails loudly. check.sh green (deny/eval/xcode stages not active yet).
 - 2026-11-09 — Workflow: one branch per task, ff-merge to main, milestone tags; no founder approvals until M8.
 - 2026-11-09 — Repository scaffolded (docs, agents, commands, Rust workspace stub).
