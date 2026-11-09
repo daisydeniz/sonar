@@ -40,6 +40,61 @@ pub enum Error {
         #[source]
         source: serde_json::Error,
     },
+
+    /// No data directory could be determined: neither `SONAR_HOME` nor
+    /// `HOME` is set to a non-empty value.
+    #[error("cannot determine the Sonar data directory: set SONAR_HOME or HOME")]
+    NoDataDir,
+
+    /// A SQLite operation on the store failed.
+    ///
+    /// The detail is in the message and deliberately not exposed as
+    /// `source()`, so `anyhow` chains do not print it twice.
+    #[error("database error: {0}")]
+    Sqlite(rusqlite::Error),
+
+    /// The database schema version is not one this build can work with
+    /// (written by a newer Sonar, or corrupt). The file is left untouched.
+    #[error(
+        "database schema version {found} is not supported (this build supports up to {supported})"
+    )]
+    UnsupportedSchema {
+        /// `PRAGMA user_version` found in the file.
+        found: i64,
+        /// Latest schema version this build knows.
+        supported: i64,
+    },
+
+    /// Applying migration `version` failed; its transaction was rolled back,
+    /// so the database stays at `version - 1`.
+    #[error("migration {version} ({name}) failed")]
+    Migration {
+        /// Schema version the migration would have produced.
+        version: i64,
+        /// Migration name, e.g. `0001_init`.
+        name: &'static str,
+        /// Underlying SQLite error.
+        #[source]
+        source: rusqlite::Error,
+    },
+
+    /// A required connection pragma did not take effect (e.g. SQLite refused
+    /// WAL journaling, or foreign keys could not be enabled).
+    #[error("could not set PRAGMA {name} = {expected} (SQLite reports '{found}')")]
+    Pragma {
+        /// Pragma name, e.g. `journal_mode`.
+        name: &'static str,
+        /// Value we required.
+        expected: &'static str,
+        /// Value SQLite reported back.
+        found: String,
+    },
+}
+
+impl From<rusqlite::Error> for Error {
+    fn from(source: rusqlite::Error) -> Self {
+        Self::Sqlite(source)
+    }
 }
 
 impl Error {
@@ -107,6 +162,33 @@ mod tests {
         let err = Error::json("/tmp/fixtures.json", source);
         assert_eq!(err.to_string(), "invalid JSON at /tmp/fixtures.json");
         assert!(err.source().is_some());
+    }
+
+    #[test]
+    fn store_errors_are_descriptive() {
+        let err = Error::UnsupportedSchema {
+            found: 9,
+            supported: 1,
+        };
+        assert_eq!(
+            err.to_string(),
+            "database schema version 9 is not supported (this build supports up to 1)"
+        );
+        let err = Error::from(rusqlite::Error::InvalidQuery);
+        assert!(matches!(err, Error::Sqlite(_)));
+        let detail = rusqlite::Error::InvalidQuery.to_string();
+        assert_eq!(err.to_string(), format!("database error: {detail}"));
+        assert!(err.source().is_none(), "detail must not repeat in chains");
+        let err = Error::Pragma {
+            name: "journal_mode",
+            expected: "wal",
+            found: "delete".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "could not set PRAGMA journal_mode = wal (SQLite reports 'delete')"
+        );
+        assert!(Error::NoDataDir.to_string().contains("SONAR_HOME"));
     }
 
     #[test]

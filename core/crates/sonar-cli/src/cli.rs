@@ -49,6 +49,22 @@ pub enum Command {
         #[arg(long)]
         skip_long: bool,
     },
+
+    /// Inspect the SQLite store (location: $SONAR_HOME/sonar.db, else
+    /// ~/Library/Application Support/Sonar/sonar.db).
+    Store {
+        /// Store action.
+        #[command(subcommand)]
+        command: StoreCommand,
+    },
+}
+
+/// `sonar store` subcommands.
+#[derive(Debug, Subcommand)]
+pub enum StoreCommand {
+    /// Open (create + migrate if needed) the store and print its path,
+    /// schema version, journal mode and per-table row counts.
+    Info,
 }
 
 #[cfg(test)]
@@ -70,6 +86,20 @@ mod tests {
                 command: Command::Version
             })
         ));
+    }
+
+    #[test]
+    fn parses_store_info_and_requires_an_action() {
+        let cli = Cli::try_parse_from(["sonar", "store", "info"]).map_err(|e| e.to_string());
+        assert!(matches!(
+            cli,
+            Ok(Cli {
+                command: Command::Store {
+                    command: StoreCommand::Info
+                }
+            })
+        ));
+        assert!(Cli::try_parse_from(["sonar", "store"]).is_err());
     }
 
     #[test]

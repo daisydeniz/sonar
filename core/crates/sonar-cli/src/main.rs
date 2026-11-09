@@ -5,11 +5,12 @@ mod cli;
 use anyhow::{Context, Result};
 use clap::Parser;
 use sonar_core::fixtures::{self, FixtureOptions};
+use sonar_core::Store;
 use std::io::IsTerminal;
 use std::path::Path;
 use tracing_subscriber::EnvFilter;
 
-use crate::cli::{Cli, Command};
+use crate::cli::{Cli, Command, StoreCommand};
 
 /// Filter used when `RUST_LOG` is unset or invalid.
 const DEFAULT_LOG_FILTER: &str = "warn";
@@ -26,6 +27,28 @@ fn main() -> Result<()> {
             seed,
             skip_long,
         } => fixtures(&dir, seed, !skip_long)?,
+        Command::Store {
+            command: StoreCommand::Info,
+        } => store_info()?,
+    }
+    Ok(())
+}
+
+/// `sonar store info`: open the default store and print a summary.
+fn store_info() -> Result<()> {
+    let store = Store::open_default().context("opening the Sonar store")?;
+    let info = store.info().context("reading store info")?;
+    let path = info
+        .path
+        .as_deref()
+        .map_or_else(|| "(in memory)".into(), |p| p.display().to_string());
+    println!("path: {path}");
+    println!("schema version: {}", info.schema_version);
+    println!("journal mode: {}", info.journal_mode);
+    println!("tables:");
+    let width = info.tables.iter().map(|t| t.name.len()).max().unwrap_or(0);
+    for t in &info.tables {
+        println!("  {:<width$}  {}", t.name, t.rows);
     }
     Ok(())
 }

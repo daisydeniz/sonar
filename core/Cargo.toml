@@ -26,6 +26,8 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
 # MPL-2.0. Library side uses no default features (no cargo_metadata); only the
 # `uniffi-bindgen` helper crate enables `cli` + `cargo-metadata`.
 uniffi = { version = "0.32.2", default-features = false }
+# MIT. `bundled` compiles SQLite (public domain) in: no system lib, known version.
+rusqlite = { version = "0.41.1", features = ["bundled"] }
 # Test-only (dev-dependencies).
 hound = "3.5.1"      # Apache-2.0; independent WAV reader to verify our writer
 tempfile = "3.27.0"  # MIT OR Apache-2.0

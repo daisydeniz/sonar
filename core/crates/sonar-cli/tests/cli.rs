@@ -104,6 +104,55 @@ fn fixtures_into_a_file_path_fails_cleanly() {
     assert!(String::from_utf8_lossy(&out.stderr).contains("generating fixtures"));
 }
 
+/// Runs `sonar store info` with `SONAR_HOME` pointed at `home`.
+fn store_info(home: &std::path::Path) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_sonar"))
+        .args(["store", "info"])
+        .env("SONAR_HOME", home)
+        .env_remove("RUST_LOG")
+        .output()
+        .expect("failed to spawn sonar binary")
+}
+
+#[test]
+fn store_info_creates_store_under_sonar_home() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let home = tmp.path().join("sonar-home");
+    for run in 0..2 {
+        let out = store_info(&home);
+        assert!(
+            out.status.success(),
+            "run {run} stderr: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let text = stdout(&out);
+        let db = home.join("sonar.db");
+        assert!(text.contains(&format!("path: {}", db.display())), "{text}");
+        assert!(text.contains("schema version: 1"), "{text}");
+        assert!(text.contains("journal mode: wal"), "{text}");
+        for table in ["libraries", "files", "analysis", "hidden"] {
+            assert!(
+                text.lines()
+                    .any(|l| l.split_whitespace().eq([table, "0"].into_iter())),
+                "{table} row missing: {text}"
+            );
+        }
+        assert!(db.is_file());
+    }
+}
+
+#[test]
+fn store_info_on_garbage_file_fails_cleanly() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db = tmp.path().join("sonar.db");
+    std::fs::write(&db, vec![0x5a_u8; 4096]).expect("write junk");
+    let out = store_info(tmp.path());
+    assert!(!out.status.success());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("opening the Sonar store"), "{err}");
+    assert!(!err.contains("panicked"), "{err}");
+}
+
 #[test]
 fn invalid_rust_log_falls_back_to_default() {
     let out = Command::new(env!("CARGO_BIN_EXE_sonar"))

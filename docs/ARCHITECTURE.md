@@ -61,7 +61,13 @@ Location: `~/Library/Application Support/Sonar/` (override with
 
 - `libraries(id, root_path, volume_uuid, bookmark BLOB, online, added_at)`
 - `files(id, library_id, rel_path, size, mtime, quick_hash, content_hash,
-   status, analysis_version, error)`
+   status, analysis_version, error)` — `mtime` in ns since epoch,
+   `quick_hash` u64 stored bit-cast as INTEGER, `status ∈ {new, meta,
+   analyzed, error, missing}`; schema in `store/migrations/*.sql`
+   (versioned by `PRAGMA user_version`, tables STRICT)
+- Per-stage pipeline progress (T1.5) goes in its own table, e.g.
+  `file_stages(file_id, stage, version, error)`, rather than by widening
+  `files.status` (a CHECK change would need a table rebuild).
 - `audio_meta(file_id, duration_ms, sample_rate, channels, bit_depth,
    peak_db, loudness_lufs)`
 - `analysis(file_id, kind, kind_conf, bpm, bpm_conf, bpm_source, key,
