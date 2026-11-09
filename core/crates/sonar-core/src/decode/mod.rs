@@ -6,6 +6,8 @@
 //! downmix ([`mix`]) of the first `max_analysis_secs` → band-limited
 //! resampling with rubato ([`resample`]); frames past the window are only
 //! counted from packet durations, never decoded ([`stream`]).
+//! [`Decoder::decode_with_meta`] additionally measures peak and loudness
+//! ([`crate::meta`]) in the same pass, at the native rate, before downmix.
 //!
 //! Supported (symphonia 0.6 features in `core/Cargo.toml`): WAV (PCM int
 //! 8–32, float 32/64, extensible, A-law/µ-law, IMA/MS ADPCM), AIFF/AIFC,
@@ -40,6 +42,8 @@ use std::sync::Arc;
 
 use serde::Serialize;
 
+use crate::meta::channels::channel_weights;
+use crate::meta::{BasicMeta, MetaOptions, Meter};
 use crate::Result;
 use resample::MonoResampler;
 use source::decode_err;
@@ -151,6 +155,7 @@ pub struct Decoder {
     resampler: MonoResampler,
     planar: stream::Planar,
     mono: Vec<f32>,
+    meter: Meter,
 }
 
 impl Decoder {
@@ -163,7 +168,35 @@ impl Decoder {
     /// are caught and reported as [`crate::Error::Decode`], and the scratch state
     /// is discarded.
     pub fn decode(&mut self, path: &Path, opts: &DecodeOptions) -> Result<Decoded> {
-        let result = catch_unwind(AssertUnwindSafe(|| self.decode_inner(path, opts)));
+        self.decode_guarded(path, opts, None).map(|(d, _)| d)
+    }
+
+    /// [`Decoder::decode`] plus basic metadata ([`crate::meta`]) in the same
+    /// pass: peak and loudness are measured on the native-rate, all-channel
+    /// samples of the first `meta.max_meta_secs`. Packets are decoded up to
+    /// the longer of the analysis and meta windows; only the analysis
+    /// window is buffered, and the returned [`Decoded`] is identical to
+    /// [`Decoder::decode`]'s. A packet past the analysis window that the
+    /// codec rejects stops the measurement there (the rest is counted) and
+    /// sets [`BasicMeta::partial`].
+    pub fn decode_with_meta(
+        &mut self,
+        path: &Path,
+        opts: &DecodeOptions,
+        meta: &MetaOptions,
+    ) -> Result<(Decoded, BasicMeta)> {
+        let (d, m) = self.decode_guarded(path, opts, Some(meta))?;
+        let m = m.ok_or_else(|| decode_err(path, "meta not measured"))?;
+        Ok((d, m))
+    }
+
+    fn decode_guarded(
+        &mut self,
+        path: &Path,
+        opts: &DecodeOptions,
+        meta: Option<&MetaOptions>,
+    ) -> Result<(Decoded, Option<BasicMeta>)> {
+        let result = catch_unwind(AssertUnwindSafe(|| self.decode_inner(path, opts, meta)));
         let out = result.unwrap_or_else(|_| {
             *self = Self::default();
             Err(decode_err(path, "internal decoder panic"))
@@ -179,7 +212,12 @@ impl Decoder {
         out
     }
 
-    fn decode_inner(&mut self, path: &Path, opts: &DecodeOptions) -> Result<Decoded> {
+    fn decode_inner(
+        &mut self,
+        path: &Path,
+        opts: &DecodeOptions,
+        meta: Option<&MetaOptions>,
+    ) -> Result<(Decoded, Option<BasicMeta>)> {
         let target = opts.target_rate;
         if !(source::MIN_SAMPLE_RATE..=source::MAX_SAMPLE_RATE).contains(&target) {
             return Err(decode_err(path, format!("invalid target rate {target} Hz")));
@@ -201,12 +239,17 @@ impl Decoder {
             .min(window.keep_frames)
             .min(MAX_RESERVE_FRAMES);
         self.mono.reserve(reserve);
+        if let Some(m) = meta {
+            let weights = channel_weights(src.layout.as_ref(), src.channels);
+            self.meter.reset(rate, &weights, m.max_frames(rate));
+        }
         let outcome = stream::run(
             path,
             &mut src,
             window.keep_frames,
             &mut self.planar,
             &mut self.mono,
+            meta.map(|_| &mut self.meter),
             opts.cancel.as_deref(),
         )?;
 
@@ -215,7 +258,9 @@ impl Decoder {
             .resample(&self.mono, rate, target, window.max_out)
             .map_err(|e| decode_err(path, e))?;
         let num_frames = outcome.total_frames;
-        Ok(Decoded {
+        // Metering stopped at a bad packet: the measured span is short.
+        let meta_partial = outcome.partial || outcome.meter_problem.is_some();
+        let decoded = Decoded {
             samples,
             sample_rate: target,
             source: SourceInfo {
@@ -231,7 +276,10 @@ impl Decoder {
             truncated_for_analysis: num_frames > window.window_frames,
             partial: outcome.partial,
             problem: outcome.problem,
-        })
+        };
+        let meta =
+            meta.map(|_| BasicMeta::from_measurement(&decoded.source, &self.meter, meta_partial));
+        Ok((decoded, meta))
     }
 }
 

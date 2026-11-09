@@ -179,12 +179,16 @@ fn read_failure_is_an_io_error_not_a_partial_result() {
         SampleFormat::Int16,
         &[sine(440.0, 44_100, 88_200, 0.5)],
     );
-    // Fails inside the analysis window (decoding) and past it (counting).
-    for keep in [1 << 20, 0] {
+    // Fails inside the analysis window (decoding), past it (counting) and
+    // while decoding past it for the meta measurement.
+    for (keep, metered) in [(1 << 20, false), (0, false), (0, true)] {
         let mut src = source::open_source(path, FailingSource::boxed(bytes.clone(), 100_000))
             .expect("header is readable");
         let (mut planar, mut mono) = (Vec::new(), Vec::new());
-        let r = stream::run(path, &mut src, keep, &mut planar, &mut mono, None);
+        let mut meter = crate::meta::Meter::new();
+        meter.reset(44_100, &[1.0], u64::MAX);
+        let m = metered.then_some(&mut meter);
+        let r = stream::run(path, &mut src, keep, &mut planar, &mut mono, m, None);
         match r {
             Err(Error::Io { path: p, source }) => {
                 assert_eq!(p, path);
@@ -199,6 +203,6 @@ fn read_failure_is_an_io_error_not_a_partial_result() {
     // The same bytes without the failure decode completely.
     let mut src = source::open_source(path, FailingSource::boxed(bytes, u64::MAX)).unwrap();
     let (mut planar, mut mono) = (Vec::new(), Vec::new());
-    let out = stream::run(path, &mut src, 1 << 20, &mut planar, &mut mono, None).unwrap();
+    let out = stream::run(path, &mut src, 1 << 20, &mut planar, &mut mono, None, None).unwrap();
     assert_eq!((out.total_frames, out.partial), (88_200, false));
 }

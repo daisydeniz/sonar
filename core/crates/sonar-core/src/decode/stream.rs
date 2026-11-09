@@ -1,6 +1,15 @@
 //! The packet loop: decode + downmix the analysis window, then count the
 //! remaining frames without decoding them.
 //!
+//! With a [`Meter`] (basic meta, [`crate::meta`]), packets are decoded
+//! until the meter's own window is full too, and every decoded block's
+//! playable frames (priming dropped, gapless end respected) are fed to it
+//! at the source rate, all channels, before downmix. Only the analysis
+//! window is ever buffered; the mono samples are identical with or without
+//! a meter. A codec error on a packet decoded only for the meter stops the
+//! meter ([`Outcome::meter_problem`]) and the loop continues counting, so
+//! length, `partial` and `problem` are identical with or without a meter.
+//!
 //! Past the window only packet *durations* are summed (`Packet::dur`, the
 //! number of valid frames after gapless trimming, in track time-base
 //! ticks; converted to frames once at the end, so no per-packet rounding
@@ -28,6 +37,7 @@
 //! so the counted length is `min(raw − start, len)` on both paths.
 
 use std::io::ErrorKind;
+use std::ops::Range;
 use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -36,6 +46,7 @@ use symphonia::core::packet::Packet;
 
 use super::mix::append_mean;
 use super::source::{decode_err, map_error, ticks_to_frames, Opened};
+use crate::meta::Meter;
 use crate::{Error, Result};
 
 /// Consecutive undecodable packets tolerated before giving up.
@@ -56,19 +67,24 @@ pub(super) struct Outcome {
     pub partial: bool,
     /// Why the result is partial (first problem seen).
     pub problem: Option<String>,
+    /// Metering stopped early: a packet past the analysis window could not
+    /// be decoded (the rest of the file was only counted).
+    pub meter_problem: Option<String>,
 }
 
 /// Reusable scratch: planar f32 copy of one decoded packet.
 pub(super) type Planar = Vec<Vec<f32>>;
 
 /// Streams every packet of the selected track. The first `keep` frames are
-/// downmixed into `mono` (source rate); later packets are only counted.
+/// downmixed into `mono` (source rate); `meter`, if given, measures the
+/// playable frames until it is full; later packets are only counted.
 pub(super) fn run(
     path: &Path,
     src: &mut Opened,
     keep: usize,
     planar: &mut Planar,
     mono: &mut Vec<f32>,
+    mut meter: Option<&mut Meter>,
     cancel: Option<&AtomicBool>,
 ) -> Result<Outcome> {
     let mut out = Outcome::default();
@@ -78,6 +94,12 @@ pub(super) fn run(
     let skip = src
         .gapless
         .map_or(0, |g| usize::try_from(g.start).unwrap_or(0));
+    // Playable span in decoded-stream frames, for the meter.
+    let play_start = src.gapless.map_or(0, |g| g.start);
+    let play_end = src
+        .gapless
+        .and_then(|g| g.len)
+        .map_or(u64::MAX, |len| play_start.saturating_add(len));
     let keep = if keep == 0 {
         0
     } else {
@@ -117,17 +139,34 @@ pub(super) fn run(
         if packet.track_id != src.track_id {
             continue;
         }
-        if mono.len() >= keep {
+        let meter_wants = meter.as_ref().is_some_and(|m| !m.is_full()) && decoded_frames < play_end;
+        let metering_only = mono.len() >= keep;
+        if metering_only && !meter_wants {
             let ticks = valid_ticks(&packet, src.dur_includes_trim);
             ticks_past_window = ticks_past_window.saturating_add(ticks);
             continue;
         }
         match src.decoder.decode(&packet) {
+            // Past the analysis window a packet is decoded only for the
+            // meter. Any codec failure there stops metering and falls back
+            // to counting (this packet included), exactly what `decode()`
+            // does, so the decode result never depends on the meter.
+            Err(e) if metering_only => {
+                out.meter_problem
+                    .get_or_insert_with(|| map_error(path, e).to_string());
+                meter = None;
+                let ticks = valid_ticks(&packet, src.dur_includes_trim);
+                ticks_past_window = ticks_past_window.saturating_add(ticks);
+            }
             Ok(buf) => {
                 consecutive_errors = 0;
                 let frames = buf.frames();
                 buf.copy_to_vecs_planar::<f32>(planar);
                 append_mean(planar, frames.min(keep - mono.len()), mono);
+                if let Some(m) = meter.as_deref_mut() {
+                    let r = playable(decoded_frames, frames as u64, play_start, play_end);
+                    m.push(planar, r);
+                }
                 decoded_frames = decoded_frames.saturating_add(frames as u64);
             }
             Err(SymError::DecodeError(msg)) => {
@@ -138,6 +177,9 @@ pub(super) fn run(
                 let dur = ticks_to_frames(ticks, src.time_base, src.sample_rate);
                 let gap = usize::try_from(dur).unwrap_or(usize::MAX);
                 mono.resize(mono.len() + gap.min(keep - mono.len()), 0.0);
+                if let Some(m) = meter.as_deref_mut() {
+                    m.push_silence(playable(decoded_frames, dur, play_start, play_end).len());
+                }
                 decoded_frames = decoded_frames.saturating_add(dur);
                 if consecutive_errors > MAX_CONSECUTIVE_ERRORS {
                     ended_by_error = true;
@@ -179,6 +221,15 @@ pub(super) fn run(
         out.problem = None;
     }
     Ok(out)
+}
+
+/// Part of a block of `n` frames starting at decoded-stream frame `pos`
+/// that lies in the playable span `[lo, hi)`, as indices into the block.
+fn playable(pos: u64, n: u64, lo: u64, hi: u64) -> Range<usize> {
+    let start = lo.saturating_sub(pos).min(n);
+    let end = hi.saturating_sub(pos).min(n).max(start);
+    let idx = |v: u64| usize::try_from(v).unwrap_or(usize::MAX);
+    idx(start)..idx(end)
 }
 
 fn note(out: &mut Outcome, problem: String) {

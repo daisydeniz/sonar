@@ -84,3 +84,40 @@ swift-ui, eval and architect run on Sonnet (well-specified engineering under
 the same gates: fmt, clippy, tests, cargo deny, eval, Opus review). If review
 finds repeated quality issues from a Sonnet agent, move it back to Opus and
 note it here.
+
+## ADR-012 — Basic meta: peak and loudness definitions (T1.4)
+Accepted. `sonar_core::meta` measures in the decode pass
+(`Decoder::decode_with_meta`; decode-only API unchanged): packets are
+decoded up to max(analysis window, meta window), only the analysis window is
+buffered (bit-identical to `decode`), the meter sees native-rate planar
+samples of all channels before downmix, gapless priming/padding excluded.
+A codec error on a packet decoded only for the meter stops metering and the
+loop goes back to counting (same `partial`/`problem` as `decode`;
+`BasicMeta.partial` set). Known difference: if a *truncated final packet*
+lies past the analysis window, `decode` counts its declared duration while
+metering decodes it and reports the frames actually present (fixture
+`corrupt/bad_004.wav` with a 0 s window: 11,520 counted vs 11,025 decoded) —
+partial files only, always shorter, < 1 packet; metering is the more
+accurate of the two.
+Meta window `MetaOptions.max_meta_secs` = 600 s; duration still counts the
+whole file, `measured_s` reports the span. **Peak** = sample peak (no true
+peak), max |x| over channels, dBFS (ints / 2^(bits−1)). **Loudness** =
+ITU-R BS.1770-4 integrated: K-weighting for any rate from the analogue
+prototypes via the bilinear transform (De Man's derivation, as in
+libebur128/pyloudnorm, both MIT; written from the formulas), direct form I
+in f64; RLB high-pass numerator literally 1, −2, 1 at every rate, like
+libebur128/pyloudnorm/ffmpeg so they can serve as eval references (its
+pass-band gain is rate-dependent: +0.03 LU at 22.05 kHz, −0.02 LU at 96 kHz
+vs 48 kHz, inside ±0.1). 400 ms blocks, 75 % overlap (100 ms steps =
+round(fs/10) frames), gates −70 LUFS and −10 LU. Weights: L/R/C 1.0, side
+(or rear when no side pair, i.e. 5.1) 1.41, LFE excluded, unknown layouts
+1.0; mono = one channel, G = 1 (no dual-mono +3 dB). A positioned mask
+equal to the count-derived WAVE default (`from_wave_channel_count(n)`, what
+symphonia gives plain multichannel WAVs) counts as unknown → all 1.0, except
+n = 6 (= canonical 5.1); otherwise channel 4 of a multitrack/ambisonic WAV
+would be dropped as "LFE" (cost: an explicit 3.1/4.1 mask is weighted 1.0
+too). Spans < 400 ms: one block over the whole span
+(approximation). Silence / below gate / nothing measured → `None` (NULL in
+`audio_meta`), never −∞/NaN; non-finite float samples are ignored. Store:
+schema 0001 `audio_meta` as is (no migration); `measured_s`/`partial` are
+not stored (partial goes to `files.status/error` in the pipeline, T1.5).

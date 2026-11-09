@@ -334,6 +334,66 @@ fn decode_prints_source_duration_and_analysis_length() {
 }
 
 #[test]
+fn meta_prints_format_peak_and_loudness() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let wav = write_test_wav(tmp.path());
+    let wav_s = wav.to_str().expect("utf-8 temp path");
+
+    let out = sonar(&["meta", wav_s]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    // 440 Hz stereo sine at amplitude 0.5: −6.02 dBFS peak; BS.1770:
+    // −6.02 − 3.01 + 10·log10(2) + K(440 Hz) (+0.01) − 0.691 = −6.70 LUFS.
+    let text = stdout(&out);
+    assert!(
+        text.contains("tone.wav: 2.000 s, 48000 Hz, 2 ch, 24-bit, peak -6.02 dBFS, -6.70 LUFS"),
+        "{text}"
+    );
+
+    let out = sonar(&["meta", wav_s, "--json", "--max-meta-secs", "0.5"]);
+    assert!(out.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("JSON output");
+    let m = &v[0]["meta"];
+    assert_eq!(m["num_frames"], 96_000);
+    assert_eq!(m["duration_ms"], 2_000);
+    assert_eq!(m["bit_depth"], 24);
+    assert_eq!(m["measured_s"], 0.5);
+    assert_eq!(m["partial"], false);
+    assert!(m["loudness_lufs"].is_f64() && m["peak_dbfs"].is_f64());
+}
+
+#[test]
+fn meta_reports_bad_files_and_continues() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let wav = write_test_wav(tmp.path());
+    let junk = tmp.path().join("junk.wav");
+    std::fs::write(&junk, b"not audio at all").expect("write");
+    let (wav_s, junk_s) = (wav.to_str().unwrap(), junk.to_str().unwrap());
+
+    let out = sonar(&["meta", junk_s, wav_s]);
+    assert!(!out.status.success());
+    assert!(
+        stdout(&out).contains("tone.wav: 2.000 s"),
+        "{}",
+        stdout(&out)
+    );
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("junk.wav: error:") && err.contains("1 of 2 files"),
+        "{err}"
+    );
+
+    let out = sonar(&["meta", "--json", junk_s, wav_s]);
+    assert!(!out.status.success());
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("JSON output");
+    assert!(v[0]["error"].is_string() && v[0].get("meta").is_none());
+    assert_eq!(v[1]["meta"]["sample_rate"], 48_000);
+}
+
+#[test]
 fn decode_of_bad_input_fails_with_message() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let junk = tmp.path().join("junk.wav");

@@ -9,6 +9,7 @@ use std::fs::File;
 use std::io;
 use std::path::Path;
 
+use symphonia::core::audio::Channels;
 use symphonia::core::codecs::audio::well_known as codec_ids;
 use symphonia::core::codecs::audio::{AudioCodecId, AudioDecoder, AudioDecoderOptions};
 use symphonia::core::codecs::CodecParameters;
@@ -53,6 +54,9 @@ pub(super) struct Opened {
     pub channels: usize,
     /// Bits per sample for PCM-like codecs.
     pub bit_depth: Option<u32>,
+    /// Channel layout declared by the container (plane order of decoded
+    /// buffers), if any; drives the BS.1770 channel weights.
+    pub layout: Option<Channels>,
     /// Codec short name, e.g. `pcm_s16le`, `flac`, `mp3`.
     pub codec: String,
     /// Container short name, e.g. `wave`, `aiff`, `flac`.
@@ -126,7 +130,8 @@ pub(super) fn open_source(path: &Path, source: Box<dyn MediaSource>) -> Result<O
             ),
         ));
     }
-    let channels = params.channels.as_ref().map_or(0, |c| c.count());
+    let layout = params.channels.clone();
+    let channels = layout.as_ref().map_or(0, Channels::count);
     if !(1..=MAX_CHANNELS).contains(&channels) {
         return Err(decode_err(
             path,
@@ -171,6 +176,7 @@ pub(super) fn open_source(path: &Path, source: Box<dyn MediaSource>) -> Result<O
         sample_rate,
         channels,
         bit_depth,
+        layout,
         codec,
         container,
         declared_frames,

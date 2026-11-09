@@ -2,6 +2,7 @@
 
 mod cli;
 mod decode_cmd;
+mod meta_cmd;
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -36,6 +37,11 @@ fn main() -> Result<()> {
             full,
             json,
         } => decode_cmd::run(&file, rate, (!full).then_some(max_secs), json)?,
+        Command::Meta {
+            files,
+            max_meta_secs,
+            json,
+        } => meta_cmd::run(&files, max_meta_secs, json)?,
         Command::Store {
             command: StoreCommand::Info,
         } => store_info()?,

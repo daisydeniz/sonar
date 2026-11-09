@@ -87,6 +87,36 @@ Corrupt `expect`: `error` — the decoder must return an error;
 both cases it must not panic, hang or allocate unboundedly (one file has a
 `LIST` chunk claiming ~4 GiB).
 
+## Basic meta (peak, loudness)
+Reference for loudness: **EBU Tech 3341** (2016) Table 1 cases 1–5,
+synthesised in `meta::tests` at 48 kHz and 44.1 kHz (1 kHz stereo sines,
+levels = sine peak dBFS): expected −23.0 / −33.0 / −23.0 / −23.0 / −23.0
+LUFS, tolerance **±0.1 LU** (the Tech 3341 tolerance); measured within
+±0.025 LU. Also: K-filter coefficients = BS.1770-4 48 kHz table (±1e-8);
+fixed anchors computed outside the code from the published coefficients
+(K = −1.133498 / +0.697704 / +4.041882 dB at 100 Hz / 1 kHz / 10 kHz →
+−20 dBFS stereo sines at 48 kHz read −21.8245 / −19.9933 / −16.6491 LUFS,
+±1e-5 dB on the response, ±0.01 LU end to end); same sine at
+22.05/44.1/48/96 kHz within ±0.1 LU (measured spread 0.047 LU, from the
+literal 1, −2, 1 high-pass numerator as in libebur128/pyloudnorm/ffmpeg);
+399 ms vs 401 ms (single whole-span block vs one gated block) within
+0.2 LU of each other and of −20 (measured equal to 1e-4); mono full-scale
+1 kHz sine = −3.01 ±0.1 LUFS (BS.1770 G = 1, no dual-mono +3 dB). No
+external loudness tool is installed; these synthetic cases are the
+reference (libebur128/ffmpeg use the same filter, so they can be added).
+
+Fixtures (`tests/meta.rs`, every file incl. 310 s and all containers):
+format fields and `num_frames` exact; `duration_ms` = round(frames/rate)
+within 0.5 ms of `duration_s`; lossless `peak_dbfs` within **±0.01 dB** of
+`truth.peak_dbfs` (AAC burst, lossy: ±0.5 dB); `is_silent` → peak and
+loudness absent (`None`/NULL, never −∞). For pure-sine fixtures (category
+`sine`, crest ≥ 2.95 dB, so not the clipped one) loudness is predicted as
+`rms_dbfs + 10·log10(channels) + K(pitch_hz) − 0.691` (`K` = K-filter gain
+at the tone's frequency): tolerance **±0.1 LU** for ≥ 0.4 s, **±0.2 LU** for
+bursts shorter than one 400 ms gating block (measured as a single block — an
+approximation; BS.1770 defines no value for them). Measured: 37 sines,
+worst 0.046 LU.
+
 ## Metrics
 | Area | Metric | Target |
 |---|---|---|

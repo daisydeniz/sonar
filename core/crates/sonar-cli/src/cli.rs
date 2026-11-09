@@ -86,6 +86,22 @@ pub enum Command {
         json: bool,
     },
 
+    /// Print basic metadata of audio files: duration, sample rate, channels,
+    /// bit depth, sample peak (dBFS) and BS.1770 integrated loudness (LUFS).
+    /// Unreadable files are reported and skipped; exits non-zero if any failed.
+    Meta {
+        /// Audio files (wav, aif/aiff, flac, mp3, ogg, m4a).
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        /// Measure peak/loudness over at most this many seconds from the start.
+        #[arg(long, default_value_t = sonar_core::meta::DEFAULT_MAX_META_SECS,
+              value_parser = parse_secs)]
+        max_meta_secs: f64,
+        /// Print a JSON array instead of text.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Inspect the SQLite store (location: $SONAR_HOME/sonar.db, else
     /// ~/Library/Application Support/Sonar/sonar.db).
     Store {
@@ -163,6 +179,34 @@ mod tests {
             assert!(Cli::try_parse_from(bad).is_err(), "{bad:?}");
         }
         assert!(Cli::try_parse_from(["sonar", "decode", "a.wav", "--full"]).is_ok());
+    }
+
+    #[test]
+    fn parses_meta_files_and_flags() {
+        let cli = Cli::try_parse_from(["sonar", "meta", "a.wav", "b.flac"]);
+        match cli.map(|c| c.command) {
+            Ok(Command::Meta {
+                files,
+                max_meta_secs,
+                json: false,
+            }) => {
+                assert_eq!(files.len(), 2);
+                assert_eq!(max_meta_secs, sonar_core::meta::DEFAULT_MAX_META_SECS);
+            }
+            other => panic!("{other:?}"),
+        }
+        let cli = Cli::try_parse_from(["sonar", "meta", "a.wav", "--json", "--max-meta-secs", "5"]);
+        assert!(matches!(
+            cli.map(|c| c.command),
+            Ok(Command::Meta { json: true, max_meta_secs, .. }) if max_meta_secs == 5.0
+        ));
+        for bad in [
+            &["sonar", "meta"][..],
+            &["sonar", "meta", "a.wav", "--max-meta-secs", "-1"],
+            &["sonar", "meta", "a.wav", "--max-meta-secs", "nan"],
+        ] {
+            assert!(Cli::try_parse_from(bad).is_err(), "{bad:?}");
+        }
     }
 
     #[test]

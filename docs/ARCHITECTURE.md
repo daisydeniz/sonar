@@ -93,6 +93,10 @@ cap 30 s for analysis, full length for duration) → basic meta →
 DSP features + aspect vectors → classify → CLAP embedding (batched) →
 write store + index
 ```
+- Basic meta (`sonar_core::meta`, ADR-012) runs inside the same decode pass
+  (`Decoder::decode_with_meta`): format + counted duration, sample peak and
+  BS.1770-4 integrated loudness at native rate over all channels, first
+  600 s; `sonar meta <file>...`.
 - Stages are idempotent and resumable; crash mid-scan = continue later.
 - Priorities: metadata first for everything (fast, browsable), then DSP,
   then CLAP last (most expensive). UI shows partial results immediately.
