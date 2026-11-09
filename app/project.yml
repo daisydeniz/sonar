@@ -1,0 +1,83 @@
+# XcodeGen spec for the Sonar macOS app (ARCHITECTURE.md §8, ADR-002/003).
+# Generate with `cd app && xcodegen generate`; never hand-edit the .xcodeproj.
+name: Sonar
+
+options:
+  bundleIdPrefix: app.sonar
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+
+settings:
+  base:
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    # Ad-hoc signing: builds without an Apple developer account.
+    # Release signing/notarization is configured by the release pipeline.
+    CODE_SIGN_IDENTITY: "-"
+    CODE_SIGN_STYLE: Manual
+    DEVELOPMENT_TEAM: ""
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+
+targets:
+  Sonar:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sonar
+    info:
+      path: Sonar/Info.plist
+      properties:
+        CFBundleDisplayName: Sonar
+        CFBundleName: Sonar
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSMinimumSystemVersion: $(MACOSX_DEPLOYMENT_TARGET)
+        LSApplicationCategoryType: public.app-category.music
+        NSHumanReadableCopyright: "Copyright © 2026 Sonar. All rights reserved."
+        NSPrincipalClass: NSApplication
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.sonar.Sonar
+        PRODUCT_NAME: Sonar
+        # Direct distribution (ADR-003): hardened runtime, no App Sandbox.
+        ENABLE_HARDENED_RUNTIME: YES
+        ENABLE_APP_SANDBOX: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        COMBINE_HIDPI_IMAGES: YES
+
+  SonarTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: SonarTests
+    dependencies:
+      - target: Sonar
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.sonar.SonarTests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: $(BUILT_PRODUCTS_DIR)/Sonar.app/Contents/MacOS/Sonar
+        BUNDLE_LOADER: $(TEST_HOST)
+
+schemes:
+  Sonar:
+    build:
+      targets:
+        Sonar: all
+        SonarTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      gatherCoverageData: false
+      targets:
+        - SonarTests
+    archive:
+      config: Release
