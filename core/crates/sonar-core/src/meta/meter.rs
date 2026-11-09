@@ -39,7 +39,7 @@ const STEPS_PER_BLOCK: usize = 4;
 /// Frames in one 100 ms gating step at `rate` (rounded to nearest, as
 /// libebur128 does for rates that are not multiples of 10 Hz).
 pub fn step_frames(rate: u32) -> usize {
-    ((rate + 5) / 10).max(1) as usize
+    (rate.saturating_add(5) / 10).max(1) as usize
 }
 
 /// Peak + loudness accumulator for one file; reusable across files via

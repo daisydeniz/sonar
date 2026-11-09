@@ -24,6 +24,10 @@ use sonar_core::Error;
 /// Peak tolerance for lossless files (dB): the decoder returns the stored
 /// samples exactly, so only `f32` rounding remains.
 const PEAK_TOL_LOSSLESS: f64 = 0.01;
+/// Upper bound on one packet's frames for the fixture codecs (PCM blocks,
+/// FLAC/ALAC frames ≤ 4096): the counted-vs-metered length difference on a
+/// truncated file (ADR-012) is less than one packet.
+const MAX_PACKET_FRAMES: u64 = 4_096;
 /// Loudness tolerance (LU) for sustained pure sines ≥ 0.4 s: the BS.1770
 /// prediction is exact for a stationary sine; fades and block edges cost
 /// < 0.05 LU.
@@ -137,7 +141,7 @@ fn every_fixture_meta_matches_manifest() {
             let mut with = with.map(|(d, _)| d).map_err(|e| e.to_string());
             if let (Ok(p), Ok(w)) = (&plain, &mut with) {
                 let (pn, wn) = (p.source.num_frames, w.source.num_frames);
-                if p.partial && wn < pn && pn - wn < 4_096 {
+                if p.partial && wn < pn && pn - wn < MAX_PACKET_FRAMES {
                     eprintln!("{}: counted {pn}, decoded {wn} frames", f.path);
                     w.source.num_frames = pn;
                     w.source.duration_s = p.source.duration_s;

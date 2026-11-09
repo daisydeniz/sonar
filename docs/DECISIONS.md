@@ -107,7 +107,7 @@ prototypes via the bilinear transform (De Man's derivation, as in
 libebur128/pyloudnorm, both MIT; written from the formulas), direct form I
 in f64; RLB high-pass numerator literally 1, −2, 1 at every rate, like
 libebur128/pyloudnorm/ffmpeg so they can serve as eval references (its
-pass-band gain is rate-dependent: +0.03 LU at 22.05 kHz, −0.02 LU at 96 kHz
+pass-band gain is rate-dependent: +0.05 LU at 22.05 kHz, −0.02 LU at 96 kHz
 vs 48 kHz, inside ±0.1). 400 ms blocks, 75 % overlap (100 ms steps =
 round(fs/10) frames), gates −70 LUFS and −10 LU. Weights: L/R/C 1.0, side
 (or rear when no side pair, i.e. 5.1) 1.41, LFE excluded, unknown layouts

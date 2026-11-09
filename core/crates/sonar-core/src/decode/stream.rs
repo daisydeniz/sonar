@@ -8,7 +8,9 @@
 //! window is ever buffered; the mono samples are identical with or without
 //! a meter. A codec error on a packet decoded only for the meter stops the
 //! meter ([`Outcome::meter_problem`]) and the loop continues counting, so
-//! length, `partial` and `problem` are identical with or without a meter.
+//! `partial` and `problem` are identical with or without a meter, and so is
+//! the length except on a truncated file whose short final packet lies past
+//! the analysis window (decoded frames < declared duration; ADR-012).
 //!
 //! Past the window only packet *durations* are summed (`Packet::dur`, the
 //! number of valid frames after gapless trimming, in track time-base

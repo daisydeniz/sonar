@@ -176,7 +176,8 @@ impl Decoder {
     /// samples of the first `meta.max_meta_secs`. Packets are decoded up to
     /// the longer of the analysis and meta windows; only the analysis
     /// window is buffered, and the returned [`Decoded`] is identical to
-    /// [`Decoder::decode`]'s. A packet past the analysis window that the
+    /// [`Decoder::decode`]'s, except `num_frames` on a truncated file whose
+    /// short final packet lies past the analysis window (ADR-012). A packet past the analysis window that the
     /// codec rejects stops the measurement there (the rest is counted) and
     /// sets [`BasicMeta::partial`].
     pub fn decode_with_meta(
