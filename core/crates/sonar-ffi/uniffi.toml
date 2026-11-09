@@ -1,0 +1,8 @@
+# UniFFI binding config (read by `uniffi-bindgen generate --library`).
+# Swift: the generated `SonarCore.swift` is compiled into the app and imports
+# the C module `SonarCoreFFI`, which the xcframework provides
+# (Headers/SonarCoreFFI.h + Headers/module.modulemap). See scripts/build-core.sh.
+[bindings.swift]
+module_name = "SonarCore"
+ffi_module_name = "SonarCoreFFI"
+ffi_module_filename = "SonarCoreFFI"

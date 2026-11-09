@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Placeholder main window content. Replaced by the library/search/results
-/// layout in later milestones; T0.5 adds the core version via the UniFFI bridge.
+/// layout in later milestones. Shows the app version and the Rust core
+/// version (UniFFI bridge, T0.5) as proof that the core is linked.
 @MainActor
 struct ContentView: View {
     var body: some View {
@@ -11,10 +12,14 @@ struct ContentView: View {
                 .accessibilityAddTraits(.isHeader)
             Text("Sample library search is on its way.")
                 .foregroundStyle(.secondary)
-            Text("Version \(AppInfo.versionString())")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-                .accessibilityLabel("App version \(AppInfo.versionString())")
+            VStack(spacing: 2) {
+                Text("Version \(AppInfo.versionString())")
+                    .accessibilityLabel("App version \(AppInfo.versionString())")
+                Text("Core \(CoreInfo.version)")
+                    .accessibilityLabel("Core version \(CoreInfo.version)")
+            }
+            .font(.caption)
+            .foregroundStyle(.tertiary)
         }
         .padding(40)
         .frame(maxWidth: .infinity, maxHeight: .infinity)

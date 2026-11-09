@@ -1,0 +1,17 @@
+[package]
+name = "sonar-ffi"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+description = "UniFFI facade over sonar-core for the macOS app (SonarCore.xcframework)."
+
+[lib]
+# staticlib: linked into the app via SonarCore.xcframework (scripts/build-core.sh).
+# lib: lets Rust tests and the workspace use the crate normally.
+crate-type = ["staticlib", "lib"]
+name = "sonar_ffi"
+
+[dependencies]
+sonar-core = { path = "../sonar-core" }
+uniffi.workspace = true

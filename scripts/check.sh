@@ -28,9 +28,8 @@ if "$SONAR_BIN" eval --help >/dev/null 2>&1; then
 fi
 
 if [[ "$(uname -s)" == "Darwin" && -f "$ROOT/app/project.yml" ]]; then
-  if [[ -x "$ROOT/scripts/build-core.sh" ]]; then
-    step "build core xcframework"; "$ROOT/scripts/build-core.sh"
-  fi
+  # The app links SonarCore.xcframework; it cannot build without this step.
+  step "build core xcframework"; "$ROOT/scripts/build-core.sh"
   step "xcodegen"; (cd "$ROOT/app" && xcodegen generate --quiet)
   step "xcodebuild build"
   xcodebuild -project "$ROOT/app/Sonar.xcodeproj" -scheme Sonar \

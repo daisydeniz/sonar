@@ -35,7 +35,8 @@ Rules:
 |---|---|
 | `sonar-core` | Library: domain model, store, scan, decode, analysis, embed, index, search, eval. Modules below. |
 | `sonar-cli` | `sonar` binary: `scan`, `analyze`, `search`, `similar`, `stats`, `eval`, `bench`, `fixtures`. |
-| `sonar-ffi` | UniFFI facade over `sonar-core` (created in M0). Thin; no logic. |
+| `sonar-ffi` | UniFFI facade over `sonar-core` (created in M0). Thin; no logic. Static lib packaged by `scripts/build-core.sh` into `app/Generated/SonarCore.xcframework` + `SonarCore.swift`. |
+| `uniffi-bindgen` | Build tool only: UniFFI bindings generator pinned to the workspace UniFFI version. |
 
 `sonar-core` modules (create as needed, keep files < ~400 lines):
 `model`, `store` (SQLite + migrations), `scan` (walk, identity, watch),
