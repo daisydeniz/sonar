@@ -28,6 +28,11 @@ tracing-subscriber = { version = "0.3.23", default-features = false, features = 
 uniffi = { version = "0.32.2", default-features = false }
 # MIT. `bundled` compiles SQLite (public domain) in: no system lib, known version.
 rusqlite = { version = "0.41.1", features = ["bundled"] }
+# MIT OR Apache-2.0. Work-stealing pool for CPU/IO-parallel stages (scan hashing).
+rayon = "1.12.0"
+# MIT. XXH3-64 for `files.quick_hash` (scan identity). Not `xxhash-rust`
+# (BSL-1.0, not on the ADR-004 allow list). No `random` (pulls `rand`).
+twox-hash = { version = "2.1.5", default-features = false, features = ["std", "xxhash3_64"] }
 # Test-only (dev-dependencies).
 hound = "3.5.1"      # Apache-2.0; independent WAV reader to verify our writer
 tempfile = "3.27.0"  # MIT OR Apache-2.0

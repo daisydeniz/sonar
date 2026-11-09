@@ -7,10 +7,11 @@
 pub mod error;
 pub mod fixtures;
 pub mod paths;
+pub mod scan;
 pub mod store;
 
 pub use error::{Error, Result};
-pub use store::Store;
+pub use store::{Library, Store};
 
 /// Version of the core library, shown in the app and CLI.
 pub fn version() -> &'static str {

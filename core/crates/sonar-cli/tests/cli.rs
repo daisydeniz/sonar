@@ -153,6 +153,108 @@ fn store_info_on_garbage_file_fails_cleanly() {
     assert!(!err.contains("panicked"), "{err}");
 }
 
+/// Runs `sonar <args>` with `SONAR_HOME` pointed at `home`.
+fn sonar_in(home: &std::path::Path, args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_sonar"))
+        .args(args)
+        .env("SONAR_HOME", home)
+        .env_remove("RUST_LOG")
+        .output()
+        .expect("failed to spawn sonar binary")
+}
+
+#[test]
+fn scan_fixtures_then_rescan_all() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let lib = tmp.path().join("lib");
+    let lib_s = lib.to_str().expect("utf-8 temp path");
+    let out = sonar_in(&home, &["fixtures", lib_s, "--skip-long"]);
+    assert!(out.status.success());
+    let manifest: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(lib.join("fixtures.json")).expect("manifest"))
+            .expect("json");
+    let wavs = manifest["fixtures"]
+        .as_array()
+        .expect("fixtures")
+        .iter()
+        .filter(|f| f["path"].as_str().is_some_and(|p| p.ends_with(".wav")))
+        .count();
+    assert!(wavs > 100, "{wavs}");
+
+    let out = sonar_in(&home, &["scan", lib_s]);
+    let text = stdout(&out);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(text.starts_with("library 1: "), "{text}");
+    assert!(
+        text.contains(&format!("added {wavs}, changed 0, moved 0, removed 0")),
+        "{text}"
+    );
+    assert!(!text.contains("issues"), "{text}");
+
+    // Same dir again: same library, nothing new.
+    let out = sonar_in(&home, &["scan", lib_s]);
+    let text = stdout(&out);
+    assert!(text.starts_with("library 1: "), "{text}");
+    assert!(text.contains(&format!("unchanged {wavs},")), "{text}");
+
+    // No argument: rescans every library; a vanished root is reported
+    // offline, not an error.
+    std::fs::rename(&lib, tmp.path().join("gone")).expect("move away");
+    let out = sonar_in(&home, &["scan"]);
+    assert!(out.status.success());
+    let text = stdout(&out);
+    assert!(text.contains("[offline]"), "{text}");
+    assert!(text.contains("added 0,"), "{text}");
+}
+
+#[test]
+fn scan_of_registered_but_vanished_dir_reports_offline() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let home = tmp.path().join("home");
+    let lib = tmp.path().join("drive");
+    std::fs::create_dir(&lib).expect("mkdir");
+    std::fs::write(lib.join("kick.wav"), b"kick").expect("write");
+    let lib_s = lib.to_str().expect("utf-8 temp path");
+    let out = sonar_in(&home, &["scan", lib_s]);
+    assert!(out.status.success());
+    assert!(stdout(&out).contains("added 1,"));
+
+    std::fs::remove_dir_all(&lib).expect("unmount");
+    let out = sonar_in(&home, &["scan", lib_s]);
+    let text = stdout(&out);
+    assert!(
+        out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(text.starts_with("library 1: "), "{text}");
+    assert!(text.contains("[offline]"), "{text}");
+}
+
+#[test]
+fn scan_with_no_libraries_says_so() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let out = sonar_in(tmp.path(), &["scan"]);
+    assert!(out.status.success());
+    assert!(stdout(&out).contains("no libraries"));
+}
+
+#[test]
+fn scan_of_missing_dir_fails_cleanly() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let missing = tmp.path().join("nope");
+    let out = sonar_in(tmp.path(), &["scan", missing.to_str().expect("utf-8")]);
+    assert!(!out.status.success());
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(err.contains("adding library"), "{err}");
+    assert!(!err.contains("panicked"), "{err}");
+}
+
 #[test]
 fn invalid_rust_log_falls_back_to_default() {
     let out = Command::new(env!("CARGO_BIN_EXE_sonar"))

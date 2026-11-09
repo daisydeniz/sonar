@@ -5,7 +5,7 @@ mod cli;
 use anyhow::{Context, Result};
 use clap::Parser;
 use sonar_core::fixtures::{self, FixtureOptions};
-use sonar_core::Store;
+use sonar_core::{scan, Store};
 use std::io::IsTerminal;
 use std::path::Path;
 use tracing_subscriber::EnvFilter;
@@ -27,11 +27,66 @@ fn main() -> Result<()> {
             seed,
             skip_long,
         } => fixtures(&dir, seed, !skip_long)?,
+        Command::Scan { dir } => scan(dir.as_deref())?,
         Command::Store {
             command: StoreCommand::Info,
         } => store_info()?,
     }
     Ok(())
+}
+
+/// `sonar scan [DIR]`: add DIR as a library if needed and scan it, or
+/// rescan every library. Prints one report per library.
+fn scan(dir: Option<&Path>) -> Result<()> {
+    let mut store = Store::open_default().context("opening the Sonar store")?;
+    let ids = match dir {
+        Some(dir) => match store.add_library(dir) {
+            Ok(lib) => vec![lib.id],
+            // A registered root that is gone (e.g. unmounted drive) is
+            // scanned anyway, so the user gets its `[offline]` report.
+            Err(add_err) => match store.library_by_root(dir).context("looking up library")? {
+                Some(lib) => vec![lib.id],
+                None => {
+                    return Err(add_err)
+                        .with_context(|| format!("adding library {}", dir.display()))
+                }
+            },
+        },
+        None => {
+            let libs = store.libraries().context("listing libraries")?;
+            if libs.is_empty() {
+                println!("no libraries yet: run `sonar scan <dir>`");
+            }
+            libs.into_iter().map(|l| l.id).collect()
+        }
+    };
+    for id in ids {
+        let report =
+            scan::scan_library(&mut store, id).with_context(|| format!("scanning library {id}"))?;
+        print_report(&report);
+    }
+    Ok(())
+}
+
+fn print_report(r: &scan::ScanReport) {
+    let state = if r.offline { " [offline]" } else { "" };
+    println!(
+        "library {}: {}{state} ({:.2} s)",
+        r.library_id,
+        r.root.display(),
+        r.duration.as_secs_f64()
+    );
+    let c = &r.counts;
+    println!(
+        "  added {}, changed {}, moved {}, removed {}, restored {}, unchanged {}, errors {}",
+        c.added, c.changed, c.moved, c.removed, c.restored, c.unchanged, c.errors
+    );
+    if !r.issues.is_empty() {
+        println!("  issues ({}):", r.issues.len());
+        for issue in &r.issues {
+            println!("    {issue}");
+        }
+    }
 }
 
 /// `sonar store info`: open the default store and print a summary.

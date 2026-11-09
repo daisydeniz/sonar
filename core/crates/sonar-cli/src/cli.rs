@@ -50,6 +50,14 @@ pub enum Command {
         skip_long: bool,
     },
 
+    /// Scan a sample library: add DIR as a library if it is new, then bring
+    /// the store in line with the disk (added/changed/moved/removed files).
+    /// Without DIR, rescan every registered library.
+    Scan {
+        /// Library root directory.
+        dir: Option<PathBuf>,
+    },
+
     /// Inspect the SQLite store (location: $SONAR_HOME/sonar.db, else
     /// ~/Library/Application Support/Sonar/sonar.db).
     Store {
@@ -100,6 +108,24 @@ mod tests {
             })
         ));
         assert!(Cli::try_parse_from(["sonar", "store"]).is_err());
+    }
+
+    #[test]
+    fn parses_scan_with_and_without_dir() {
+        let cli = Cli::try_parse_from(["sonar", "scan", "/x"]).map_err(|e| e.to_string());
+        assert!(matches!(
+            cli,
+            Ok(Cli {
+                command: Command::Scan { dir: Some(ref d) }
+            }) if d.as_os_str() == "/x"
+        ));
+        let cli = Cli::try_parse_from(["sonar", "scan"]).map_err(|e| e.to_string());
+        assert!(matches!(
+            cli,
+            Ok(Cli {
+                command: Command::Scan { dir: None }
+            })
+        ));
     }
 
     #[test]

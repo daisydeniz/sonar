@@ -78,6 +78,21 @@ pub enum Error {
         source: rusqlite::Error,
     },
 
+    /// No library with this id exists in the store.
+    #[error("library {id} not found")]
+    LibraryNotFound {
+        /// Requested `libraries.id`.
+        id: i64,
+    },
+
+    /// A path that must be stored as text (e.g. a library root) is not
+    /// valid UTF-8.
+    #[error("path is not valid UTF-8: {}", path.display())]
+    NonUtf8Path {
+        /// The offending path.
+        path: PathBuf,
+    },
+
     /// A required connection pragma did not take effect (e.g. SQLite refused
     /// WAL journaling, or foreign keys could not be enabled).
     #[error("could not set PRAGMA {name} = {expected} (SQLite reports '{found}')")]
@@ -189,6 +204,14 @@ mod tests {
             "could not set PRAGMA journal_mode = wal (SQLite reports 'delete')"
         );
         assert!(Error::NoDataDir.to_string().contains("SONAR_HOME"));
+        assert_eq!(
+            Error::LibraryNotFound { id: 7 }.to_string(),
+            "library 7 not found"
+        );
+        let err = Error::NonUtf8Path {
+            path: "/x/y".into(),
+        };
+        assert_eq!(err.to_string(), "path is not valid UTF-8: /x/y");
     }
 
     #[test]

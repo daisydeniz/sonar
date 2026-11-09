@@ -7,6 +7,7 @@
 //! [`LATEST_VERSION`]; a database from a newer build is refused before
 //! anything is written to it.
 
+mod libraries;
 mod migrations;
 #[cfg(test)]
 mod tests;
@@ -19,6 +20,7 @@ use rusqlite::Connection;
 
 use crate::{paths, Error, Result};
 
+pub use libraries::Library;
 pub use migrations::LATEST_VERSION;
 
 /// How long a connection waits for a lock held by another connection.
@@ -196,6 +198,11 @@ impl Store {
     /// Underlying connection, for other core modules (scan, jobs, index).
     pub(crate) fn conn(&self) -> &Connection {
         &self.conn
+    }
+
+    /// Mutable connection, for modules that open write transactions.
+    pub(crate) fn conn_mut(&mut self) -> &mut Connection {
+        &mut self.conn
     }
 }
 

@@ -43,3 +43,16 @@ process for crash isolation. VST2-only and 32-bit plugins unsupported.
 ## ADR-008 — Quality measured, not asserted
 Accepted. Every analysis/search change runs `sonar eval` against synthetic
 fixtures and (when present) the golden set; regressions block merge.
+
+## ADR-009 — Scanner file identity and walk policy (T1.2)
+Accepted. Identity = `size` + `mtime` (ns) + `quick_hash`, where
+`quick_hash` = XXH3-64 (`twox-hash`, MIT) over the size as LE u64 + first
+64 KiB + last 64 KiB (whole file if ≤ 128 KiB), stored bit-cast as INTEGER.
+Unchanged size+mtime → the file is not opened. Moves/renames are matched by
+(size, quick_hash) within one library, so ids and user data survive.
+Changing the recipe invalidates every stored hash (needs a migration that
+rehashes). Symlinks are **not** followed (no loops, no double-indexing);
+dot-files/dirs and AppleDouble `._*` are skipped. Missing files become
+`status='missing'` (rows and user data kept); an offline root or an
+unreadable folder never marks rows missing. Revisit symlink support if users
+keep packs behind links (follow with a visited-inode set).

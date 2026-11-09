@@ -50,7 +50,7 @@ progress), `eval`.
 ### Preferred dependencies (permissive licenses only)
 `symphonia` (decode), `rubato` (resample), `rustfft`/`realfft`, `rayon`,
 `rusqlite` (bundled), `tantivy`, `usearch` (or SIMD brute force),
-`ort` (ONNX Runtime; CoreML EP on macOS), `notify`, `xxhash-rust`,
+`ort` (ONNX Runtime; CoreML EP on macOS), `notify`, `twox-hash` (XXH3; not `xxhash-rust`, which is BSL-1.0),
 `serde`/`serde_json`, `clap` (CLI), `thiserror`/`anyhow`, `tracing`,
 `uniffi`, `criterion` (bench). **No GPL/AGPL/LGPL-static** (no aubio,
 Essentia, libKeyFinder). Enforced by `cargo deny` (`core/deny.toml`).
