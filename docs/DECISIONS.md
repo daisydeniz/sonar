@@ -75,7 +75,7 @@ packets, ≤ 64 Mi source frames buffered. Every call runs under
 `catch_unwind` (symphonia-format-riff 0.6.1 has a u16 overflow panic on a
 crafted WAV header in debug builds).
 
-## ADR-009 — Model mix for the agent team (usage budget)
+## ADR-011 — Model mix for the agent team (usage budget)
 Accepted (2026-11-09). Founder is on the Pro plan; usage limits, not model
 quality, were the bottleneck (1–4 tasks per 5-hour window). Orchestrator
 (autopilot `--model opus`), reviewer, dsp-analysis and search-ranking stay on

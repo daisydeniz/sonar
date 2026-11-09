@@ -96,5 +96,5 @@ When every non-human task is done, set `Loop state: ROADMAP COMPLETE`.
 | eval (sonnet) | fixtures truth, `sonar eval`, reports, baseline tracking |
 | reviewer (opus) | read-only review of diffs vs AC, rules, perf, licenses |
 
-Models per ADR-009: you (orchestrator) run on Opus. Subagents cannot spawn subagents; you coordinate. Keep your own context
+Models per ADR-011: you (orchestrator) run on Opus. Subagents cannot spawn subagents; you coordinate. Keep your own context
 lean: delegate reading large code areas to subagents and ask for summaries.
