@@ -14,6 +14,7 @@ rustc/cargo 1.99.1 · cargo-deny 0.20.2 · claude 2.1.316 · gh: not installed (
 ## Needs human
 _(Agents list anything that requires the founder: decisions, credentials,
 manual tests, labeled data. Keep each item one line with the task id.)_
+- T0.1 `git push origin main` fails: no GitHub credentials for HTTPS in this (non-interactive) shell. Run `brew install gh && gh auth login && gh auth setup-git` once; main is ahead locally until then (loop keeps going, commits are local).
 - T0.1 (optional) For `cargo` in a normal terminal / hand-started `claude`, add to ~/.zprofile: `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"` (scripts and autopilot already handle it). Optional: `brew install gh`.
 - T3.7 Golden set labeling (when M3 starts)
 - T8.1 End-to-end test by the founder (after M7)
