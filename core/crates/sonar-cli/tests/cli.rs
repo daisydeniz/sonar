@@ -264,3 +264,76 @@ fn invalid_rust_log_falls_back_to_default() {
         .expect("failed to spawn sonar binary");
     assert!(out.status.success());
 }
+
+/// Writes a 2 s, 48 kHz, 24-bit stereo sine WAV into `dir`.
+fn write_test_wav(dir: &std::path::Path) -> std::path::PathBuf {
+    use sonar_core::fixtures::wav::{encode, SampleFormat, WavSpec};
+    let spec = WavSpec::new(48_000, 2, SampleFormat::Int24);
+    let samples: Vec<f32> = (0..96_000)
+        .flat_map(|i| {
+            let t = f64::from(i) / 48_000.0;
+            let s = (0.5 * (std::f64::consts::TAU * 440.0 * t).sin()) as f32;
+            [s, s]
+        })
+        .collect();
+    let path = dir.join("tone.wav");
+    std::fs::write(&path, encode(&spec, &samples).bytes).expect("write wav");
+    path
+}
+
+#[test]
+fn decode_prints_source_duration_and_analysis_length() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let wav = write_test_wav(tmp.path());
+    let wav_s = wav.to_str().expect("utf-8 temp path");
+
+    let out = sonar(&["decode", wav_s]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = stdout(&out);
+    for want in [
+        "format: wave / pcm_s24le",
+        "source: 48000 Hz, 2 ch, 24-bit",
+        "duration: 2.000000 s (96000 frames; header: 96000)",
+        "analysis: 44100 samples @ 22050 Hz (2.000 s)",
+        "partial: no",
+    ] {
+        assert!(text.contains(want), "missing {want:?} in:\n{text}");
+    }
+
+    let out = sonar(&["decode", wav_s, "--json", "--max-secs", "1"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("JSON output");
+    assert_eq!(v["source"]["num_frames"], 96_000);
+    assert_eq!(v["source"]["bit_depth"], 24);
+    assert_eq!(v["analysis"]["samples"], 22_050);
+    assert_eq!(v["truncated_for_analysis"], true);
+    assert_eq!(v["partial"], false);
+
+    let out = sonar(&["decode", wav_s, "--json", "--full", "--rate", "16000"]);
+    let v: serde_json::Value = serde_json::from_slice(&out.stdout).expect("JSON output");
+    assert_eq!(v["analysis"]["samples"], 32_000);
+    assert_eq!(v["analysis"]["sample_rate"], 16_000);
+}
+
+#[test]
+fn decode_of_bad_input_fails_with_message() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let junk = tmp.path().join("junk.wav");
+    std::fs::write(&junk, b"not audio at all").expect("write");
+    let missing = tmp.path().join("missing.wav");
+    for (path, want) in [(&junk, "unsupported audio format"), (&missing, "I/O error")] {
+        let out = sonar(&["decode", path.to_str().expect("utf-8")]);
+        assert!(!out.status.success());
+        assert!(out.stdout.is_empty());
+        let err = String::from_utf8_lossy(&out.stderr);
+        assert!(err.contains("decoding") && err.contains(want), "{err}");
+    }
+}

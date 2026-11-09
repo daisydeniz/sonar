@@ -1,6 +1,7 @@
 //! `sonar` — headless entry point to every core feature.
 
 mod cli;
+mod decode_cmd;
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -28,6 +29,13 @@ fn main() -> Result<()> {
             skip_long,
         } => fixtures(&dir, seed, !skip_long)?,
         Command::Scan { dir } => scan(dir.as_deref())?,
+        Command::Decode {
+            file,
+            rate,
+            max_secs,
+            full,
+            json,
+        } => decode_cmd::run(&file, rate, (!full).then_some(max_secs), json)?,
         Command::Store {
             command: StoreCommand::Info,
         } => store_info()?,

@@ -58,6 +58,34 @@ pub enum Command {
         dir: Option<PathBuf>,
     },
 
+    /// Decode one audio file the way analysis does (mono, resampled, first
+    /// 30 s) and print its source format, true duration and the analysis
+    /// sample count. Exits non-zero if the file cannot be decoded.
+    Decode {
+        /// Audio file (wav, aif/aiff, flac, mp3, ogg, m4a).
+        file: PathBuf,
+        /// Analysis sample rate in Hz.
+        #[arg(
+            long,
+            default_value_t = sonar_core::decode::ANALYSIS_RATE,
+            value_parser = clap::value_parser!(u32).range(
+                i64::from(sonar_core::decode::source::MIN_SAMPLE_RATE)
+                    ..=i64::from(sonar_core::decode::source::MAX_SAMPLE_RATE)
+            )
+        )]
+        rate: u32,
+        /// Analysis window in seconds (0 = duration only).
+        #[arg(long, default_value_t = sonar_core::decode::DEFAULT_MAX_ANALYSIS_SECS,
+              value_parser = parse_secs, conflicts_with = "full")]
+        max_secs: f64,
+        /// Decode the whole file (up to the hard memory cap) instead of the window.
+        #[arg(long)]
+        full: bool,
+        /// Print JSON instead of text.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Inspect the SQLite store (location: $SONAR_HOME/sonar.db, else
     /// ~/Library/Application Support/Sonar/sonar.db).
     Store {
@@ -75,10 +103,67 @@ pub enum StoreCommand {
     Info,
 }
 
+/// Parses a finite, non-negative number of seconds.
+fn parse_secs(s: &str) -> Result<f64, String> {
+    match s.parse::<f64>() {
+        Ok(v) if v.is_finite() && v >= 0.0 => Ok(v),
+        _ => Err(format!("'{s}' is not a non-negative number of seconds")),
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use clap::CommandFactory;
+
+    #[test]
+    fn parses_decode_defaults_and_flags() {
+        let cli = Cli::try_parse_from(["sonar", "decode", "a.wav"]).map_err(|e| e.to_string());
+        assert!(matches!(
+            cli,
+            Ok(Cli {
+                command: Command::Decode {
+                    rate: 22_050,
+                    full: false,
+                    json: false,
+                    max_secs,
+                    ..
+                }
+            }) if max_secs == 30.0
+        ));
+        let cli = Cli::try_parse_from([
+            "sonar",
+            "decode",
+            "a.wav",
+            "--rate",
+            "16000",
+            "--max-secs",
+            "2.5",
+            "--json",
+        ])
+        .map_err(|e| e.to_string());
+        assert!(matches!(
+            cli,
+            Ok(Cli {
+                command: Command::Decode {
+                    rate: 16_000,
+                    json: true,
+                    max_secs,
+                    ..
+                }
+            }) if max_secs == 2.5
+        ));
+        for bad in [
+            &["sonar", "decode", "a.wav", "--full", "--max-secs", "3"][..],
+            &["sonar", "decode", "a.wav", "--max-secs", "-1"],
+            &["sonar", "decode", "a.wav", "--max-secs", "nan"],
+            &["sonar", "decode", "a.wav", "--rate", "0"],
+            &["sonar", "decode"],
+        ] {
+            assert!(Cli::try_parse_from(bad).is_err(), "{bad:?}");
+        }
+        assert!(Cli::try_parse_from(["sonar", "decode", "a.wav", "--full"]).is_ok());
+    }
 
     #[test]
     fn definition_is_consistent() {

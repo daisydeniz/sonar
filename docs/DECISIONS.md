@@ -56,3 +56,21 @@ dot-files/dirs and AppleDouble `._*` are skipped. Missing files become
 `status='missing'` (rows and user data kept); an offline root or an
 unreadable folder never marks rows missing. Revisit symlink support if users
 keep packs behind links (follow with a visited-inode set).
+
+## ADR-010 — Decode policy (T1.3)
+Accepted. `sonar_core::decode` uses symphonia 0.6.1 (MPL-2.0; wav, aiff,
+pcm, adpcm, flac, mp3, ogg/vorbis, isomp4/aac/alac, id3v2) and rubato 5.0.1
+`Fft` resampler (MIT/Apache; chunk 4096, 4 sub-chunks, delay trimmed and
+tail flushed → `ceil(n·22050/src)` samples, ±1-sample alignment). Analysis
+input = mean-of-channels mono f32 at 22.05 kHz, capped at 30 s (+ an edge
+margin of max(50 ms, 2 resampler blocks) decoded past the cap). Duration is
+**counted**: decoded frames in the window + packet durations past it (raw
+ticks, converted once); counted < declared → `partial`. Policy: a packet
+the codec rejects → silence of equal length + `partial` (> 32 in a row
+stops); malformed container mid-stream → `partial`; real I/O error (not EOF)
+→ `Error::Io` (offline drive must not be stored as a damaged file); nothing
+decoded + error → error; valid header with 0 frames → Ok, empty; 0-byte file
+→ error. Hard caps: 1 kHz–768 kHz, 1–32 ch, ≤ 2^18 frames/packet, ≤ 2^23
+packets, ≤ 64 Mi source frames buffered. Every call runs under
+`catch_unwind` (symphonia-format-riff 0.6.1 has a u16 overflow panic on a
+crafted WAV header in debug builds).

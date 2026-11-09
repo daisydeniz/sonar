@@ -104,6 +104,27 @@ pub enum Error {
         /// Value SQLite reported back.
         found: String,
     },
+
+    /// The file at `path` could not be decoded as audio: not audio at all,
+    /// a damaged header, no decodable frames, or limits exceeded (absurd
+    /// channel count / sample rate / packet size).
+    #[error("cannot decode {}: {reason}", path.display())]
+    Decode {
+        /// The audio file.
+        path: PathBuf,
+        /// Human-readable cause (from the demuxer/decoder or our checks).
+        reason: String,
+    },
+
+    /// The file at `path` is in a container or codec this build cannot
+    /// decode (or is not recognised as audio at all).
+    #[error("unsupported audio format in {}: {reason}", path.display())]
+    UnsupportedFormat {
+        /// The audio file.
+        path: PathBuf,
+        /// What is unsupported.
+        reason: String,
+    },
 }
 
 impl From<rusqlite::Error> for Error {
@@ -212,6 +233,27 @@ mod tests {
             path: "/x/y".into(),
         };
         assert_eq!(err.to_string(), "path is not valid UTF-8: /x/y");
+    }
+
+    #[test]
+    fn decode_errors_name_path_and_reason() {
+        let err = Error::Decode {
+            path: "/s/kick.wav".into(),
+            reason: "unexpected end of file".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "cannot decode /s/kick.wav: unexpected end of file"
+        );
+        assert!(err.source().is_none());
+        let err = Error::UnsupportedFormat {
+            path: "/s/a.wav".into(),
+            reason: "no audio track".into(),
+        };
+        assert_eq!(
+            err.to_string(),
+            "unsupported audio format in /s/a.wav: no audio track"
+        );
     }
 
     #[test]
