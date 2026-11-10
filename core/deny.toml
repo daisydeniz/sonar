@@ -24,6 +24,12 @@ allow = [
 confidence-threshold = 0.9
 unused-allowed-license = "allow"
 
+# notify is CC0-1.0, a public-domain dedication with no conditions; scoped to
+# the one crate that needs it instead of allowing it globally (ADR-014).
+[[licenses.exceptions]]
+name = "notify"
+allow = ["CC0-1.0"]
+
 [licenses.private]
 # Our own crates are `publish = false` with `LicenseRef-Proprietary`.
 ignore = true

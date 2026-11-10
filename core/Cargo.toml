@@ -43,6 +43,9 @@ symphonia = { version = "0.6.1", default-features = false, features = [
 # MIT OR Apache-2.0. Band-limited resampling to the analysis rate (FFT
 # resampler: synchronous, fixed ratio, fast).
 rubato = "5.0.1"
+# CC0-1.0 (public-domain dedication). FSEvents file watching (ADR-014). No
+# `crossbeam-channel` feature: events go through std mpsc.
+notify = { version = "8.2.2", default-features = false, features = ["macos_fsevent"] }
 # Test-only (dev-dependencies).
 hound = "3.5.1"      # Apache-2.0; independent WAV reader to verify our writer
 tempfile = "3.27.0"  # MIT OR Apache-2.0

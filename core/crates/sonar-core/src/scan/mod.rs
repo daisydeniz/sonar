@@ -45,6 +45,12 @@
 //! - Root missing or unlistable (e.g. unmounted drive): the report is
 //!   flagged `offline`, `libraries.online` set to 0, no file row changes.
 //!   A successful scan sets `online` back to 1.
+//! - Stale mount point: a root that exists but is a completely **empty**
+//!   directory while the library has present (non-`missing`) rows is treated
+//!   as offline too (an unmounted volume often leaves its empty mount-point
+//!   directory behind). Without this guard every row would be marked
+//!   `missing`. A library the user really emptied therefore stays
+//!   "offline" until at least one entry appears; no rows are lost.
 //!
 //! Same-path content swaps (`a`↔`b` renamed into each other) are seen as
 //! two **changed** files: user data stays with the path.
@@ -184,20 +190,20 @@ pub fn scan_library_with(
         Ok(w) => w,
         Err(walk::WalkError::Cancelled) => return Err(Error::Cancelled),
         Err(walk::WalkError::Offline(e)) => {
-            store.set_library_online(library_id, false)?;
-            report.offline = true;
-            report.issues.push(ScanIssue {
-                path: root,
-                kind: IssueKind::UnreadableDir,
-                message: format!("library root unavailable: {e}"),
-            });
-            report.duration = start.elapsed();
-            return Ok(report);
+            let why = format!("library root unavailable: {e}");
+            return offline_report(store, report, why, start);
         }
     };
+    let rows = apply::load_files(store.conn(), library_id)?;
+    if walked.files.is_empty()
+        && rows.iter().any(|r| r.status != reconcile::Status::Missing)
+        && is_empty_dir(&root)
+    {
+        let why = "library root is an empty directory (stale mount point?)".to_owned();
+        return offline_report(store, report, why, start);
+    }
     report.issues = walked.issues;
 
-    let rows = apply::load_files(store.conn(), library_id)?;
     let plan = reconcile::plan(
         rows,
         walked.files,
@@ -211,6 +217,29 @@ pub fn scan_library_with(
 
     report.counts = plan.counts;
     report.issues.extend(plan.issues);
+    report.duration = start.elapsed();
+    Ok(report)
+}
+
+/// True if `dir` can be listed and has no entries at all.
+fn is_empty_dir(dir: &std::path::Path) -> bool {
+    std::fs::read_dir(dir).is_ok_and(|mut d| d.next().is_none())
+}
+
+/// Marks the library offline (no row changes) and finishes the report.
+fn offline_report(
+    store: &mut Store,
+    mut report: ScanReport,
+    message: String,
+    start: Instant,
+) -> Result<ScanReport> {
+    store.set_library_online(report.library_id, false)?;
+    report.offline = true;
+    report.issues.push(ScanIssue {
+        path: report.root.clone(),
+        kind: IssueKind::UnreadableDir,
+        message,
+    });
     report.duration = start.elapsed();
     Ok(report)
 }

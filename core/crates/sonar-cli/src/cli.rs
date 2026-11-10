@@ -127,6 +127,21 @@ pub enum Command {
         debug_delay_ms: u64,
     },
 
+    /// Watch every library in the store and keep the index in line with the
+    /// disk until killed (Ctrl-C): added, deleted, renamed and moved files
+    /// are picked up by a debounced incremental rescan; a library whose
+    /// folder disappears (unmounted drive) goes offline with its rows kept,
+    /// and comes back when the folder returns. Prints one line (or JSON
+    /// object) per event on stdout. Does not analyze: run `sonar analyze`.
+    Watch {
+        /// Print one JSON object per line instead of text.
+        #[arg(long)]
+        json: bool,
+        /// Quiet period after the last change before rescanning (ms).
+        #[arg(long, default_value_t = 400, value_parser = clap::value_parser!(u64).range(1..=60_000))]
+        debounce_ms: u64,
+    },
+
     /// Inspect the SQLite store (location: $SONAR_HOME/sonar.db, else
     /// ~/Library/Application Support/Sonar/sonar.db).
     Store {

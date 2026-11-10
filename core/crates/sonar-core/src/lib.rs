@@ -13,6 +13,7 @@ pub mod paths;
 pub mod quiet_panic;
 pub mod scan;
 pub mod store;
+pub mod watch;
 
 pub use error::{Error, Result};
 pub use store::{Library, Store};

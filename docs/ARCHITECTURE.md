@@ -111,8 +111,11 @@ write store + index
   then CLAP last (most expensive). UI shows partial results immediately.
 - `rayon` pool for CPU stages; CLAP in batches on its own thread.
 - Corrupt files: record `error`, never panic across FFI (catch_unwind).
-- Watching: FSEvents via `notify`; offline volumes keep cached rows,
-  marked `online=0`.
+- Watching (`watch`, ADR-014): FSEvents via `notify` as a *trigger* only; a
+  debounced (400 ms quiet, 5 s cap) incremental rescan of the affected
+  library does the work, serialized on one watcher thread. Offline volumes
+  keep cached rows, marked `online=0`; a 2 s root poll detects unmount and
+  remount and re-establishes the watch. `sonar watch` exposes it.
 
 ## 5. Features for similarity (aspects)
 Per file, fixed-length vectors, z-score normalized with library stats:

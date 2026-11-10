@@ -124,6 +124,83 @@ fn missing_root_is_offline_and_changes_no_rows() {
 }
 
 #[test]
+fn empty_root_with_present_rows_is_a_stale_mount_point() {
+    let mut lib = Lib::new();
+    lib.write("a.wav", b"a");
+    lib.write("sub/b.wav", b"b");
+    lib.scan();
+    let before = lib.dump();
+
+    // Unmounted volume: the mount point stays behind as an empty directory.
+    let away = lib.outside().join("unmounted");
+    fs::rename(&lib.root, &away).expect("unmount");
+    fs::create_dir(&lib.root).expect("empty mount point");
+    let report = lib.scan();
+    assert!(report.offline);
+    assert_eq!(report.counts, ScanCounts::default());
+    assert_eq!(lib.dump(), before, "nothing marked missing");
+    assert!(
+        !lib.store
+            .library(lib.id)
+            .expect("get")
+            .expect("some")
+            .online
+    );
+
+    // Remounted: normal scan, back online.
+    fs::remove_dir(&lib.root).expect("rmdir");
+    fs::rename(&away, &lib.root).expect("remount");
+    let report = lib.scan();
+    assert!(!report.offline);
+    assert_eq!(report.counts, counts(0, 0, 0, 0, 2));
+    assert!(
+        lib.store
+            .library(lib.id)
+            .expect("get")
+            .expect("some")
+            .online
+    );
+}
+
+#[test]
+fn root_with_only_non_audio_entries_marks_rows_missing() {
+    let mut lib = Lib::new();
+    lib.write("a.wav", b"a");
+    lib.scan();
+    // Emptied in Finder: a `.DS_Store` (hidden) stays behind.
+    fs::remove_file(lib.path("a.wav")).expect("rm");
+    lib.write(".DS_Store", b"finder");
+    let report = lib.scan();
+    assert!(!report.offline, "a non-empty root is a real library");
+    assert_eq!(report.counts.removed, 1);
+    assert_eq!(lib.must("a.wav").status, "missing");
+}
+
+#[test]
+fn empty_root_with_only_missing_rows_stays_online() {
+    let mut lib = Lib::new();
+    lib.write("a.wav", b"a");
+    lib.write("notes.txt", b"keeps the root non-empty");
+    lib.scan();
+    fs::remove_file(lib.path("a.wav")).expect("rm");
+    lib.scan();
+    assert_eq!(lib.must("a.wav").status, "missing");
+
+    fs::remove_file(lib.path("notes.txt")).expect("rm notes");
+    let report = lib.scan();
+    assert!(!report.offline, "no present rows → no stale-mount guess");
+    assert_eq!(report.counts, ScanCounts::default());
+    assert_eq!(lib.must("a.wav").status, "missing");
+}
+
+#[test]
+fn new_empty_root_is_online() {
+    let mut lib = Lib::new();
+    let report = lib.scan();
+    assert!(!report.offline, "a new, empty library is fine");
+}
+
+#[test]
 fn unlistable_root_is_offline() {
     let mut lib = Lib::new();
     lib.write("a.wav", b"a");

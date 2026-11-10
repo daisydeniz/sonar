@@ -160,3 +160,45 @@ Accepted. `sonar_core::jobs` runs the analysis stages in the background.
   the job thread; `JobHandle` pause/resume (Condvar, no busy loop, between
   files), cancel (stop claiming, in-flight files finish and commit), polled
   `progress()` and an optional event callback.
+
+## ADR-014 — File watching (T1.6)
+- **Strategy**: `notify` 8.2.2 (FSEvents backend, `macos_fsevent` only, no
+  crossbeam) events only *trigger* an incremental `scan_library_with` of the
+  affected library; no per-event DB edits (moves need the library-wide view,
+  the size+mtime fast path makes a no-op rescan cheap). Events on dot-files
+  and non-audio files are dropped; directory events, renames, unknown kinds,
+  `need_rescan` and watcher errors always trigger.
+- **Debounce**: per library, 400 ms of silence, at most 5 s after the first
+  event of a burst (pure state machine, unit-tested without real time).
+  Measured write-to-`Scanned` latency with a 100 ms debounce: ~120 ms.
+- **Serialization**: one watcher thread owns its `Store` connection and runs
+  scans one at a time, so scans of a library never overlap. A failed scan
+  (e.g. busy beyond the 5 s timeout) is reported and retried after 5 s.
+  Job-pipeline commits are short batches in WAL; the pipeline's stale-claim
+  check discards results for files a scan reset.
+- **Offline**: a 2 s poll checks each root. Missing root: drop the notify
+  watch (cannot watch a missing path), scan once (`online=0`, rows kept).
+  Back: new watch, scan (`online=1`). A library offline in the index but
+  present on disk is rescanned each poll. The same poll adopts libraries
+  added to the store. Every library is scanned once at start.
+- **Robustness**: callback and scan run under `quiet_panic::guarded`;
+  panics become `WatchEvent::Error`.
+- **License**: notify is CC0-1.0 (public-domain dedication); allowed in
+  `deny.toml` as a `[[licenses.exceptions]]` entry for `notify` only.
+- **Spacing**: after a scan, event-driven rescans of that library wait
+  `2 x scan time` besides the 400 ms quiet period (scan duty cycle ≤ ~1/3
+  during long copies; ms-fast libraries still react in ~0.4 s); root changes, manual rescans and retries skip it.
+  A root that exists but is offline in the index is retried every 5 s.
+- **Stale mount point**: the scanner treats a root that is an empty
+  directory while the library has present rows as offline (`online=0`, no
+  row marked missing), so an unmounted volume's leftover mount point cannot
+  wipe the index. Emptying a library on purpose keeps it "offline" until an
+  entry appears.
+- **Shutdown**: `stop()` from inside the callback only requests the stop
+  (no self-join). A watcher-thread panic outside scan/callback emits a final
+  `Error{library_id: None}` and `is_running()` turns false.
+- **Limits**: FSEvents does not report changes made remotely on SMB/NAS
+  volumes (only the periodic root poll and manual `rescan_now` help there).
+  A root replaced by a different volume at the same path within
+  one poll interval is treated as unchanged; the 2 s poll bounds
+  detection latency for unmounts that raise no event.

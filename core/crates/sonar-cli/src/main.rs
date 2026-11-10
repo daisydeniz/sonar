@@ -4,6 +4,7 @@ mod analyze_cmd;
 mod cli;
 mod decode_cmd;
 mod meta_cmd;
+mod watch_cmd;
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -56,6 +57,7 @@ fn main() -> Result<()> {
             json,
             debug_delay_ms,
         })?,
+        Command::Watch { json, debounce_ms } => watch_cmd::run(json, debounce_ms)?,
         Command::Store {
             command: StoreCommand::Info,
         } => store_info()?,

@@ -7,6 +7,7 @@ publish.workspace = true
 description = "Sonar core: scan, analysis, index and search for local sample libraries."
 
 [dependencies]
+notify.workspace = true
 rayon.workspace = true
 rubato.workspace = true
 rusqlite.workspace = true

@@ -91,6 +91,8 @@ fn reappearing_file_is_restored_with_its_status() {
     lib.set_mtime("snare.wav", 2_000_000);
     lib.write("plain.wav", b"plain");
     lib.set_mtime("plain.wav", 2_000_000);
+    // A non-audio entry keeps the root from looking like a stale mount point.
+    lib.write("notes.txt", b"x");
     lib.scan();
     let snare = lib.must("snare.wav").id;
     let plain = lib.must("plain.wav").id;
@@ -136,6 +138,7 @@ fn restoring_clears_stale_error_text() {
     let mut lib = Lib::new();
     lib.write("same-path.wav", b"one");
     lib.write("moved.wav", b"two");
+    lib.write("notes.txt", b"x"); // root never looks like an empty mount point
     lib.scan();
     // Analysis failures recorded later (status error, hash kept).
     for rel in ["same-path.wav", "moved.wav"] {

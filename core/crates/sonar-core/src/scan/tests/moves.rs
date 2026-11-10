@@ -147,6 +147,7 @@ fn surplus_identical_copies_are_added_or_removed() {
 fn missing_row_is_revived_by_a_later_move() {
     let mut lib = Lib::new();
     lib.write("one.wav", b"one-shot");
+    lib.write("notes.txt", b"x"); // root never looks like an empty mount point
     lib.scan();
     let id = lib.must("one.wav").id;
     lib.decorate(id);
