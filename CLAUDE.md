@@ -7,7 +7,8 @@ he lets the loop run and tests the app himself at the end. Never wait for
 approval; make reasonable decisions, record them (ADR / STATUS log), continue.
 
 ## Read first (every session)
-1. `docs/STATUS.md` — where we are, what needs a human.
+1. `docs/STATUS.md` — where we are, what needs a human. (`docs/STATUS-ARCHIVE.md`
+   holds old log entries: do not read it unless the task needs that history.)
 2. `docs/ROADMAP.md` — the task queue and rules.
 3. `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`,
    `docs/EVAL.md` — only the sections relevant to the current task.
@@ -19,17 +20,25 @@ approval; make reasonable decisions, record them (ADR / STATUS log), continue.
    create `task/<id>-<slug>` (e.g. `task/t1-2-scanner`).
 1. Pick the first unchecked, non-`[HUMAN]` task in ROADMAP whose deps are done.
 2. Plan briefly (scope, files, tests). If the task is large, split it into
-   sub-tasks in ROADMAP and do the first one.
+   sub-tasks in ROADMAP and do the first one. Split only to reach the task's
+   own AC — never to add follow-ups (see "Scope" below).
 3. Delegate implementation to the owner subagent named in the task tag
    (`.claude/agents/`). Give it: task id, AC, relevant doc sections, files.
    Independent pieces may go to several subagents in parallel.
 4. Run `scripts/check.sh`. Fix until green (delegate fixes back if needed).
 5. Ask the **reviewer** subagent to review the diff against AC + rules below.
-   Address every blocking finding.
+   Address every BLOCKING finding. **At most 2 review rounds**: round 2 only
+   re-checks round-1 blockers. NITs: fix only if trivial (a few lines),
+   otherwise add one line to ROADMAP `## Later`. If something non-critical is
+   still open after round 2, move it to `## Later` and finish the task.
 6. For analysis/search changes: run eval (`eval` subagent) and compare to
    BASELINE; regressions follow the rule in EVAL.md.
-7. Update ROADMAP (check box + short commit hash), STATUS (Current, Log entry
-   with what changed + numbers, Needs human), commit on the task branch.
+7. Update ROADMAP (check box + short commit hash), STATUS (Current, Log entry,
+   Needs human), commit on the task branch. **Log entry: max ~5 lines** —
+   what changed, key numbers, open follow-ups (by Later reference). Details
+   belong in the commit message / ADR, not STATUS. Keep only the **3 newest**
+   Log entries in STATUS.md; move older ones to the top of
+   `docs/STATUS-ARCHIVE.md`.
 8. Merge (see Git): rebase on `main`, `check.sh` green again, fast-forward
    `main`, push, delete the task branch. Tag the milestone if it is complete.
 9. Stop. The autopilot starts a fresh session for the next task.
@@ -53,7 +62,19 @@ When every non-human task is done, set `Loop state: ROADMAP COMPLETE`.
   comments.
 - **Robustness**: never panic across FFI; corrupt input → error value.
 - **Performance budgets** in PRODUCT.md are requirements; add a benchmark
-  when touching a hot path.
+  when touching a hot path. Meeting the budget/AC is enough: do not optimize
+  beyond it inside the MVP roadmap.
+
+## Scope (usage budget is limited)
+- Do the task's AC, nothing more. Extra perf work, rare edge cases,
+  refactors and reviewer NITs that aren't trivial go to ROADMAP `## Later`
+  as one line each (`- (from T1.7c) …`). The loop never picks `## Later`
+  items; the founder triages them after M8.
+- New roadmap tasks are allowed only when the MVP cannot work without them
+  (a real bug, a missing piece another task depends on). Record why in the
+  task line.
+- Don't re-run `scripts/check.sh` more than needed: once after
+  implementation, once after review fixes, once after rebase.
 - Small modules (< ~400 lines), clear names, doc comments on public items,
   tests next to code. `cargo fmt`, `clippy -D warnings`, no `unwrap()` in
   non-test code paths that handle user files.

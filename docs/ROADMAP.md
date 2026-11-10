@@ -10,6 +10,9 @@ The autonomous loop works top to bottom. Rules:
   Append the commit hash: `[x] … (abc1234)`.
 - Agents may split a task into sub-tasks (T1.2a, T1.2b) or add tasks, but must
   not delete or reorder existing ones. Scope changes → ADR in DECISIONS.md.
+- Split/add only what the AC or the MVP really needs. Follow-ups, extra perf,
+  rare edge cases and non-trivial NITs go to `## Later` (end of file, one line
+  each, no checkbox). The loop never picks Later items.
 
 Owner tags map to subagents in `.claude/agents/`.
 
@@ -86,3 +89,8 @@ Owner tags map to subagents in `.claude/agents/`.
 ## Future (do not start)
 v1.x: record-to-search, 2D map, tempo-synced preview, kit builder, `.als` project map.
 v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
+
+## Later (not picked by the loop — founder triages after M8)
+- (from T1.7c review) Resume pressed while a failed job is shutting down may start a few files that are stopped immediately.
+- (from T1.7c review) Loop guard against a loop that cannot happen today.
+- (from T1.7c) `cargo deny` advisories check failed once (not in check.sh, no deps changed); cause unconfirmed.

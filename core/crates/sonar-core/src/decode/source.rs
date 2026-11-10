@@ -16,7 +16,7 @@ use symphonia::core::codecs::CodecParameters;
 use symphonia::core::errors::Error as SymError;
 use symphonia::core::formats::probe::Hint;
 use symphonia::core::formats::well_known::{
-    FORMAT_ID_ISOMP4, FORMAT_ID_MP1, FORMAT_ID_MP2, FORMAT_ID_MP3,
+    FORMAT_ID_AIFF, FORMAT_ID_ISOMP4, FORMAT_ID_MP1, FORMAT_ID_MP2, FORMAT_ID_MP3, FORMAT_ID_WAVE,
 };
 use symphonia::core::formats::{FormatOptions, FormatReader, TrackType};
 use symphonia::core::io::{MediaSource, MediaSourceStream, MediaSourceStreamOptions};
@@ -24,6 +24,7 @@ use symphonia::core::meta::MetadataOptions;
 use symphonia::core::units::TimeBase;
 
 use super::gapless::{self, Gapless};
+use super::{aiff, header};
 use crate::{Error, Result};
 
 /// Lowest accepted source sample rate (Hz).
@@ -59,8 +60,6 @@ pub(super) struct Opened {
     pub layout: Option<Channels>,
     /// Codec short name, e.g. `pcm_s16le`, `flac`, `mp3`.
     pub codec: String,
-    /// Codec id of the selected track (drives the header length path).
-    pub codec_id: AudioCodecId,
     /// Container short name, e.g. `wave`, `aiff`, `flac`.
     pub container: String,
     /// Playable frames declared by the container, if any.
@@ -68,18 +67,32 @@ pub(super) struct Opened {
     /// The demuxer reports `Packet::dur` *before* gapless trimming
     /// (symphonia 0.6.1 MPEG audio; see [`super::stream::valid_ticks`]).
     pub dur_includes_trim: bool,
-    /// Encoder priming/padding of an MP4 file (symphonia ignores it, see
-    /// [`super::gapless`]); [`Opened::declared_frames`] already reflects it.
+    /// Playable span of the decoded stream: encoder priming/padding of an
+    /// MP4 file (symphonia ignores it, see [`super::gapless`]) or the
+    /// `COMM` length of an AIFF whose `SSND` holds more frames
+    /// ([`super::aiff`]); [`Opened::declared_frames`] already reflects it.
     pub gapless: Option<Gapless>,
+    /// Bytes per frame of uncompressed PCM in WAVE/AIFF (one frame per
+    /// block, ticks = frames): a packet holds `data.len() / pcm_frame_bytes`
+    /// frames ([`super::stream`]). `None` for every other codec/container.
+    pub pcm_frame_bytes: Option<u64>,
 }
 
 /// Opens and probes `path`. Errors: [`Error::Io`] if the file cannot be
 /// opened or read, [`Error::UnsupportedFormat`] for unknown containers or
 /// codecs, [`Error::Decode`] for damaged headers or out-of-limit values.
+///
+/// AIFF: `COMM` is the declared length and a truncated `FORM` is read
+/// through a consistent header ([`aiff`], T1.7d).
 pub(super) fn open(path: &Path) -> Result<Opened> {
     let file = File::open(path).map_err(|e| Error::io(path, e))?;
-    let mut src = open_source(path, Box::new(file))?;
-    if src.format.format_info().format == FORMAT_ID_ISOMP4 {
+    let (source, layout) = aiff::prepare(path, file)?;
+    let mut src = open_source(path, source)?;
+    let format = src.format.format_info().format;
+    if let Some(l) = layout.filter(|_| format == FORMAT_ID_AIFF) {
+        aiff::apply(&mut src, &l);
+    }
+    if format == FORMAT_ID_ISOMP4 {
         if let Some(g) = gapless::read_isomp4(path, src.sample_rate, src.track_id) {
             // The demuxer counts every sample of the media; the playable
             // length is what is left after the edit.
@@ -170,6 +183,12 @@ pub(super) fn open_source(path: &Path, source: Box<dyn MediaSource>) -> Result<O
     let info = format.format_info();
     let container = info.short_name.to_owned();
     let dur_includes_trim = [FORMAT_ID_MP1, FORMAT_ID_MP2, FORMAT_ID_MP3].contains(&info.format);
+    // Ticks are frames when there is no time base or it is 1 / rate.
+    let tick_is_frame =
+        time_base.is_none_or(|tb| tb.numer.get() == 1 && tb.denom.get() == sample_rate);
+    let pcm_frame_bytes = header::sample_bytes(codec_id)
+        .filter(|_| tick_is_frame && [FORMAT_ID_WAVE, FORMAT_ID_AIFF].contains(&info.format))
+        .and_then(|b| b.checked_mul(u64::try_from(channels).ok()?));
 
     Ok(Opened {
         format,
@@ -181,11 +200,11 @@ pub(super) fn open_source(path: &Path, source: Box<dyn MediaSource>) -> Result<O
         bit_depth,
         layout,
         codec,
-        codec_id,
         container,
         declared_frames,
         dur_includes_trim,
         gapless: None,
+        pcm_frame_bytes,
     })
 }
 

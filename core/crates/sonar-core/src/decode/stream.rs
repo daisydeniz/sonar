@@ -9,15 +9,17 @@
 //! a meter. A codec error on a packet decoded only for the meter stops the
 //! meter ([`Outcome::meter_problem`]) and the loop continues counting, so
 //! `partial` and `problem` are identical with or without a meter, and so is
-//! the length except on a truncated file whose short final packet lies past
-//! the analysis window (decoded frames < declared duration; ADR-012).
+//! the length except, for compressed codecs, on a truncated file whose
+//! short final packet lies past the analysis window (decoded frames <
+//! declared duration; ADR-012). PCM in WAVE/AIFF is counted by its bytes
+//! ([`packet_ticks`]), so there decoded and counted lengths always agree.
 //!
 //! Past the window only packet *durations* are summed (`Packet::dur`, the
 //! number of valid frames after gapless trimming, in track time-base
 //! ticks; converted to frames once at the end, so no per-packet rounding
-//! drift). That costs one demuxer read per packet and no codec work, so the
-//! true length of a 5-minute file is known for the price of reading its
-//! bytes.
+//! drift; PCM WAVE/AIFF: the frames its bytes hold). That costs one demuxer
+//! read per packet and no codec work, so the true length of a 5-minute
+//! file is known for the price of reading its bytes.
 //!
 //! Error policy (consistent with `docs/EVAL.md` corrupt `expect`):
 //! - a real read failure (anything but end-of-file: drive unplugged,
@@ -36,7 +38,9 @@
 //!
 //! MP4 priming ([`super::gapless`]): the leading `start` frames of the
 //! decoded stream are dropped and the total is capped at the edit's length,
-//! so the counted length is `min(raw − start, len)` on both paths.
+//! so the counted length is `min(raw − start, len)` on both paths. An AIFF
+//! whose `SSND` holds more frames than `COMM` declares is capped the same
+//! way (`start` = 0, [`super::aiff`]).
 
 use std::io::ErrorKind;
 use std::ops::Range;
@@ -144,7 +148,7 @@ pub(super) fn run(
         let meter_wants = meter.as_ref().is_some_and(|m| !m.is_full()) && decoded_frames < play_end;
         let metering_only = mono.len() >= keep;
         if metering_only && !meter_wants {
-            let ticks = valid_ticks(&packet, src.dur_includes_trim);
+            let ticks = packet_ticks(&packet, src);
             ticks_past_window = ticks_past_window.saturating_add(ticks);
             continue;
         }
@@ -157,7 +161,7 @@ pub(super) fn run(
                 out.meter_problem
                     .get_or_insert_with(|| map_error(path, e).to_string());
                 meter = None;
-                let ticks = valid_ticks(&packet, src.dur_includes_trim);
+                let ticks = packet_ticks(&packet, src);
                 ticks_past_window = ticks_past_window.saturating_add(ticks);
             }
             Ok(buf) => {
@@ -175,7 +179,7 @@ pub(super) fn run(
                 consecutive_errors += 1;
                 note(&mut out, format!("undecodable packet: {msg}"));
                 out.partial = true;
-                let ticks = valid_ticks(&packet, src.dur_includes_trim);
+                let ticks = packet_ticks(&packet, src);
                 let dur = ticks_to_frames(ticks, src.time_base, src.sample_rate);
                 let gap = usize::try_from(dur).unwrap_or(usize::MAX);
                 mono.resize(mono.len() + gap.min(keep - mono.len()), 0.0);
@@ -237,6 +241,24 @@ fn playable(pos: u64, n: u64, lo: u64, hi: u64) -> Range<usize> {
 fn note(out: &mut Outcome, problem: String) {
     if out.problem.is_none() {
         out.problem = Some(problem);
+    }
+}
+
+/// Frames (= ticks) `packet` holds for uncompressed PCM in WAVE/AIFF, its
+/// [`valid_ticks`] otherwise.
+///
+/// symphonia 0.6.1's RIFF demuxer (`symphonia-format-riff`
+/// `common::next_packet`) sets `dur` to the whole blocks it asks for, but
+/// reads them with `read_boxed_slice`, which returns a short buffer at end
+/// of file without an error: the final packet of a file cut inside it
+/// would count up to 1,151 phantom frames. The PCM decoder decodes
+/// `data.len() / frame bytes` whole frames (`symphonia-codec-pcm`
+/// `decode_inner`), so counting the bytes gives exactly what decoding
+/// would, and a trailing partial frame is dropped on both paths (T1.7d).
+fn packet_ticks(packet: &Packet, src: &Opened) -> u64 {
+    match src.pcm_frame_bytes {
+        Some(fb) if fb > 0 => packet.data.len() as u64 / fb,
+        _ => valid_ticks(packet, src.dur_includes_trim),
     }
 }
 

@@ -125,20 +125,24 @@ fn mutated_files_never_panic() {
 }
 
 /// In-memory file whose reads fail (like an unplugged drive) once
-/// `limit` bytes have been read in total.
-struct FailingSource {
+/// `limit` bytes have been read in total (also used by `aiff::tests`).
+pub(super) struct FailingSource {
     inner: std::io::Cursor<Vec<u8>>,
     read: u64,
     limit: u64,
 }
 
 impl FailingSource {
-    fn boxed(bytes: Vec<u8>, limit: u64) -> Box<dyn symphonia::core::io::MediaSource> {
-        Box::new(Self {
+    pub(super) fn new(bytes: Vec<u8>, limit: u64) -> Self {
+        Self {
             inner: std::io::Cursor::new(bytes),
             read: 0,
             limit,
-        })
+        }
+    }
+
+    fn boxed(bytes: Vec<u8>, limit: u64) -> Box<dyn symphonia::core::io::MediaSource> {
+        Box::new(Self::new(bytes, limit))
     }
 }
 

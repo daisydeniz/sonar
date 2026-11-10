@@ -110,3 +110,28 @@ fn error_is_retried_only_when_its_own_stage_is_outdated() {
     assert_eq!((s.stages[1].total, s.stages[1].ok), (1, 1));
     assert_eq!(status(&env), "analyzed");
 }
+
+/// A version bump of `meta` and `dsp` (e.g. T1.7d: lengths of truncated
+/// PCM WAV/AIFF counted per packet, AIFF `COMM` honoured): rows written by
+/// the previous version of each stage are pending again for both stages.
+#[test]
+fn rows_of_the_previous_version_are_pending_after_a_bump() {
+    let env = Env::new(2, 0);
+    env.run(opts(1, 8));
+    env.conn()
+        .execute(
+            "UPDATE file_stages SET version = CASE stage \
+             WHEN 'meta' THEN ?1 WHEN 'dsp' THEN ?2 ELSE version END",
+            rusqlite::params![META_VERSION - 1, DSP_VERSION - 1],
+        )
+        .expect("write rows as the previous version");
+    let s = env.run(opts(1, 8));
+    assert_eq!((s.stages[0].stage, s.stages[0].total), (Stage::Meta, 2));
+    assert_eq!((s.stages[1].stage, s.stages[1].total), (Stage::Dsp, 2));
+    let current = format!(
+        "SELECT count(*) FROM file_stages WHERE \
+         (stage = 'meta' AND version = {META_VERSION}) OR \
+         (stage = 'dsp' AND version = {DSP_VERSION})"
+    );
+    assert_eq!(env.count(&current), 4);
+}

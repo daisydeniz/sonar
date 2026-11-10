@@ -102,6 +102,9 @@ write store + index
   the meter (0 s windows); `Dsp` measures peak/loudness. For intact
   uncompressed PCM WAV/AIFF the `Meta` probe reads the length from the
   header without touching the payload (ADR-015); everything else is counted.
+  PCM WAV/AIFF is counted by the bytes each packet holds, so a truncated
+  file reports exactly its surviving frames (`partial`); AIFF `COMM`
+  `numSampleFrames` is the declared length (ADR-015 addendum T1.7d).
 - Stages are idempotent and resumable; crash mid-scan = continue later.
   `sonar_core::jobs` (ADR-013) runs them: `Meta` (probe with 0 s windows:
   format + duration) for the whole store, then `Dsp` (30 s analysis decode +

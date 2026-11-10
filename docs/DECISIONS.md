@@ -294,7 +294,8 @@ its header states; on cold libraries that made the `Meta` stage I/O-bound.
   streamed WAV and AIFF, payload never read (byte-counting source).
 - **No stage version bump**: results are identical to the counted ones, so
   existing `meta` rows stay valid.
-- **Known limits** (pre-existing, same on both paths, not changed here):
+- **Known limits** (pre-existing, same on both paths, not changed here;
+  both fixed by T1.7d, see the addendum):
   - a short final PCM packet is counted at its full 1,152 frames (symphonia
     returns a short read without error), so a WAV cut inside its last
     packet reports up to 1,151 frames too many and is not `partial`; cut
@@ -302,6 +303,44 @@ its header states; on cold libraries that made the `Meta` stage I/O-bound.
   - symphonia ignores the AIFF `COMM` `numSampleFrames` and derives the
     length from the `SSND` size, so an AIFF whose `SSND` holds more frames
     than `numSampleFrames` over-reports its length.
+- **Addendum T1.7d — exact PCM length** (`decode::stream::packet_ticks`,
+  `decode::aiff`):
+  - PCM in WAVE/AIFF is counted by the bytes each packet holds
+    (`data.len() / (sample bytes × channels)`), not `Packet::dur`; the PCM
+    decoder decodes exactly those whole frames, so counted = decoded and a
+    trailing partial frame is dropped on both. A truncated WAV reports
+    exactly `floor(surviving data bytes / frame)` frames and is `partial`.
+  - AIFF: `COMM` `numSampleFrames` is the declared length (AIFF 1.3: the
+    number of sample frames in `SSND`). `SSND` longer → capped at `COMM`
+    (decode, meter and length; trimmed, not `partial`; packets past `COMM`
+    are still read and counted, the total is capped afterwards; counted,
+    not the header path). `SSND` shorter → `partial` (also for an intact
+    file whose writer over-declared `COMM`; watch AIFF `partial` counts in
+    eval). `numSampleFrames = 0` with a non-empty `SSND` = never finalised
+    → `SSND` size used.
+  - Truncated AIFF: symphonia 0.6.1 cannot open a `FORM` cut by the end of
+    the file (it skips the `SSND` body while scanning chunks). So before
+    symphonia probes, `source::open` runs `aiff::prepare` on the same file
+    handle: a bounded seek-only chunk walk (≤ 4,096 headers, stops once
+    `COMM` and `SSND` are found). Whenever the `FORM` extends past the end
+    of the file (no symphonia failure needed), the demuxer reads the file
+    through an in-memory header overlay: a cut `SSND` keeps its
+    surviving bytes, any other cut chunk is dropped by ending the `FORM`
+    before it. One open and one code path for every AIFF, not a
+    fail-then-retry. Declared length stays `COMM`, so the result is the exact
+    surviving frames + `partial` (not `partial` when only chunks after the
+    sound data were lost). The file is never written.
+  - Header path unchanged in rules; it still equals counting on every
+    fixture and on the truncated/over-long cases above.
+  - **Stage versions**: `meta` 1 → 2 and `dsp` 1 → 2 (both store
+    `num_frames`; `dsp` also changes peak/loudness of over-long AIFF and
+    turns truncated-AIFF errors into partial results). Every file re-runs
+    both stages once; the header path keeps the `meta` re-run cheap.
+  - Cost: every file pays one unbuffered 12-byte read + rewind (form
+    check) before probing; AIFF adds a few header reads/seeks on the same
+    handle (like the MP4 `gapless` walk); the overlay only exists for
+    `FORM`s cut by the end of the file. Measured with `sonar bench analyze`
+    (STATUS log, T1.7d).
 - **File replaced between the two opens** (fallback path): reported as
   `Error::Io` ("file changed while reading"), so the pipeline skips and
   retries it instead of recording a permanent error.

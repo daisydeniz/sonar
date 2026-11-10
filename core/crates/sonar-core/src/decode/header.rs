@@ -40,6 +40,14 @@
 //! packets, so for PCM the payload's content cannot change the outcome.
 //! `header_tests` checks header == counted on every fixture.
 //!
+//! AIFF (T1.7d, [`super::aiff`]): `N` is `COMM` `numSampleFrames`, so an
+//! `SSND` of a different size fails (6) and is counted; an AIFF with an
+//! `SSND` longer than `COMM` is capped ([`Opened::gapless`]) and never
+//! takes this path. A truncated AIFF is read through a patched header
+//! whose `SSND` ends at the end of the file, so (7) holds, but its payload
+//! is shorter than `N` and fails (6) unless every `COMM` frame survived,
+//! in which case counting finds exactly `N` too.
+//!
 //! Not on this path, by design: FLAC (RFC 9639 STREAMINFO "total samples"
 //! is exact when non-zero, but the payload is compressed and only reading
 //! the frames reveals a truncated or damaged stream, which counting reports
@@ -64,15 +72,11 @@ const RIFF_PACKET_FRAMES: u64 = 1_152;
 /// Bytes per frame when `src` is eligible for the header length (rules 2–4
 /// above), `None` when its length must be counted. Does not read the file.
 pub(super) fn pcm_frame_bytes(src: &Opened) -> Option<u64> {
-    let format = src.format.format_info().format;
-    if format != FORMAT_ID_WAVE && format != FORMAT_ID_AIFF {
-        return None;
-    }
     if src.gapless.is_some() || src.declared_frames.is_none() {
         return None;
     }
-    let channels = u64::try_from(src.channels).ok()?;
-    sample_bytes(src.codec_id)?.checked_mul(channels)
+    // Set only for PCM in WAVE/AIFF ([`super::source::open_source`]).
+    src.pcm_frame_bytes
 }
 
 /// The declared length of `src` if the payload chunk header confirms it

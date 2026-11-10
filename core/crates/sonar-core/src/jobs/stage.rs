@@ -9,10 +9,17 @@ use crate::meta::BasicMeta;
 
 /// Current version of the `meta` stage (format, duration). Bump it to
 /// re-run the stage on every file.
-pub const META_VERSION: u32 = 1;
+///
+/// History: 2 (T1.7d) exact length of truncated PCM WAV/AIFF (counted by
+/// packet bytes), AIFF `COMM` length, truncated AIFF decodable.
+pub const META_VERSION: u32 = 2;
 /// Current version of the `dsp` stage (decode window, peak/loudness, and
 /// later the DSP features of T3.x). Bump it to re-run the stage.
-pub const DSP_VERSION: u32 = 1;
+///
+/// History: 2 (T1.7d) same length fixes as `META_VERSION` 2 (the stage
+/// stores `num_frames`; truncated AIFF no longer an error; an AIFF `SSND`
+/// past `COMM` is no longer metered).
+pub const DSP_VERSION: u32 = 2;
 /// Version of the `embed` stage (T5.2). Declared so the stage name and
 /// version slot exist in the schema; there is no implementation yet.
 pub const EMBED_VERSION: u32 = 1;

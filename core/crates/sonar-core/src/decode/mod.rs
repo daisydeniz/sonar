@@ -28,6 +28,7 @@
 //! Empty files: a valid header with zero frames decodes to `Ok` with no
 //! samples and `num_frames == 0`; a zero-byte file is an error.
 
+mod aiff;
 mod gapless;
 mod header;
 mod inner;
@@ -38,6 +39,8 @@ pub mod stream;
 
 #[cfg(test)]
 mod header_tests;
+#[cfg(test)]
+mod length_tests;
 #[cfg(test)]
 mod robust_tests;
 #[cfg(test)]
@@ -184,8 +187,10 @@ impl Decoder {
     /// samples of the first `meta.max_meta_secs`. Packets are decoded up to
     /// the longer of the analysis and meta windows; only the analysis
     /// window is buffered, and the returned [`Decoded`] is identical to
-    /// [`Decoder::decode`]'s, except `num_frames` on a truncated file whose
-    /// short final packet lies past the analysis window (ADR-012). A packet past the analysis window that the
+    /// [`Decoder::decode`]'s, except `num_frames` on a truncated file of a
+    /// compressed codec whose short final packet lies past the analysis
+    /// window (ADR-012; PCM WAV/AIFF is exact either way, T1.7d). A packet
+    /// past the analysis window that the
     /// codec rejects stops the measurement there (the rest is counted) and
     /// sets [`BasicMeta::partial`].
     pub fn decode_with_meta(

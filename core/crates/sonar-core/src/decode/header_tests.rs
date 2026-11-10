@@ -227,16 +227,16 @@ fn truncated_wav_is_counted_and_partial() {
     );
     assert!(takes_header(&tmp.write("full.wav", &full)));
     assert!(takes_header(&tmp.write("full24.wav", &wav24)));
-    // Counting sums packet durations; symphonia 0.6.1 delivers a short
-    // final PCM packet with its full duration (a short read is not an
-    // error), so a cut inside the last packet still counts as complete.
-    // The header path must not change that outcome either way.
-    for (name, bytes) in [
-        ("mid_frame.wav", &full[..full.len() - 1]),
-        ("mid_frame24.wav", &wav24[..wav24.len() - 2]),
+    // Cut inside the last packet (and inside a frame): counted by the
+    // bytes each packet holds (T1.7d), so exact and partial; the header
+    // path rejects it (bytes missing) and agrees.
+    for (name, bytes, frames) in [
+        ("mid_frame.wav", &full[..full.len() - 1], 9_999),
+        ("mid_frame24.wav", &wav24[..wav24.len() - 2], 4_999),
     ] {
         let (d, _) = check(&tmp, name, bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
-        assert!(!d.partial, "{name}: {d:?}");
+        assert!(d.partial && d.problem.is_some(), "{name}: {d:?}");
+        assert_eq!(d.source.num_frames, frames, "{name}");
     }
     for (name, bytes, declared) in [
         ("mid_file.wav", &full[..full.len() / 2], 10_000),
@@ -250,20 +250,26 @@ fn truncated_wav_is_counted_and_partial() {
 }
 
 #[test]
-fn truncated_aiff_keeps_its_counted_outcome() {
+fn truncated_aiff_is_counted_exactly_and_partial() {
     let tmp = Tmp::new();
     let samples: Vec<i32> = (0..20_000).map(|i| (i % 300) * 50).collect();
     let full = aiff(44_100, 2, 24, &samples);
     assert!(takes_header(&tmp.write("full.aiff", &full)));
-    for (name, bytes) in [
-        ("mid_frame.aiff", &full[..full.len() - 1]),
-        ("mid_file.aiff", &full[..full.len() / 2]),
+    // 54-byte header, 6-byte frames: 59,999 sample bytes / 2 surviving.
+    for (name, bytes, frames) in [
+        ("mid_frame.aiff", &full[..full.len() - 1], 9_999),
+        (
+            "mid_file.aiff",
+            &full[..full.len() / 2],
+            (full.len() / 2 - 54) as u64 / 6,
+        ),
     ] {
-        // symphonia 0.6.1 reads the end of SSND while opening, so a cut AIFF
-        // is a decode error on both paths; a result must at least be partial.
-        if let Ok((d, _)) = check(&tmp, name, bytes) {
-            assert!(d.partial && d.source.num_frames < 10_000, "{name}");
-        }
+        // symphonia 0.6.1 cannot open a cut FORM; it is reopened with a
+        // consistent header (`decode::aiff`) and counted on both paths.
+        let (d, _) = check(&tmp, name, bytes).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert!(d.partial && d.problem.is_some(), "{name}");
+        assert_eq!(d.source.num_frames, frames, "{name}");
+        assert_eq!(d.source.declared_frames, Some(10_000), "{name}");
     }
 }
 
@@ -286,8 +292,8 @@ fn oversized_or_unaligned_declared_chunks_are_counted() {
     let (d, _) = check(&tmp, "oversized.wav", &patch(4_000, 4_000, &[])).unwrap();
     assert!(d.partial, "{d:?}");
     assert_eq!(d.source.declared_frames, Some(2_000));
-    // Counted, so the last (short) packet counts in full: 1,152 frames.
-    assert!((1_000..2_000).contains(&d.source.num_frames), "{d:?}");
+    // Counted: exactly the 1,000 frames present.
+    assert_eq!(d.source.num_frames, 1_000, "{d:?}");
     // A data chunk of 4,002 bytes (half a frame extra), all present.
     let (d, _) = check(&tmp, "unaligned.wav", &patch(2, 2, &[0, 0])).unwrap();
     assert!(!d.partial, "{d:?}");
@@ -296,11 +302,10 @@ fn oversized_or_unaligned_declared_chunks_are_counted() {
     let mut streamed = full.clone();
     streamed[4..8].copy_from_slice(&u32::MAX.to_le_bytes());
     streamed[data_at + 4..data_at + 8].copy_from_slice(&u32::MAX.to_le_bytes());
-    // (Counted to the end of the file; the short last packet counts in
-    // full, see `truncated_wav_is_counted_and_partial`.)
+    // (Counted to the end of the file, by bytes: exact.)
     let (d, _) = check(&tmp, "streamed.wav", &streamed).unwrap();
     assert_eq!(d.source.declared_frames, None);
-    assert!(d.source.num_frames >= 1_000);
+    assert_eq!(d.source.num_frames, 1_000);
     // Streamed with a `fact` chunk: symphonia declares the fact length
     // (500) but reads the data to the end of the file. Trusting the
     // declared length here would be wrong; the 0xFFFFFFFF size rejects it.
@@ -308,7 +313,7 @@ fn oversized_or_unaligned_declared_chunks_are_counted() {
     let with_fact = [&streamed[..data_at], &fact, &streamed[data_at..]].concat();
     let (d, _) = check(&tmp, "streamed_fact.wav", &with_fact).unwrap();
     assert_eq!(d.source.declared_frames, Some(500));
-    assert!(d.source.num_frames >= 1_000);
+    assert_eq!(d.source.num_frames, 1_000);
 }
 
 /// A byte source that records how many bytes were read from it.
