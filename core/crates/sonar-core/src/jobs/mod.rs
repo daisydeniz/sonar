@@ -20,11 +20,14 @@
 //!   `files.status = 'error'`); damaged-but-readable files are `partial`; an
 //!   `Error::Io` records nothing and the file stays pending. A result is
 //!   dropped if the file's size/mtime changed since it was claimed.
-//! - **Control**: [`JobHandle::pause`] blocks workers between files (no busy
-//!   loop), [`JobHandle::cancel`] stops claiming, lets in-flight files
-//!   finish and commits them. Progress can be polled
+//! - **Control**: [`JobHandle::pause`] stops workers starting new files
+//!   (files in flight finish and are committed; the rest of the batch is
+//!   re-dispatched after [`JobHandle::resume`], no busy loop),
+//!   [`JobHandle::cancel`] stops claiming, lets in-flight files finish and
+//!   commits them. Progress can be polled
 //!   ([`JobHandle::progress`]) or pushed ([`JobOptions::on_event`]).
 
+mod batches;
 mod progress;
 pub(crate) mod queue;
 mod runner;
@@ -116,8 +119,8 @@ impl fmt::Debug for JobHandle {
 }
 
 impl JobHandle {
-    /// Workers stop taking new files (in-flight files finish and are
-    /// committed with their batch).
+    /// Workers stop taking new files. Files that finished in a partial batch
+    /// are committed; files that never started run after [`JobHandle::resume`].
     pub fn pause(&self) {
         self.shared.pause();
     }

@@ -160,7 +160,48 @@ Accepted. `sonar_core::jobs` runs the analysis stages in the background.
 - **Threading/control.** `jobs::start` opens its own connection and spawns
   the job thread; `JobHandle` pause/resume (Condvar, no busy loop, between
   files), cancel (stop claiming, in-flight files finish and commit), polled
-  `progress()` and an optional event callback.
+  `progress()` and an optional event callback. Pause semantics changed in
+  the T1.7c addendum below (workers stop starting files instead of blocking).
+
+**Addendum (T1.7c) — batch look-ahead, commit-on-pause.** `sonar bench
+analyze` now reports `StageTiming` (pool utilization = busy worker-s /
+(threads x wall), coordinator claim / commit / wait time). Measured first
+(release, M4 Pro 14 cores, warm cache): with strictly sequential
+claim -> compute -> commit the pool idled 36 % (meta) / 14 % (dsp) of the
+wall at batch 128 (commit alone 23 % / 7 %, batch tail 0.3 / 1.1 ms per
+batch), i.e. > 10 % throughput on the table, so the loop was pipelined:
+`jobs/batches.rs` keeps 2 batches in flight (`LOOKAHEAD`), the coordinator
+claims ahead and commits finished batches in claim order while workers run
+the next. Invariants kept: one `IMMEDIATE` tx per batch, ids claimed once
+(monotonic cursor), stale-claim check at commit, BUSY retry, claim-ahead
+only inside the current stage (stage drains before the next starts).
+Pause/cancel: workers no longer block mid-batch; they stop starting files
+(`Unstarted`), the coordinator commits what finished, and after the
+pipeline drained dispatches the unstarted claims again (a retry list, in
+batch-size chunks, before claiming anything new; dropped on cancel). The
+id cursor is never rewound: rayon spreads a batch over threads, so the
+unstarted files are not a suffix and a rewind would re-offer files already
+committed (skipped/stale ones stay pending) and double count them.
+Unstarted files never got a row: no duplicates, kill -9 safe as before. Files/s, before -> after, (utilization):
+
+| stage | files | batch | before | after |
+|---|---|---|---|---|
+| meta | 3k | 32 | 37,783 (47 %) | 48,631 (62 %) |
+| meta | 3k | 128 | 40,565 (54 %) | 56,233 (71 %) |
+| meta | 3k | 512 | 49,409 (64 %) | 60,910 (74 %) |
+| meta | 20k | 128 | 36,501 (64 %) | 43,219 (79 %) |
+| meta | 20k | 512 | 40,704 (71 %) | 45,860 (85 %) |
+| meta, cold clone | 20k | 128 | 37,009 (69 %) | 42,755 (81 %) |
+| dsp | 3k | 32 | 6,874 (74 %) | 7,845 (83 %) |
+| dsp | 3k | 128 | 7,932 (84 %) | 8,026 (90 %) |
+| dsp | 3k | 512 | 8,059 (90 %) | 8,507 (91 %) |
+| dsp | 20k | 128 | 6,820 (86 %) | 7,975 (90 %) |
+| dsp | 20k | 512 | 7,127 (89 %) | 8,461 (93 %) |
+
+Single runs, run-to-run noise about +-5 %; the gain is largest at small
+batches (the 128 default now costs little vs 512). Commit stays 7-9 % (dsp)
+of wall but overlaps compute; the remaining dsp idle is the coordinator
+thread competing for a core and rayon spawn overhead.
 
 ## ADR-014 — File watching (T1.6)
 - **Strategy**: `notify` 8.2.2 (FSEvents backend, `macos_fsevent` only, no

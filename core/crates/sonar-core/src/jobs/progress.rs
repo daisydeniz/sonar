@@ -67,6 +67,41 @@ pub struct StageSummary {
     pub skipped: u64,
     /// Wall-clock seconds.
     pub seconds: f64,
+    /// Where the wall-clock time went (pipeline instrumentation).
+    pub timing: StageTiming,
+}
+
+/// Where a stage's wall-clock time went, to judge how much of the worker
+/// pool sat idle (ADR-013 addendum). Seconds unless noted.
+#[derive(Debug, Clone, Default, PartialEq, Serialize)]
+pub struct StageTiming {
+    /// Worker threads in the pool.
+    pub threads: usize,
+    /// Batches committed.
+    pub batches: u64,
+    /// Coordinator time reading batches from the store.
+    pub claim_secs: f64,
+    /// Coordinator time blocked waiting for the next batch's workers (the
+    /// pool was the bottleneck; with look-ahead it overlaps other batches).
+    pub wait_secs: f64,
+    /// Coordinator time committing batches (incl. BUSY retries).
+    pub commit_secs: f64,
+    /// Sum of per-file worker time (decode + measure).
+    pub busy_secs: f64,
+    /// Sum over batches of the slowest file's time.
+    pub max_file_secs: f64,
+}
+
+impl StageTiming {
+    /// Share of `threads x wall` the workers spent on files (0..1).
+    pub fn utilization(&self, wall: f64) -> f64 {
+        let cap = self.threads as f64 * wall;
+        if cap > 0.0 {
+            self.busy_secs / cap
+        } else {
+            0.0
+        }
+    }
 }
 
 impl StageSummary {
@@ -80,6 +115,7 @@ impl StageSummary {
             errors: 0,
             skipped: 0,
             seconds: 0.0,
+            timing: StageTiming::default(),
         }
     }
 
@@ -142,6 +178,9 @@ pub(crate) struct Shared {
     /// Mirrors `cancelled`; handed to decoders so cancel interrupts a long
     /// decode (the file then stays pending).
     cancel_flag: Arc<AtomicBool>,
+    /// Lock-free mirror of "neither paused nor cancelled" for the per-file
+    /// check; written only while holding `control`.
+    runnable: AtomicBool,
 }
 
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
@@ -165,6 +204,7 @@ impl Shared {
             }),
             listener,
             cancel_flag: Arc::new(AtomicBool::new(false)),
+            runnable: AtomicBool::new(true),
         })
     }
 
@@ -180,6 +220,7 @@ impl Shared {
     pub(crate) fn pause(&self) {
         let changed = {
             let mut c = lock(&self.control);
+            self.runnable.store(false, Ordering::Relaxed);
             !std::mem::replace(&mut c.paused, true) && !c.cancelled
         };
         if changed {
@@ -188,7 +229,11 @@ impl Shared {
     }
 
     pub(crate) fn resume(&self) {
-        let changed = std::mem::replace(&mut lock(&self.control).paused, false);
+        let changed = {
+            let mut c = lock(&self.control);
+            self.runnable.store(!c.cancelled, Ordering::Relaxed);
+            std::mem::replace(&mut c.paused, false)
+        };
         self.wake.notify_all();
         if changed {
             self.emit(JobEvent::Resumed);
@@ -196,7 +241,22 @@ impl Shared {
     }
 
     pub(crate) fn cancel(&self) {
-        lock(&self.control).cancelled = true;
+        {
+            let mut c = lock(&self.control);
+            c.cancelled = true;
+            self.runnable.store(false, Ordering::Relaxed);
+        }
+        self.cancel_flag.store(true, Ordering::SeqCst);
+        self.wake.notify_all();
+    }
+
+    /// Stops workers and interrupts decoders after an internal failure,
+    /// without marking the job as cancelled by the user.
+    pub(crate) fn abort(&self) {
+        {
+            let _c = lock(&self.control);
+            self.runnable.store(false, Ordering::Relaxed);
+        }
         self.cancel_flag.store(true, Ordering::SeqCst);
         self.wake.notify_all();
     }
@@ -211,6 +271,11 @@ impl Shared {
 
     pub(crate) fn is_cancelled(&self) -> bool {
         lock(&self.control).cancelled
+    }
+
+    /// True while neither paused nor cancelled (non-blocking).
+    pub(crate) fn should_run(&self) -> bool {
+        self.runnable.load(Ordering::Relaxed)
     }
 
     /// Blocks (no busy loop) while paused. Returns `false` once the job is

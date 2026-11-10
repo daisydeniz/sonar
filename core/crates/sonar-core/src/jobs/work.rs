@@ -37,8 +37,9 @@ pub(crate) fn process(
     shared: &Shared,
     opts: &WorkOptions,
 ) -> FileResult {
-    // Pause blocks here (Condvar); cancel stops new files from starting.
-    if !shared.wait_runnable() {
+    // Pause and cancel stop new files from starting; the coordinator commits
+    // what finished and re-claims the `Unstarted` files after a resume.
+    if !shared.should_run() {
         return FileResult::Unstarted;
     }
     let run = quiet_panic::guarded(|| {

@@ -166,6 +166,24 @@ pub(crate) fn print_analyze(b: &AnalyzeBench) {
             s.errors,
             s.skipped
         );
+        let t = &s.timing;
+        println!(
+            "  pool: utilization {:.0} % of {} threads x wall; {} batches, slowest file {:.1} ms/batch",
+            t.utilization(s.seconds) * 100.0,
+            t.threads,
+            t.batches,
+            t.max_file_secs * 1e3 / t.batches.max(1) as f64
+        );
+        let pct = |x: f64| x / s.seconds.max(1e-9) * 100.0;
+        println!(
+            "  coordinator: claim {:.3} s ({:.1} %), commit {:.3} s ({:.1} %), waiting for workers {:.3} s ({:.1} %)",
+            t.claim_secs,
+            pct(t.claim_secs),
+            t.commit_secs,
+            pct(t.commit_secs),
+            t.wait_secs,
+            pct(t.wait_secs)
+        );
     }
     println!("job total: {:.3} s", b.job_secs);
 }
