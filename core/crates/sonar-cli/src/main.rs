@@ -7,6 +7,7 @@ mod cli;
 mod decode_cmd;
 mod meta_cmd;
 mod stats_cmd;
+mod tokenize_cmd;
 mod watch_cmd;
 
 use anyhow::{Context, Result};
@@ -61,6 +62,11 @@ fn main() -> Result<()> {
             debug_delay_ms,
         })?,
         Command::Stats { json } => stats_cmd::run(json)?,
+        Command::Tokenize {
+            inputs,
+            query,
+            json,
+        } => tokenize_cmd::run(&inputs, query, json)?,
         Command::Bench { command } => bench_cmd::run(command)?,
         Command::Watch { json, debounce_ms } => watch_cmd::run(json, debounce_ms)?,
         Command::Store {

@@ -151,6 +151,23 @@ pub enum Command {
         json: bool,
     },
 
+    /// Show how file names, paths or queries are tokenized for search
+    /// (separators, camelCase, `120bpm`, keys → `key:c#m`/`note:c#`, pack
+    /// noise dropped) and the BPM/key priors read from the file name.
+    /// Tokens sharing a position are joined by `|`.
+    Tokenize {
+        /// File names, paths or query strings.
+        #[arg(required = true)]
+        inputs: Vec<String>,
+        /// Tokenize as a search query (lowercase keys like `am`, `eb` also
+        /// emit `key:`/`note:` tokens) instead of as an indexed name.
+        #[arg(long)]
+        query: bool,
+        /// Print a JSON array instead of text.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Performance benchmarks in a temporary folder with its own store
     /// (never yours). Use a release build for meaningful numbers.
     Bench {

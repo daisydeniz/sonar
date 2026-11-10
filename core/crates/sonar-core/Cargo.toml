@@ -17,6 +17,7 @@ symphonia.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 twox-hash.workspace = true
+unicode-normalization.workspace = true
 
 [dev-dependencies]
 hound.workspace = true

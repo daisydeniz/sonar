@@ -348,3 +348,34 @@ its header states; on cold libraries that made the `Meta` stage I/O-bound.
   APFS clones (`--cold --clone`) 3k files 5,926 → 33,599 files/s, 20k files
   (13 GB) 1,138 → 37,399 files/s; warm 28,284 → 48,183 (3k) and 28,408 →
   37,166 files/s (20k).
+
+## ADR-016 — Text analysis chain and filename priors (T2.1)
+Accepted. `sonar_core::text` is the one analysis chain for names, paths and
+queries (index and query must agree); T2.2 wraps it in a Tantivy tokenizer.
+- **Chain**: split on separators, letter↔digit and camelCase → lowercase +
+  diacritic fold (`unicode-normalization` NFD, MIT/Apache) → music
+  recognition → noise removal. Tokens carry byte offsets and a position;
+  extra tokens of one span share the position (Lucene-synonym style).
+- **Canonical tokens**: BPM `120bpm` (+ `120`); key `key:<root>[m]` +
+  `note:<root>`, roots in sharps (`Gb`→`f#`), major and unspecified share
+  `key:<root>`; one-word keys also keep their folded spelling (`am`) so
+  lowercase queries match. camelCase runs also emit the catenated run
+  (`DnB` → `dn`+`dnb`, `b`), like ES `catenate_all`/`preserve_original`.
+- **Ambiguity rules (conservative)**: `FM`/`AM`/`dB`/`EBM` and lowercase
+  `am`/`fm`/`eb` are words; a bare letter is a key only right after a BPM
+  (`Loop_120_C`); a bare number is a BPM only if 60–200, standalone, no
+  leading zero, and the name has a loop word or a strong key, with exactly
+  one candidate. Conflicting values → no prior. Folders (2 levels) give
+  explicit values only. Priors use the same recognizer as the tokens.
+- **Noise**: short stop list (formats, `bpm` alone, `bit/hz/khz`, `www/com`,
+  `prod/free/copy/sample(s)`, `the/and/of/by`); padded numbers (`_01`),
+  versions (`v2`), number+unit (`24bit`, `44.1kHz`, `48k`), sample rates.
+  `loop`, `one shot`, vendor names stay. All configurable
+  (`TokenizerConfig`).
+- **Query mode** (`Tokenizer::for_query()`, `sonar tokenize --query`):
+  users type lowercase, so an all-lowercase key spelling (`am`, `cm`,
+  `eb`, `dbm`, `fm`) also emits `key:`/`note:` beside the plain word;
+  bare letters (`a`) still don't. Index mode stays strict (`fm bass` is
+  FM). T2.2 must OR the tokens that share a position when building a
+  query (they are alternatives, not all required).
+- **Cost**: ~0.7 µs per full path (release, M4 Pro), ~0.4 µs per prior.
