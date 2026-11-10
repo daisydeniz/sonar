@@ -203,6 +203,24 @@ Accepted. `sonar_core::jobs` runs the analysis stages in the background.
   A root replaced by a different volume at the same path within
   one poll interval is treated as unchanged; the 2 s poll bounds
   detection latency for unmounts that raise no event.
+- **Measured (T1.7b, `sonar bench watch`, M4 Pro, release, 50k library)**:
+  whole-library rescans per burst are cheap enough; no subtree scoping and
+  no change to the watcher. Copy only, 10,000 files at 250 files/s (40 s):
+  8 scans of 183-212 ms, duty cycle 3 % over the copy, catch-up 0.63 s
+  (= 400 ms debounce + one scan). Copy only, 20,000 files unthrottled
+  (1.3 s): one 756 ms scan after the burst, catch-up 1.17 s; that scan is
+  ~31-43 % of burst + catch-up time, above the "about 1/3" that the 2x
+  spacing guarantees for a *sustained* copy (the first scan of a burst is
+  not delayed). With the pipeline restarted to run for the whole copy (7
+  runs over the 10k copy): all 8 scans overlapped pipeline runs (5.5 s in
+  total), scans grew to 553-908 ms, duty cycle 12 %, catch-up 1.9 s, and the
+  pipeline slowed 21,481 -> 19,465 files/s (-9 %). 20k unthrottled with the
+  pipeline: the copy took 7.1 s instead of 1.3 s (about 5x slower under the
+  14-thread pipeline), 2 scans (max 1.7 s), catch-up 3.6 s, pipeline
+  20,163 -> 16,903 files/s (-16 %). In all runs 0 `SQLITE_BUSY` watcher
+  errors and no pipeline failure; the pipeline's longest gap between progress
+  events was 53 ms. Revisit if libraries grow well beyond 50k or scans on slow
+  volumes dominate.
 
 ## ADR-015 — Header length for the meta probe (T1.7a)
 Accepted. Counting packets reads every byte of a PCM file to learn what

@@ -12,6 +12,9 @@ pub mod analyze;
 pub mod corpus;
 pub mod decode;
 pub mod scan;
+pub mod watch;
+pub mod watch_pipeline;
+pub mod watch_stats;
 
 use std::process::Command;
 
@@ -20,6 +23,9 @@ use serde::Serialize;
 pub use analyze::{bench_analyze, AnalyzeBench, AnalyzeBenchOptions};
 pub use decode::{bench_decode, DecodeBench, DecodeBenchOptions, DecodeRun};
 pub use scan::{bench_scan, ScanBench, ScanPhase};
+pub use watch::{bench_watch, ContendedPhase, WatchBench, WatchBenchOptions, WatchPhase};
+pub use watch_pipeline::PipelineRun;
+pub use watch_stats::ScanStats;
 
 /// The machine a benchmark ran on, recorded with every result.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]

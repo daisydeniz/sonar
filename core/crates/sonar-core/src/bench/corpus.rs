@@ -76,7 +76,7 @@ pub fn rel_path(index: usize) -> PathBuf {
     .collect()
 }
 
-fn templates() -> Vec<Vec<u8>> {
+pub(crate) fn templates() -> Vec<Vec<u8>> {
     TEMPLATE_FRAMES
         .iter()
         .map(|&n| {
@@ -87,7 +87,7 @@ fn templates() -> Vec<Vec<u8>> {
 }
 
 /// File `index` as bytes: a template with the index in the first samples.
-fn content(templates: &[Vec<u8>], index: usize) -> Vec<u8> {
+pub(crate) fn content(templates: &[Vec<u8>], index: usize) -> Vec<u8> {
     let mut b = templates[index % templates.len()].clone();
     // Cannot be out of range: the shortest template has 1,000 data bytes.
     b[DATA_OFFSET..DATA_OFFSET + 4].copy_from_slice(&(index as u32).to_le_bytes());

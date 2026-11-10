@@ -50,9 +50,14 @@
 //! # Spacing of rescans
 //! After a scan of a library, event-driven rescans of it wait at least
 //! `2 x scan duration` (besides the quiet period), so a long copy into a
-//! large library is not walked back to back (scanning ≤ ~1/3 duty cycle)
-//! while small libraries still react within the debounce. Root appearance/disappearance, manual
-//! rescans and retries bypass this spacing. A root that exists but is
+//! large library is not walked back to back. In a sustained copy this
+//! bounds the duty cycle to about 1/3 (measured: 3-12 % at 250 files/s on
+//! 50k files). The bound is per sustained stream: the first scan of a burst
+//! is not delayed, so a short burst of e.g. 20,000 files followed by a quiet
+//! period spends 30-40 % of burst plus catch-up time in that one scan (still
+//! under 2 s on 50k files, see ADR-014). Small libraries react within the
+//! debounce. Root appearance/disappearance, manual rescans and retries
+//! bypass this spacing. A root that exists but is
 //! offline in the index (unlistable, stale mount point) is retried every
 //! [`WatchOptions::error_retry`].
 

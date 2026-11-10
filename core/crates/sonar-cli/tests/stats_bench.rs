@@ -237,9 +237,48 @@ fn bench_analyze_smoke() {
 }
 
 #[test]
+fn bench_watch_smoke() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let home = tmp.path().join("home");
+    let v = json(&sonar(
+        &home,
+        &[
+            "bench",
+            "watch",
+            "--files",
+            "200",
+            "--copy-files",
+            "50",
+            "--copy-rate",
+            "200",
+            "--with-analyze",
+            "--stages",
+            "meta",
+            "--json",
+        ],
+    ));
+    let p = &v["copy_only"];
+    assert_eq!(p["caught_up"], true, "{v}");
+    assert_eq!(p["verified"], true, "{v}");
+    assert_eq!(
+        (p["expected_files"].clone(), p["db_files"].clone()),
+        (250.into(), 250.into())
+    );
+    assert_eq!(p["watcher_errors"], 0, "{v}");
+    assert_eq!(v["baseline"]["error"], serde_json::Value::Null, "{v}");
+    let c = &v["contended"];
+    assert_eq!(c["watch"]["verified"], true, "{v}");
+    assert_eq!(c["watch"]["expected_files"], 300, "{v}");
+    assert_eq!(c["pipeline"]["error"], serde_json::Value::Null, "{v}");
+    assert!(!home.join("sonar.db").exists());
+}
+
+#[test]
 fn bench_rejects_bad_arguments() {
     let tmp = tempfile::tempdir().expect("tmp");
     for args in [
+        &["bench", "watch", "--copy-rate", "0"][..],
+        &["bench", "watch", "--copy-files", "0"],
         &["bench"][..],
         &["bench", "scan", "--files", "0"],
         &["bench", "analyze", "--stages", "nope"],
