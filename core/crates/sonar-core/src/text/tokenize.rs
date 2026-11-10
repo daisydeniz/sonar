@@ -6,7 +6,9 @@
 //! Lucene synonyms), so T2.2 can wrap this in a Tantivy `TokenStream`.
 //!
 //! Tokens per unit:
-//! - word → folded text (dropped if a stop word);
+//! - word → folded text (dropped if a stop word), plus its singular when
+//!   [`TokenizerConfig::singularize`] applies (`kicks` → `kicks|kick`, see
+//!   `plural.rs`);
 //! - number → digits (`808`);
 //! - BPM → `120bpm` (kind `Bpm`) + `120` (kind `Number`, integers only);
 //! - key → `key:c#m` (kind `Key`) + `note:c#` (kind `Note`) + the folded
@@ -19,6 +21,7 @@
 use serde::Serialize;
 
 use super::lex::{fold, fold_into, lex, Piece};
+use super::plural::singular;
 use super::recognize::{recognize, NoiseRules, Unit, UnitKind};
 use super::stopwords::StopWords;
 
@@ -68,6 +71,9 @@ pub struct TokenizerConfig {
     /// the strict case rules (`fm bass` is FM, not F minor). Callers must OR
     /// tokens that share a position when building a query.
     pub query: bool,
+    /// Also emit the singular of plural words at the same position
+    /// (`Kicks` → `kicks|kick`), on both index and query side.
+    pub singularize: bool,
 }
 
 impl Default for TokenizerConfig {
@@ -78,6 +84,7 @@ impl Default for TokenizerConfig {
             drop_padded_numbers: true,
             drop_versions: true,
             query: false,
+            singularize: true,
         }
     }
 }
@@ -164,7 +171,11 @@ impl Tokenizer {
                     let w = fold(raw);
                     // Empty after folding: a lone combining mark.
                     if !w.is_empty() && !self.config.stop_words.contains(&w) {
+                        let one = singular_of(&self.config, &w);
                         push(w, TokenKind::Word);
+                        if let Some(one) = one {
+                            push(one, TokenKind::Word);
+                        }
                     }
                 }
                 UnitKind::Number => push(raw.to_owned(), TokenKind::Number),
@@ -189,18 +200,30 @@ impl Tokenizer {
             if catenated_run != Some(run) {
                 catenated_run = Some(run);
                 if let Some((cat, start, end)) = catenation(text, &self.pieces, u) {
-                    out.push(Token {
-                        text: cat,
-                        kind: TokenKind::Word,
-                        start,
-                        end,
-                        position,
-                    });
+                    let one = singular_of(&self.config, &cat);
+                    for text in std::iter::once(cat).chain(one) {
+                        out.push(Token {
+                            text,
+                            kind: TokenKind::Word,
+                            start,
+                            end,
+                            position,
+                        });
+                    }
                 }
             }
             position += 1;
         }
     }
+}
+
+/// Singular of the folded word `w` if enabled, different from `w` and not
+/// a stop word.
+fn singular_of(config: &TokenizerConfig, w: &str) -> Option<String> {
+    if !config.singularize {
+        return None;
+    }
+    singular(w).filter(|s| !config.stop_words.contains(s))
 }
 
 /// Folded text and byte span of `u`'s run if the run was split by case and

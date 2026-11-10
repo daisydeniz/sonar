@@ -14,6 +14,7 @@ rusqlite.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 symphonia.workspace = true
+tantivy.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 twox-hash.workspace = true

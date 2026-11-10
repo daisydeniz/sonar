@@ -1,0 +1,56 @@
+# Sonar search synonyms (ADR-017). Editable.
+#
+# One group of equivalent terms per line; members separated by TABs (commas
+# also work). Lines starting with # are comments. Members may be several
+# words ("one shot", "bass drum"): they match as an exact phrase. Matching
+# is case- and accent-insensitive and goes through the same analysis as
+# file names, so "Hi-Hat" and "hi hat" are the same member; plurals are
+# folded already (kick = kicks), do not list them.
+#
+# Expansion happens at query time: editing this file needs no reindex.
+# Override for one machine: copy it to <SONAR_HOME>/synonyms.tsv
+# (default ~/Library/Application Support/Sonar/synonyms.tsv), or pass
+# `sonar search --synonyms <file>`.
+#
+# Keep groups honest: a wrong synonym costs precision on every search that
+# uses it. Only true equivalents in sample-library naming; no "related"
+# sounds (crash != ride, sub != bass, keys != piano, hit != impact).
+
+# --- drums
+kick	bd	bassdrum	bass drum	kik
+snare	sd	snr
+hat	hh	hihat	hi hat
+# "OH"/"CH" are the standard drum-machine abbreviations (909 OH, CH 01).
+open hat	oh	ohh	open hihat	open hh
+closed hat	ch	chh	closed hihat	closed hh
+clap	clp	handclap	hand clap
+cymbal	cym
+rimshot	rim shot	rim
+tom	tomtom
+perc	percussion
+tambourine	tamb	tambo	tamborine
+cowbell	cow bell
+snap	fingersnap	finger snap
+breakbeat	break beat
+
+# --- instruments and sources
+vox	vocal	voc
+acapella	acappella	a capella	a cappella
+fx	sfx
+synth	syn
+gtr	guitar
+epiano	e piano	electric piano
+orch	orchestra	orchestral
+arp	arpeggio
+
+# --- sound design
+atmo	atmos	atmosphere
+riser	uplifter
+whoosh	woosh
+reverse	reversed	rev
+
+# --- forms and genres
+oneshot	one shot
+lofi	lo fi
+dnb	drum and bass	drum n bass	drumnbass
+hiphop	hip hop

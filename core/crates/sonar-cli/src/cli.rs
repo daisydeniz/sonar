@@ -168,6 +168,41 @@ pub enum Command {
         json: bool,
     },
 
+    /// Rebuild the text search index from the store (file names, folders,
+    /// tags, category, kind). `sonar search` builds it on first use and
+    /// `sonar scan` refreshes an existing one; this forces a full rebuild.
+    Index {
+        /// Print JSON instead of text.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Search the library by text. Every word narrows; `-word` or
+    /// `-"two words"` excludes; synonyms (`bd` = kick, `hh` = hihat,
+    /// `one shot` = oneshot) from docs/synonyms.tsv or
+    /// $SONAR_HOME/synonyms.tsv; keys and tempos are understood (`Cmin`,
+    /// `am`, `120 bpm`). The last word also matches as a prefix unless the
+    /// query ends with a space (as-you-type). No query lists everything.
+    /// Prints rank, score, file id and path. Options go before the query:
+    /// from the first query word on, everything is query text.
+    Search {
+        /// Query words (`kick -vinyl`, `"one shot" am`); after the options.
+        #[arg(allow_hyphen_values = true)]
+        query: Vec<String>,
+        /// Maximum number of results printed.
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+        /// Print JSON instead of text.
+        #[arg(long)]
+        json: bool,
+        /// Match the last word exactly (no as-you-type prefix matching).
+        #[arg(long)]
+        no_prefix: bool,
+        /// Synonyms file to use instead of the default.
+        #[arg(long, value_name = "FILE")]
+        synonyms: Option<PathBuf>,
+    },
+
     /// Performance benchmarks in a temporary folder with its own store
     /// (never yours). Use a release build for meaningful numbers.
     Bench {
@@ -281,6 +316,40 @@ mod tests {
         ] {
             assert!(Cli::try_parse_from(bad).is_err(), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn parses_search_words_exclusions_and_flags() {
+        let cli = Cli::try_parse_from([
+            "sonar", "search", "--limit", "5", "--json", "kick", "-vinyl", "dark",
+        ]);
+        match cli.map(|c| c.command) {
+            Ok(Command::Search {
+                query,
+                limit: 5,
+                json: true,
+                no_prefix: false,
+                synonyms: None,
+            }) => assert_eq!(query, ["kick", "-vinyl", "dark"]),
+            other => panic!("{other:?}"),
+        }
+        let cli = Cli::try_parse_from(["sonar", "search", "--no-prefix", "-\"one shot\""]);
+        assert!(matches!(
+            cli.map(|c| c.command),
+            Ok(Command::Search { ref query, no_prefix: true, .. }) if query == &["-\"one shot\""]
+        ));
+        let cli = Cli::try_parse_from(["sonar", "search"]);
+        assert!(matches!(
+            cli.map(|c| c.command),
+            Ok(Command::Search { ref query, limit: 20, .. }) if query.is_empty()
+        ));
+        // From the first query word on, everything is query text.
+        let cli = Cli::try_parse_from(["sonar", "search", "kick", "--json"]);
+        assert!(matches!(
+            cli.map(|c| c.command),
+            Ok(Command::Search { ref query, json: false, .. }) if query == &["kick", "--json"]
+        ));
+        assert!(Cli::try_parse_from(["sonar", "index", "--json"]).is_ok());
     }
 
     #[test]

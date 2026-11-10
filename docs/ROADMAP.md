@@ -100,3 +100,11 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T2.1 review) All-lowercase names (`vox_chop_am_120`, `rnb_keys_loop_gm_90`) get no key prior; consider allowing with explicit BPM / loop word.
 - (from T2.1 review) `-6dB` emits stray `d`/`b` tokens from the camelCase split.
 - (from T2.1 review) Full-width digits (`１２０`) dropped as separators; NFKC folding would cover them.
+- (from T2.2) Synonym expansion for unfinished (prefix) words (`kic` → kick group), guarded so `bas` doesn't pull in `bassdrum`.
+- (from T2.2 review) `sonar scan` rebuilds the whole text index; use `refresh_files` with only the changed ids (check against the 500k budget in T2.4).
+- (from T2.2 review) `sonar watch` does not refresh the text index yet; wire `refresh_files` into the watcher.
+- (from T2.2) Text search is not cancellable yet (ARCHITECTURE §6); add with the FFI search API.
+- (from T2.2 review) Any index open error deletes and rebuilds the index dir; only do so on real corruption, not transient errors (EMFILE, permissions).
+- (from T2.2 review) `Error::Index(tantivy::TantivyError)` leaks a Tantivy type into the public API; store a `String` before FFI.
+- (from T2.2 review) Single-letter earlier words (`c mi` on the way to "c minor") still require the unfinished last word; results can blink empty while typing.
+- (from T2.2 review) Add an assertion that unfinished `c#` finds a `C#` file (proves regex escaping in `search/build.rs`).

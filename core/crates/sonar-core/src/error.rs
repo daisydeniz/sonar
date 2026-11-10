@@ -124,6 +124,22 @@ pub enum Error {
         reason: String,
     },
 
+    /// The full-text index failed (Tantivy: I/O, lock held by another
+    /// writer, corrupt segment, ...).
+    ///
+    /// The detail is in the message and deliberately not exposed as
+    /// `source()`, so `anyhow` chains do not print it twice.
+    #[error("search index error: {0}")]
+    Index(tantivy::TantivyError),
+
+    /// The search index directory holds files Sonar did not write, so it
+    /// is not wiped to rebuild the index.
+    #[error("{} is not a Sonar search index; refusing to overwrite it", path.display())]
+    ForeignIndexDir {
+        /// The directory.
+        path: PathBuf,
+    },
+
     /// The file at `path` is in a container or codec this build cannot
     /// decode (or is not recognised as audio at all).
     #[error("unsupported audio format in {}: {reason}", path.display())]
@@ -138,6 +154,12 @@ pub enum Error {
 impl From<rusqlite::Error> for Error {
     fn from(source: rusqlite::Error) -> Self {
         Self::Sqlite(source)
+    }
+}
+
+impl From<tantivy::TantivyError> for Error {
+    fn from(source: tantivy::TantivyError) -> Self {
+        Self::Index(source)
     }
 }
 

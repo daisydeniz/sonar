@@ -8,6 +8,7 @@
 //! anything is written to it.
 
 pub mod audio_meta;
+mod files;
 mod libraries;
 mod migrations;
 mod stats;

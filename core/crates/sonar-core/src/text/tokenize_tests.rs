@@ -25,7 +25,7 @@ fn tokenize_table() {
         // Separators, case, extensions-as-stop-words, take numbers.
         ("Deep_House-Kick 01.wav", "deep house kick"),
         ("Kick (Wet) [Dry]", "kick wet dry"),
-        ("Drums/Kicks/Kick_01.wav", "drums kicks kick"),
+        ("Drums/Kicks/Kick_01.wav", "drums|drum kicks|kick kick"),
         ("C:\\Samples\\Snare", "c snare"),
         ("One Shot Kick", "one shot kick"),
         ("dark kick -vinyl", "dark kick vinyl"),
@@ -69,7 +69,7 @@ fn tokenize_table() {
             "Bass Loop 128 F# 120",
             "bass loop 128 key:f#|note:f#|f# 120",
         ),
-        ("Loops/128/Kick 2", "loops 128 kick 2"),
+        ("Loops/128/Kick 2", "loops|loop 128 kick 2"),
         // Keys.
         ("Cmin Chord", "key:cm|note:c|cmin chord"),
         ("C#m", "key:c#m|note:c#|c#m"),
@@ -77,7 +77,7 @@ fn tokenize_table() {
         ("F# minor Pad", "key:f#m|note:f# pad"),
         ("Fsharp minor", "key:f#m|note:f#"),
         ("Gbmaj", "key:f#|note:f#|gbmaj"),
-        ("GbMaj Keys", "key:f#|note:f#|gbmaj keys"),
+        ("GbMaj Keys", "key:f#|note:f#|gbmaj keys|key"),
         ("A minor", "key:am|note:a"),
         ("a min", "key:am|note:a"),
         ("AMinor", "key:am|note:a|aminor"),
@@ -102,7 +102,7 @@ fn tokenize_table() {
         ("Kick_44100", "kick"),
         ("Snare v2", "snare"),
         ("Snare V1.2 Final", "snare final"),
-        ("www.freesamples.com Kick", "freesamples kick"),
+        ("www.freesamples.com Kick", "freesamples|freesample kick"),
         ("Prod by DJ X", "dj x"),
     ];
     for (input, want) in cases {
@@ -199,11 +199,20 @@ fn config_switches() {
         drop_padded_numbers: false,
         drop_versions: false,
         query: false,
+        singularize: false,
     });
     assert_eq!(
         render(&keep_all.tokenize("Kick_01 v2.wav")),
         "kick 01 v 2 wav"
     );
+    assert_eq!(render(&keep_all.tokenize("Kicks")), "kicks");
+    // Plural folding (on by default): singular shares the position, also
+    // for camelCase catenations; stop-word singulars are not added.
+    let mut t = Tokenizer::default();
+    assert_eq!(render(&t.tokenize("Kicks/BD")), "kicks|kick bd");
+    assert_eq!(render(&t.tokenize("HiHats")), "hi|hihats|hihat hats|hat");
+    assert_eq!(render(&t.tokenize("One Shots")), "one shots|shot");
+    assert_eq!(render(&t.tokenize("Bass Vox")), "bass vox");
     let mut custom = Tokenizer::new(TokenizerConfig {
         stop_words: StopWords::default().with_extra(["vengeance"]),
         ..TokenizerConfig::default()

@@ -64,6 +64,20 @@ impl StopWords {
         self
     }
 
+    /// True if some stop word starts with the folded `prefix` (as-you-type:
+    /// `bp` may become the dropped `bpm`).
+    pub fn any_starts_with(&self, prefix: &str) -> bool {
+        let defaults: &[&str] = if self.defaults {
+            DEFAULT_STOP_WORDS
+        } else {
+            &[]
+        };
+        let i = defaults.partition_point(|w| *w < prefix);
+        let j = self.extra.partition_point(|w| w.as_str() < prefix);
+        defaults.get(i).is_some_and(|w| w.starts_with(prefix))
+            || self.extra.get(j).is_some_and(|w| w.starts_with(prefix))
+    }
+
     /// True if the folded word `w` is a stop word.
     pub fn contains(&self, w: &str) -> bool {
         (self.defaults && DEFAULT_STOP_WORDS.binary_search(&w).is_ok())

@@ -6,6 +6,7 @@ mod bench_print;
 mod cli;
 mod decode_cmd;
 mod meta_cmd;
+mod search_cmd;
 mod stats_cmd;
 mod tokenize_cmd;
 mod watch_cmd;
@@ -67,6 +68,20 @@ fn main() -> Result<()> {
             query,
             json,
         } => tokenize_cmd::run(&inputs, query, json)?,
+        Command::Index { json } => search_cmd::index(json)?,
+        Command::Search {
+            query,
+            limit,
+            json,
+            no_prefix,
+            synonyms,
+        } => search_cmd::run(&search_cmd::Args {
+            query: &query,
+            limit,
+            json,
+            no_prefix,
+            synonyms: synonyms.as_deref(),
+        })?,
         Command::Bench { command } => bench_cmd::run(command)?,
         Command::Watch { json, debounce_ms } => watch_cmd::run(json, debounce_ms)?,
         Command::Store {
@@ -106,6 +121,7 @@ fn scan(dir: Option<&Path>) -> Result<()> {
             scan::scan_library(&mut store, id).with_context(|| format!("scanning library {id}"))?;
         print_report(&report);
     }
+    search_cmd::refresh_after_scan(&store);
     Ok(())
 }
 

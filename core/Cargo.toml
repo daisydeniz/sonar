@@ -49,6 +49,10 @@ unicode-normalization = { version = "0.1.26", default-features = false, features
 # CC0-1.0 (public-domain dedication). FSEvents file watching (ADR-014). No
 # `crossbeam-channel` feature: events go through std mpsc.
 notify = { version = "8.2.2", default-features = false, features = ["macos_fsevent"] }
+# MIT. Full-text index (T2.2, ADR-017). No default features: `mmap` for the
+# on-disk index, `lz4-compression` for the doc store; no stemmer/stopwords
+# (we bring our own analysis chain, `sonar_core::text`), no zstd.
+tantivy = { version = "0.27.0", default-features = false, features = ["mmap", "lz4-compression"] }
 # Test-only (dev-dependencies).
 hound = "3.5.1"      # Apache-2.0; independent WAV reader to verify our writer
 tempfile = "3.27.0"  # MIT OR Apache-2.0

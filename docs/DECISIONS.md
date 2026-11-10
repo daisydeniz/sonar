@@ -379,3 +379,42 @@ queries (index and query must agree); T2.2 wraps it in a Tantivy tokenizer.
   FM). T2.2 must OR the tokens that share a position when building a
   query (they are alternatives, not all required).
 - **Cost**: ~0.7 µs per full path (release, M4 Pro), ~0.4 µs per prior.
+
+## ADR-017 — Text index and query semantics (T2.2)
+Accepted. `sonar_core::index` (Tantivy) + `sonar_core::search` (queries).
+- **Engine**: `tantivy` 0.27 (MIT), `default-features = false`, features
+  `mmap` + `lz4-compression` only. Text fields use the ADR-016 chain as a
+  registered tokenizer, plus plural folding (`kicks` → + `kick` at the same
+  position, Harman S-stemmer; `ANALYZER_VERSION` 2).
+- **Schema** (`SCHEMA_VERSION` 1), one doc per present file: `file_id` (u64,
+  indexed + fast), `name` (file name w/o extension), `path` (library root
+  name + folders), `tags`, `category`, `kind` (effective = override, else
+  detected). Positions on. Query weights name 3, tags/category 2, kind 1.5,
+  path 1.
+- **Location / freshness**: `<data dir>/index/text` + a version file
+  (schema + analyzer). Version mismatch, unfinished build or unreadable
+  index → wiped and rebuilt; a non-empty dir that is not ours is never
+  deleted (`ForeignIndexDir`). `sonar search` builds a missing index on
+  first use; `sonar scan` rebuilds an existing one; `sonar index` forces a
+  rebuild. `refresh_files(ids)` exists for incremental callers (watcher,
+  app).
+- **Synonyms**: `docs/synonyms.tsv` (built in via `include_str!`), one
+  group per line, members TAB/comma separated, `#` comments, multi-word
+  members match as phrases, members go through the index chain. Lookup:
+  `--synonyms <file>` > `<data dir>/synonyms.tsv` > built-in. Expanded at
+  query time (editing needs no reindex). Alternatives at one position share
+  one IDF (max doc freq of the group, like Lucene `SynonymQuery`); synonyms
+  weigh 0.8 of the typed word.
+- **Query**: whitespace chunks, `"..."` groups, `-chunk` excludes (with its
+  synonyms). Every positive position is required (AND); each position is a
+  dis-max (tie 0.1) over its alternatives × fields. Only exclusions / empty
+  → all docs minus exclusions.
+- **As-you-type**: without a trailing space the last positive chunk also
+  matches as a prefix (constant score 0.5 × field weight, below exact
+  hits). Prefixes are literal: no synonym expansion of partial words
+  (`kic` finds Kick files; `kick` then adds BD) — expanding `bas` would
+  pull in `bassdrum`. A tail that may still become a stop word (`bp`) only
+  boosts. Exclusions never use prefixes.
+- **CLI**: `sonar search [--json] [--limit N] [--no-prefix] [--synonyms F]
+  <query...>`; options come **before** the query words (the query takes
+  hyphen values so `-vinyl` works). `sonar index` rebuilds.
