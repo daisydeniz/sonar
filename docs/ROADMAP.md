@@ -46,7 +46,7 @@ Owner tags map to subagents in `.claude/agents/`.
 
 ## M3 — Audio analysis (DSP)
 - [x] T3.1 (dsp-analysis) STFT, mel filterbank, MFCC, onset strength envelope. AC: tests vs analytic signals. (588f79f)
-- [ ] T3.2 (dsp-analysis) Aspect vectors (Spectrum, Timbre, Pitch, Amplitude, Overall) per ARCHITECTURE §5; library-level normalization stats. AC: fixed dims documented; stable across runs. Note (T3.1): `dsp::N_MFCC` = 20 incl. c0 (loudness-dependent); decide whether Timbre drops c0 (Amplitude covers loudness).
+- [x] T3.2 (dsp-analysis) Aspect vectors (Spectrum, Timbre, Pitch, Amplitude, Overall) per ARCHITECTURE §5; library-level normalization stats. AC: fixed dims documented; stable across runs. Note (T3.1): `dsp::N_MFCC` = 20 incl. c0 (loudness-dependent); decide whether Timbre drops c0 (Amplitude covers loudness).
 - [ ] T3.3 (dsp-analysis) Loop vs one-shot classifier (heuristics: duration, onset periodicity, tail, filename hints). AC: ≥ 95 % on fixtures.
 - [ ] T3.4 (dsp-analysis) BPM for loops only (onset autocorrelation/tempogram + filename prior, octave correction). AC: ≥ 95 % (±1 BPM) on fixtures; one-shots never get BPM.
 - [ ] T3.5 (dsp-analysis) Key (chroma + key profiles, filename prior) and pitch/note for tonal one-shots (YIN). AC: fixtures ≥ 90 % key, ≥ 95 % note.
@@ -54,7 +54,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [ ] T3.7 [HUMAN] Founder points `SONAR_GOLDEN_DIR` at a real sample folder and labels ~300 files (CSV template from `sonar eval --init-golden`). Agents continue with silver/fixtures meanwhile.
 
 ## M4 — Similarity search
-- [ ] T4.1 (search-ranking) Vector store: mmap matrices per aspect, row-id mapping, incremental append, compaction. AC: tests; 1M×(dims) load < 1 s.
+- [ ] T4.1 (search-ranking) Vector store: mmap matrices per aspect, row-id mapping, incremental append, compaction. AC: tests; 1M×(dims) load < 1 s. Note (T3.2): the `jobs` Dsp stage does not compute aspect vectors yet; wire `AspectExtractor` (raw vectors stored) + `LibraryNorm` (rayon fold/merge, persisted) into the pipeline here.
 - [ ] T4.2 (search-ranking) `similar` query: seed = file id or external file (analyzed on the fly), aspect weights, filters respected. AC: CLI `sonar similar`; fixtures sanity (same synth/pitch family ranks first).
 - [ ] T4.3 (search-ranking) Performance: SIMD brute force vs USearch ANN + re-rank; pick by benchmark. AC: p95 < 50 ms at 500k; decision recorded as ADR.
 - [ ] T4.4 (eval) Similarity metrics (P@10) in eval; tune aspect features against silver/golden. AC: numbers in STATUS.md.
@@ -124,3 +124,4 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T2.4 review) Browse classes have 3 queries (p95 ≈ max of 30 runs); raise default rounds or add queries. No test for the budget-miss non-zero exit (move check into core + unit test).
 - (from T3.1 review) `FeatureMatrix` has public fields; add a checked constructor so `data.len() == n_frames * n_cols` holds.
 - (from T3.1 review) DSP timing is only an `#[ignore]` test; add `sonar bench dsp` once T3.2 wires DSP into the pipeline.
+- (from T3.2) serde_json's default float parsing can be 1 ulp off; enable `float_roundtrip` (or store stats in binary) if persisted `LibraryNorm` must reproduce z-scores bit-exactly.

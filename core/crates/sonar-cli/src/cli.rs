@@ -118,6 +118,21 @@ pub enum Command {
         json: bool,
     },
 
+    /// Compute the similarity aspect vectors (Spectrum, Timbre, Pitch,
+    /// Amplitude) of audio files from their analysis window and print a
+    /// summary. With two or more files, also normalizes them with stats
+    /// over the given files and prints distances to the first file
+    /// (including Overall). Unreadable files are reported and skipped;
+    /// exits non-zero if any failed.
+    Aspects {
+        /// Audio files (wav, aif/aiff, flac, mp3, ogg, m4a).
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        /// Print JSON (full raw and normalized vectors) instead of text.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Run the analysis pipeline over every library in the store: `meta`
     /// (format, duration) for all files first, then `dsp` (analysis decode,
     /// peak, loudness). Resumable: only pending files are processed, so it can

@@ -1,6 +1,7 @@
 //! `sonar` — headless entry point to every core feature.
 
 mod analyze_cmd;
+mod aspects_cmd;
 mod bench_cmd;
 mod bench_print;
 mod cli;
@@ -52,6 +53,7 @@ fn main() -> Result<()> {
             json,
         } => meta_cmd::run(&files, max_meta_secs, json)?,
         Command::Dsp { files, json } => dsp_cmd::run(&files, json)?,
+        Command::Aspects { files, json } => aspects_cmd::run(&files, json)?,
         Command::Analyze {
             stages,
             threads,

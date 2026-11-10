@@ -450,3 +450,35 @@ fields; `SCHEMA_VERSION` 2 (old indexes rebuild).
   [--sort F[:desc]] [--facets] [query...]`.
 - **Cost** (500k synthetic docs, in RAM, release, M-series): text `kick`
   p95 2.9 ms; browse all + facets 23 ms; BPM range + facets 1.4 ms.
+
+## ADR-019 — Aspect vectors and library normalization (T3.2)
+Accepted. `sonar_core::dsp::aspects`, `ASPECTS_VERSION` 1; table of dims in
+ARCHITECTURE §5 and per-index docs in each submodule.
+- **Dims**: Spectrum 38, Timbre 57, Pitch 18, Amplitude 22 (raw), Overall
+  135 (normalized only). Fixed for any input length; silence has a
+  documented value per dimension; every value finite.
+- **c0 dropped** from Timbre (c1–c19 mean/std/delta-std): c0 is the frame's
+  mean log-mel level = loudness, already in Amplitude. Delta *std* only —
+  delta mean telescopes to ≈ 0. Spectrum/Timbre also read the log-mel
+  clipped 80 dB below the file max (librosa `top_db`), so a gain change does
+  not move them (a pure sine ±20 dB: Timbre/Pitch/Spectrum distance < 10 %
+  of sine-vs-noise after normalization).
+- **Active frames**: frame stats skip frames > 60 dB below the loudest
+  (tails, padding).
+- **Pitch**: reusable `dsp::yin` (de Cheveigné & Kawahara 2002, FFT
+  difference function, threshold 0.15, parabolic interpolation on d;
+  < 0.2 cent on sines 55 Hz–1.76 kHz) and `dsp::chroma` (Fujishima PCP,
+  soft 2-class assignment, 100 Hz–5 kHz). f0 as `log2(f0/440)`; pitch class
+  on the unit circle; unvoiced → 0 with voiced fraction 0. Chroma not
+  key-rotated.
+- **Amplitude**: 1.45 ms block energy smoothed over 16 ms (low notes don't
+  dip at zero crossings); Peeters (2004) attack / decay / effective
+  duration as log10 s; crest and loudness over blocks within 40 dB of peak.
+- **Normalization**: `NormStats` per aspect (Welford, Chan merge for rayon
+  fold/reduce, serde JSON); z = (x − mean)/max(std, 1e-3), clamped ±8;
+  empty stats = identity. `LibraryNorm` bundles the four + version; push /
+  merge validate dims and change nothing on error.
+- **Overall** = concat of z-scored aspects × `wₐ/√dimₐ`, `wₐ` = 1 for all
+  four (each aspect ≈ equal share of the squared distance); tune in T4.4.
+- **Cost**: aspects 10.9 ms per 30 s file (analyzer + aspects 14.1 ms), 1
+  thread, release, M-series. Wiring into jobs/vector store: T4.1/T4.2.

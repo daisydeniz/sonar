@@ -131,14 +131,26 @@ dB with −100 dB floor), MFCC c0–c19 (orthonormal DCT-II), HTK deltas and the
 onset strength envelope (rectified log-mel flux, band mean, 80 dB range).
 Later features take `&Spectrogram` / `FeatureMatrix` from `dsp::Features`.
 
-Per file, fixed-length vectors, z-score normalized with library stats:
-- **Spectrum**: mel-band energy distribution stats (mean/std), centroid,
-  rolloff, flatness.
-- **Timbre**: MFCC 1–20 mean/std + deltas.
-- **Pitch**: f0 (YIN/pYIN) median, confidence, chroma summary.
-- **Amplitude**: envelope sampled on fixed time grid (log-time), attack time,
-  decay, crest factor, loudness.
-- **Overall**: weighted concat (or CLAP audio embedding blended in).
+Per file, fixed-length raw `f32` vectors (`sonar_core::dsp::aspects`,
+`ASPECTS_VERSION` 1, ADR-019; `sonar aspects <file>... [--json]`). One
+`AspectExtractor` per worker (owns the YIN plans, chroma map, DCT) next to
+the `Analyzer`. Frame stats use *active* STFT frames only (within 60 dB of
+the loudest frame); Spectrum/Timbre read the log-mel clipped 80 dB below the
+file maximum (gain-invariant shape). Every value is finite; silence has a
+documented value per dimension; same samples → bitwise-identical vectors.
+
+| Aspect | Dims | Content |
+|---|---|---|
+| Spectrum | 38 | 16 log-mel band groups: mean dB minus their average (shape) + std; centroid (`log2(f/1 kHz)`), 85 % roll-off, flatness dB — mean/std each |
+| Timbre | 57 | MFCC c1–c19 mean, std, delta std (c0 dropped: loudness lives in Amplitude) |
+| Pitch | 18 | YIN (`dsp::yin`, 30 Hz–2 kHz): voiced fraction, mean confidence, median f0 `log2(f0/440)`, f0 IQR (oct), pitch class of the median as cos/sin; 12-bin chroma mean (C..B, not key-rotated; `dsp::chroma`) |
+| Amplitude | 22 | 16-bin envelope (dB rel. peak → [0,1]) on a log-time grid 0, 5 ms … 20 s after sound start; log attack, log decay, log effective duration, crest factor dB, gated RMS dBFS, level fluctuation dB |
+| Overall | 135 | concat of the z-scored aspects, each × `wₐ/√dimₐ` (`OVERALL_WEIGHTS` = 1, 1, 1, 1) — built after normalization |
+
+Library normalization: `LibraryNorm` holds a `NormStats` (Welford mean/M2,
+mergeable across rayon workers by Chan's formula, serde JSON) per aspect;
+z = (x − mean) / max(std, 1e-3), clamped to ±8. Persisting stats and vectors
+is the vector store's job (T4.1).
 Similarity = Σ wᵢ · dᵢ(q, x) over aspects (cosine/L2 on normalized vectors).
 
 ## 6. Search

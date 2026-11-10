@@ -1,7 +1,9 @@
 //! Frame-level DSP features on the analysis signal (mono `f32` at
 //! [`crate::decode::ANALYSIS_RATE`], first 30 s; `docs/ARCHITECTURE.md`
 //! §4–5): STFT power spectrogram ([`stft`]), log-mel ([`mel`]), MFCC and
-//! deltas ([`mfcc`]), onset strength envelope ([`onset`]).
+//! deltas ([`mfcc`]), onset strength envelope ([`onset`]); YIN f0
+//! ([`yin`]), chroma ([`chroma`]) and the per-file similarity aspect
+//! vectors with their library normalization ([`aspects`]).
 //!
 //! [`Analyzer`] computes the spectrogram **once** per file and derives the
 //! rest from it; later features (spectral stats, chroma, tempo) take the
@@ -13,10 +15,13 @@
 //! at least one frame of finite values; silence maps to the dB floor
 //! ([`mel::POWER_FLOOR`]) and a zero onset envelope.
 
+pub mod aspects;
+pub mod chroma;
 pub mod mel;
 pub mod mfcc;
 pub mod onset;
 pub mod stft;
+pub mod yin;
 
 #[cfg(test)]
 mod mel_tests;
@@ -28,11 +33,14 @@ mod onset_tests;
 mod stft_tests;
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod yin_tests;
 
 pub use mel::{MelFilterbank, MelNorm};
 pub use mfcc::{deltas, Dct, DELTA_WIDTH};
 pub use onset::onset_strength;
 pub use stft::{Spectrogram, Stft};
+pub use yin::{Yin, YinConfig, YinFrame};
 
 use crate::Result;
 
