@@ -82,6 +82,11 @@ pub enum BenchCommand {
         /// `sudo purge` first; files that were just written may still be cached.
         #[arg(long)]
         cold: bool,
+        /// Make the library files APFS clones of the fixtures (`fs::copy`)
+        /// instead of writing them. New clones have no cached pages, so with
+        /// `--cold` the stages read from disk without `sudo purge`.
+        #[arg(long)]
+        clone: bool,
         /// Print JSON instead of text.
         #[arg(long)]
         json: bool,
@@ -132,6 +137,7 @@ pub fn run(cmd: BenchCommand) -> Result<()> {
             dir,
             keep,
             cold,
+            clone,
             json,
         } => {
             let work = Work::new(dir.as_deref(), keep)?;
@@ -141,6 +147,7 @@ pub fn run(cmd: BenchCommand) -> Result<()> {
                 threads,
                 batch: batch as usize,
                 warm: !cold,
+                clone,
             };
             let b = bench::bench_analyze(work.path(), &opts).context("analyze benchmark")?;
             emit(json, &b, print_analyze)
@@ -264,10 +271,12 @@ fn print_analyze(b: &AnalyzeBench) {
     );
     println!(
         "page cache: {}",
-        if b.warm_cache {
-            "warm (every file read once before the stages; numbers are CPU + database work)"
-        } else {
-            "as left by the writes (--cold; run `sudo purge` first for a truly cold cache)"
+        match (b.warm_cache, b.cloned) {
+            (true, _) =>
+                "warm (every file read once before the stages; numbers are CPU + database work)",
+            (false, true) => "cold (--cold --clone: fresh APFS clones, no cached pages)",
+            (false, false) =>
+                "as left by the writes (--cold; add --clone or run `sudo purge` for a truly cold cache)",
         }
     );
     for s in &b.stages {

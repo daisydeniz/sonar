@@ -99,7 +99,9 @@ write store + index
   (`Decoder::decode_with_meta`): format + counted duration, sample peak and
   BS.1770-4 integrated loudness at native rate over all channels, first
   600 s; `sonar meta <file>...`. The pipeline's fast `Meta` stage skips
-  the meter (0 s windows); `Dsp` measures peak/loudness.
+  the meter (0 s windows); `Dsp` measures peak/loudness. For intact
+  uncompressed PCM WAV/AIFF the `Meta` probe reads the length from the
+  header without touching the payload (ADR-015); everything else is counted.
 - Stages are idempotent and resumable; crash mid-scan = continue later.
   `sonar_core::jobs` (ADR-013) runs them: `Meta` (probe with 0 s windows:
   format + duration) for the whole store, then `Dsp` (30 s analysis decode +

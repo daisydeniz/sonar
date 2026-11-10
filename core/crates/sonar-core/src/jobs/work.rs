@@ -59,8 +59,9 @@ pub(crate) fn process(
 }
 
 /// Decode options per stage (ADR-013): `meta` probes with zero windows (no
-/// analysis buffer, no meter); `dsp` decodes the 30 s analysis window and
-/// measures peak/loudness over the default meta window.
+/// analysis buffer, no meter; header length for PCM WAV/AIFF, ADR-015);
+/// `dsp` decodes the 30 s analysis window and measures peak/loudness over
+/// the default meta window.
 fn run_stage(
     decoder: &mut Decoder,
     stage: Stage,
@@ -98,5 +99,53 @@ fn run_stage(
         }
         Err(Error::Cancelled) => FileResult::Skipped,
         Err(e) => FileResult::Failed(e.to_string()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::fixtures::manifest::Expect;
+    use crate::fixtures::{generate, FixtureOptions};
+
+    /// The meta stage (header length for intact PCM WAV/AIFF, ADR-015;
+    /// counted otherwise) on every fixture: intact files are `Done` with
+    /// the manifest's format and exact length, corrupt ones follow their
+    /// `expect` (`docs/EVAL.md`).
+    #[test]
+    fn meta_stage_outcomes_follow_the_fixture_manifest() {
+        let tmp = tempfile::tempdir().unwrap();
+        let opts = FixtureOptions {
+            include_long: false,
+            ..FixtureOptions::default()
+        };
+        let manifest = generate(tmp.path(), &opts).unwrap();
+        let mut dec = Decoder::new();
+        let cancel = Arc::new(AtomicBool::new(false));
+        let (mut ok, mut corrupt) = (0, 0);
+        for f in &manifest.fixtures {
+            let path = tmp.path().join(&f.path);
+            let result = match (&f.format, &f.truth.corrupt) {
+                (None, None) => continue,
+                _ => run_stage(&mut dec, Stage::Meta, &path, cancel.clone()),
+            };
+            match (&f.format, &f.truth.corrupt, result) {
+                (Some(fmt), None, FileResult::Done { meta }) => {
+                    assert!(!meta.partial, "{}: {:?}", f.path, meta.problem);
+                    assert_eq!(meta.num_frames, fmt.num_frames, "{}", f.path);
+                    assert_eq!(meta.sample_rate, fmt.sample_rate, "{}", f.path);
+                    assert_eq!(meta.channels, fmt.channels, "{}", f.path);
+                    assert_eq!(meta.bit_depth, fmt.bit_depth.map(u32::from), "{}", f.path);
+                    assert_eq!((meta.peak_dbfs, meta.measured_s), (None, 0.0), "{}", f.path);
+                    ok += 1;
+                }
+                (_, Some(_), FileResult::Failed(_)) => corrupt += 1,
+                (_, Some(c), FileResult::Done { .. }) if c.expect == Expect::ErrorOrPartial => {
+                    corrupt += 1;
+                }
+                (_, c, r) => panic!("{}: expected {c:?}, got {r:?}", f.path),
+            }
+        }
+        assert!(ok >= 100 && corrupt >= 15, "{ok} ok, {corrupt} corrupt");
     }
 }

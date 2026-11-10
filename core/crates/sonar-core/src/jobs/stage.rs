@@ -25,7 +25,8 @@ pub const EMBED_VERSION: u32 = 1;
 #[serde(rename_all = "lowercase")]
 pub enum Stage {
     /// Fast probe: container/codec, sample rate, channels, bit depth and
-    /// counted duration. No peak/loudness (those are measured in `Dsp`).
+    /// exact duration (from the header for intact PCM WAV/AIFF, else
+    /// counted; ADR-015). No peak/loudness (those are measured in `Dsp`).
     Meta,
     /// Analysis decode (30 s window) plus peak and loudness.
     Dsp,

@@ -137,7 +137,8 @@ Accepted. `sonar_core::jobs` runs the analysis stages in the background.
   version, so a bump retries failures); `missing` and scan-level `error`
   rows never.
 - **Meta stage** probes with 0 s analysis and 0 s meta windows (no buffer,
-  no meter): format + counted duration; `audio_meta` peak/loudness stay
+  no meter): format + counted duration (header length for intact PCM
+  WAV/AIFF, ADR-015); `audio_meta` peak/loudness stay
   NULL (format-only upsert, so a re-run never erases them). **Dsp stage**
   decodes the 30 s analysis window and meters peak/loudness over the 600 s
   default window (ADR-012). `BasicMeta.problem` carries why a result is
@@ -202,3 +203,50 @@ Accepted. `sonar_core::jobs` runs the analysis stages in the background.
   A root replaced by a different volume at the same path within
   one poll interval is treated as unchanged; the 2 s poll bounds
   detection latency for unmounts that raise no event.
+
+## ADR-015 — Header length for the meta probe (T1.7a)
+Accepted. Counting packets reads every byte of a PCM file to learn what
+its header states; on cold libraries that made the `Meta` stage I/O-bound.
+- **Scope**: only a length-only probe (0 s analysis window and 0 s or no
+  meter window: the `Meta` stage, `analyze_file`/`sonar meta` with
+  `--max-meta-secs 0`, `decode` with `Some(0.0)`). Any non-zero window
+  (the `Dsp` stage, `bench decode`) is unchanged, bit for bit.
+- **Formats**: WAVE and AIFF/AIFF-C whose codec is uncompressed PCM with one
+  frame per block (int 8/16/24/32, float 32/64, A-law, µ-law, incl.
+  WAVE_FORMAT_EXTENSIBLE and AIFF-C `sowt`/`fl32`/`in24`…). Not FLAC (RFC
+  9639 STREAMINFO total samples is exact, but only reading the compressed
+  frames reveals truncation/corruption, which counting reports as
+  `partial`), not MP4 (sample tables, same reason), not ADPCM, MP3, Ogg.
+- **Rule** (`decode::header`): symphonia opens the file as before (all
+  format fields come from it). The declared length `N` is used only if the
+  chunk header just before the payload, re-read from the file, is WAVE
+  `data` with `ckSize ≠ 0xFFFFFFFF` or AIFF `SSND` with `offset = blockSize
+  = 0`; the payload is a whole number of frames (frame = sample bytes ×
+  channels, what the demuxer reads; `nBlockAlign` is used by neither path);
+  payload / frame = `N`; and data start + payload ≤ file length. Anything
+  else (truncated, oversized declared chunk, unknown/streamed size incl. a
+  `fact` length symphonia would otherwise declare, unaligned payload,
+  non-zero SSND offset, compressed codec) → reopen and count exactly as
+  before. With those rules symphonia's RIFF demuxer would read exactly `N`
+  whole frames, so the result equals the counted one; a zero-window probe
+  never decodes, so PCM content cannot change it. Tested: header == counted
+  (Decoded + BasicMeta) on all 135 fixtures (103 take the header path,
+  corrupt ones included in the comparison), truncated/oversized/unaligned/
+  streamed WAV and AIFF, payload never read (byte-counting source).
+- **No stage version bump**: results are identical to the counted ones, so
+  existing `meta` rows stay valid.
+- **Known limits** (pre-existing, same on both paths, not changed here):
+  - a short final PCM packet is counted at its full 1,152 frames (symphonia
+    returns a short read without error), so a WAV cut inside its last
+    packet reports up to 1,151 frames too many and is not `partial`; cut
+    earlier, it is `partial`;
+  - symphonia ignores the AIFF `COMM` `numSampleFrames` and derives the
+    length from the `SSND` size, so an AIFF whose `SSND` holds more frames
+    than `numSampleFrames` over-reports its length.
+- **File replaced between the two opens** (fallback path): reported as
+  `Error::Io` ("file changed while reading"), so the pipeline skips and
+  retries it instead of recording a permanent error.
+- **Measured** (M4 Pro, 14 threads, `bench analyze --stages meta`): cold
+  APFS clones (`--cold --clone`) 3k files 5,926 → 33,599 files/s, 20k files
+  (13 GB) 1,138 → 37,399 files/s; warm 28,284 → 48,183 (3k) and 28,408 →
+  37,166 files/s (20k).

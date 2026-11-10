@@ -28,6 +28,12 @@ pub struct AnalyzeBenchOptions {
     /// Read every file once (untimed) before the stages so they run on a
     /// warm page cache; false for `--cold`.
     pub warm: bool,
+    /// Create the library files as copies made by `fs::copy` (APFS
+    /// `clonefile` on macOS) instead of writing their bytes: every file is a
+    /// new vnode with no cached pages, so with `warm: false` the stages read
+    /// from disk without `sudo purge`. Clones share extents with the source
+    /// fixtures (cold reads of the same blocks).
+    pub clone: bool,
 }
 
 /// Result of [`bench_analyze`]. By default the numbers are for a **warm
@@ -49,6 +55,9 @@ pub struct AnalyzeBench {
     /// Whether the files were read once before the stages ran, so the
     /// timings are CPU + database work on a warm page cache.
     pub warm_cache: bool,
+    /// Library files are `fs::copy` clones of the fixtures
+    /// ([`AnalyzeBenchOptions::clone`]).
+    pub cloned: bool,
     /// Seconds to write the files (untimed in the results below).
     pub generate_secs: f64,
     /// Seconds for the initial scan (untimed in the results below).
@@ -82,9 +91,11 @@ pub fn bench_analyze(work: &Path, opts: &AnalyzeBenchOptions) -> Result<AnalyzeB
         });
     }
 
-    // Independent files: the source bytes are read once and written out per
-    // file. `fs::copy` would make APFS clones that share extents and start
-    // with a cold page cache, which distorts the per-stage numbers.
+    // Default: independent files (source bytes read once, written out per
+    // file), so the warm-cache numbers measure CPU + database work. Clones
+    // (`opts.clone`) start with no cached pages and share extents, so the
+    // first stage to touch them pays all the disk reads: useful only as an
+    // explicit cold measurement, not as the default.
     let mut contents = Vec::with_capacity(sources.len());
     for s in &sources {
         contents.push(fs::read(s).map_err(|e| Error::io(s, e))?);
@@ -101,7 +112,11 @@ pub fn bench_analyze(work: &Path, opts: &AnalyzeBenchOptions) -> Result<AnalyzeB
         let dir = root.join(format!("pack{:03}", i / 200));
         fs::create_dir_all(&dir).map_err(|e| Error::io(&dir, e))?;
         let to = dir.join(format!("s{i:06}.{ext}"));
-        fs::write(&to, data).map_err(|e| Error::io(&to, e))?;
+        if opts.clone {
+            fs::copy(&sources[i % sources.len()], &to).map_err(|e| Error::io(&to, e))?;
+        } else {
+            fs::write(&to, data).map_err(|e| Error::io(&to, e))?;
+        }
         bytes += data.len() as u64;
     }
     let generate_secs = t.elapsed().as_secs_f64();
@@ -145,6 +160,7 @@ pub fn bench_analyze(work: &Path, opts: &AnalyzeBenchOptions) -> Result<AnalyzeB
         },
         batch: opts.batch,
         warm_cache: opts.warm,
+        cloned: opts.clone,
         generate_secs,
         scan_secs,
         warmup_secs,
@@ -186,6 +202,7 @@ mod tests {
                 threads: 2,
                 batch: 32,
                 warm: true,
+                clone: false,
             },
         )
         .expect("bench");

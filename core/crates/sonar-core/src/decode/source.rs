@@ -59,6 +59,8 @@ pub(super) struct Opened {
     pub layout: Option<Channels>,
     /// Codec short name, e.g. `pcm_s16le`, `flac`, `mp3`.
     pub codec: String,
+    /// Codec id of the selected track (drives the header length path).
+    pub codec_id: AudioCodecId,
     /// Container short name, e.g. `wave`, `aiff`, `flac`.
     pub container: String,
     /// Playable frames declared by the container, if any.
@@ -163,6 +165,7 @@ pub(super) fn open_source(path: &Path, source: Box<dyn MediaSource>) -> Result<O
     let decoder = symphonia::default::get_codecs()
         .make_audio_decoder(params, &AudioDecoderOptions::default())
         .map_err(|e| map_error(path, e))?;
+    let codec_id = params.codec;
     let codec = decoder.codec_info().short_name.to_owned();
     let info = format.format_info();
     let container = info.short_name.to_owned();
@@ -178,6 +181,7 @@ pub(super) fn open_source(path: &Path, source: Box<dyn MediaSource>) -> Result<O
         bit_depth,
         layout,
         codec,
+        codec_id,
         container,
         declared_frames,
         dur_includes_trim,
