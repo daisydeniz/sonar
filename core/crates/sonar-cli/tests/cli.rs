@@ -128,9 +128,9 @@ fn store_info_creates_store_under_sonar_home() {
         let text = stdout(&out);
         let db = home.join("sonar.db");
         assert!(text.contains(&format!("path: {}", db.display())), "{text}");
-        assert!(text.contains("schema version: 1"), "{text}");
+        assert!(text.contains("schema version: 2"), "{text}");
         assert!(text.contains("journal mode: wal"), "{text}");
-        for table in ["libraries", "files", "analysis", "hidden"] {
+        for table in ["libraries", "files", "analysis", "hidden", "file_stages"] {
             assert!(
                 text.lines()
                     .any(|l| l.split_whitespace().eq([table, "0"].into_iter())),

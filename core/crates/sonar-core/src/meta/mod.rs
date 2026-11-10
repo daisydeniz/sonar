@@ -89,11 +89,20 @@ pub struct BasicMeta {
     /// Decoding was incomplete (damaged/truncated file): values cover the
     /// readable part only.
     pub partial: bool,
+    /// Why `partial` is set (first problem seen while decoding or metering);
+    /// the pipeline stores it in `file_stages.message` (T1.5).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub problem: Option<String>,
 }
 
 impl BasicMeta {
     /// Combines the decoder's format info with a finished measurement.
-    pub(crate) fn from_measurement(src: &SourceInfo, meter: &Meter, partial: bool) -> Self {
+    pub(crate) fn from_measurement(
+        src: &SourceInfo,
+        meter: &Meter,
+        partial: bool,
+        problem: Option<String>,
+    ) -> Self {
         Self {
             duration_ms: duration_ms(src.num_frames, src.sample_rate),
             num_frames: src.num_frames,
@@ -108,6 +117,7 @@ impl BasicMeta {
                 meter.measured_secs()
             },
             partial,
+            problem,
         }
     }
 }

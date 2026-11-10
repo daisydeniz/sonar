@@ -76,6 +76,12 @@ const SCHEMA: &[(&str, &[&str])] = &[
     ),
     ("favorites", &["file_id", "added_at"]),
     ("hidden", &["file_id"]),
+    (
+        "file_stages",
+        &[
+            "file_id", "stage", "version", "outcome", "message", "done_at",
+        ],
+    ),
 ];
 
 fn columns(store: &Store, table: &str) -> Vec<String> {

@@ -7,8 +7,10 @@
 pub mod decode;
 pub mod error;
 pub mod fixtures;
+pub mod jobs;
 pub mod meta;
 pub mod paths;
+pub mod quiet_panic;
 pub mod scan;
 pub mod store;
 

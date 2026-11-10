@@ -1,5 +1,6 @@
 //! `sonar` — headless entry point to every core feature.
 
+mod analyze_cmd;
 mod cli;
 mod decode_cmd;
 mod meta_cmd;
@@ -42,6 +43,19 @@ fn main() -> Result<()> {
             max_meta_secs,
             json,
         } => meta_cmd::run(&files, max_meta_secs, json)?,
+        Command::Analyze {
+            stages,
+            threads,
+            batch,
+            json,
+            debug_delay_ms,
+        } => analyze_cmd::run(analyze_cmd::Args {
+            stages,
+            threads,
+            batch: batch as usize,
+            json,
+            debug_delay_ms,
+        })?,
         Command::Store {
             command: StoreCommand::Info,
         } => store_info()?,

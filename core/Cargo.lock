@@ -872,6 +872,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "clap",
+ "rusqlite",
  "serde_json",
  "sonar-core",
  "tempfile",
@@ -892,6 +893,7 @@ dependencies = [
  "symphonia",
  "tempfile",
  "thiserror",
+ "tracing",
  "twox-hash",
 ]
 

@@ -105,6 +105,14 @@ pub enum Error {
         found: String,
     },
 
+    /// A background job failed unexpectedly (a panic in the job thread, or
+    /// a thread/pool that could not be started). Never carries user data.
+    #[error("internal error: {reason}")]
+    Internal {
+        /// What went wrong.
+        reason: String,
+    },
+
     /// The file at `path` could not be decoded as audio: not audio at all,
     /// a damaged header, no decodable frames, or limits exceeded (absurd
     /// channel count / sample rate / packet size).

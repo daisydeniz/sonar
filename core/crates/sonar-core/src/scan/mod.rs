@@ -21,7 +21,8 @@
 //! # Reconcile (one transaction per scan)
 //! - **changed** — same path, different size or mtime: new identity, status
 //!   `new`, `analysis_version` 0, `error`/`content_hash` cleared,
-//!   `audio_meta`/`analysis` rows deleted; user data kept.
+//!   `audio_meta`/`analysis`/`file_stages` rows deleted (stages re-run);
+//!   user data kept.
 //! - **moved** — a row whose path vanished and a new path with the same
 //!   `(size, quick_hash)`: the row's `rel_path`/`mtime` are updated so its
 //!   id and user data follow the file. Several candidates pair one-to-one:
@@ -31,8 +32,10 @@
 //!   user data and stage rows, so a returning file loses nothing).
 //! - **restored** — a `missing` row whose path reappears with the same size
 //!   and mtime: status re-derived from its surviving stage rows
-//!   (`analysis` → `analyzed`, `audio_meta` → `meta`, else `new`). If the
-//!   content differs it counts as **changed** instead.
+//!   (`analysis` or a finished `dsp` stage → `analyzed`, `audio_meta` →
+//!   `meta`, else `new`); `error` stage rows are dropped so they are retried.
+//!   Moves keep stage rows (same content). If the content differs it counts
+//!   as **changed** instead.
 //! - **added** — remaining new paths: new rows, status `new`.
 //! - **errors** — a file that can be listed but not read (e.g. mode 000):
 //!   row status `error`, `error` text, `quick_hash` NULL; retried on every

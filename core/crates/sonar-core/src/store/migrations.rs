@@ -32,10 +32,16 @@ pub(crate) struct Migration {
 }
 
 /// Every migration this build knows, in order.
-pub(crate) const MIGRATIONS: &[Migration] = &[Migration {
-    name: "0001_init",
-    sql: include_str!("migrations/0001_init.sql"),
-}];
+pub(crate) const MIGRATIONS: &[Migration] = &[
+    Migration {
+        name: "0001_init",
+        sql: include_str!("migrations/0001_init.sql"),
+    },
+    Migration {
+        name: "0002_file_stages",
+        sql: include_str!("migrations/0002_file_stages.sql"),
+    },
+];
 
 /// Latest schema version this build can create and read.
 pub const LATEST_VERSION: i64 = MIGRATIONS.len() as i64;
@@ -168,6 +174,7 @@ mod tests {
     fn latest_version_matches_list() {
         assert_eq!(LATEST_VERSION, MIGRATIONS.len() as i64);
         assert_eq!(MIGRATIONS.first().map(|m| m.name), Some("0001_init"));
+        assert_eq!(MIGRATIONS.get(1).map(|m| m.name), Some("0002_file_stages"));
     }
 
     #[test]

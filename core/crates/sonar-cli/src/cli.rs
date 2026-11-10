@@ -8,6 +8,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
+use sonar_core::jobs::Stage;
 
 /// `sonar` — headless access to every Sonar core feature.
 #[derive(Debug, Parser)]
@@ -100,6 +101,30 @@ pub enum Command {
         /// Print a JSON array instead of text.
         #[arg(long)]
         json: bool,
+    },
+
+    /// Run the analysis pipeline over every library in the store: `meta`
+    /// (format, duration) for all files first, then `dsp` (analysis decode,
+    /// peak, loudness). Resumable: only pending files are processed, so it can
+    /// be interrupted and restarted. Progress goes to stderr, the summary
+    /// to stdout. File-level errors are recorded as data (exit code 0).
+    Analyze {
+        /// Stages to run, comma separated (`meta`, `dsp`; `embed` is not
+        /// implemented yet and is skipped).
+        #[arg(long, value_delimiter = ',', default_values = ["meta", "dsp"])]
+        stages: Vec<Stage>,
+        /// Worker threads (0 = all cores).
+        #[arg(long, default_value_t = 0)]
+        threads: usize,
+        /// Files per committed batch (one database transaction each).
+        #[arg(long, default_value_t = 128, value_parser = clap::value_parser!(u32).range(1..))]
+        batch: u32,
+        /// Print the summary as JSON.
+        #[arg(long)]
+        json: bool,
+        /// Test only: sleep this many ms before every file.
+        #[arg(long, hide = true, default_value_t = 0)]
+        debug_delay_ms: u64,
     },
 
     /// Inspect the SQLite store (location: $SONAR_HOME/sonar.db, else

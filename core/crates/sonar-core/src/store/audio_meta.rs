@@ -73,6 +73,32 @@ pub fn upsert(conn: &Connection, file_id: i64, meta: &BasicMeta) -> Result<()> {
     Ok(())
 }
 
+/// Inserts the format fields (duration, rate, channels, bit depth) of
+/// `file_id`, or updates only those on an existing row: `peak_db` and
+/// `loudness_lufs` are left as they are (NULL for a new row). Used by the
+/// fast `meta` stage so a re-run never erases what the `dsp` stage measured.
+///
+/// # Errors
+/// As [`upsert`].
+pub fn upsert_format(conn: &Connection, file_id: i64, meta: &BasicMeta) -> Result<()> {
+    let duration = i64::try_from(meta.duration_ms).unwrap_or(i64::MAX);
+    conn.prepare_cached(
+        "INSERT INTO audio_meta (file_id, duration_ms, sample_rate, channels, bit_depth) \
+         VALUES (?1, ?2, ?3, ?4, ?5) \
+         ON CONFLICT (file_id) DO UPDATE SET \
+           duration_ms = excluded.duration_ms, sample_rate = excluded.sample_rate, \
+           channels = excluded.channels, bit_depth = excluded.bit_depth",
+    )?
+    .execute(params![
+        file_id,
+        duration,
+        meta.sample_rate,
+        meta.channels,
+        meta.bit_depth
+    ])?;
+    Ok(())
+}
+
 /// The row of `file_id`, if any.
 ///
 /// # Errors
@@ -147,6 +173,7 @@ mod tests {
             loudness_lufs: Some(-9.03),
             measured_s: 1.5,
             partial: false,
+            problem: None,
         }
     }
 
@@ -186,6 +213,26 @@ mod tests {
             .query_row("SELECT count(*) FROM audio_meta", [], |r| r.get(0))
             .unwrap();
         assert_eq!(rows, 1);
+    }
+
+    #[test]
+    fn upsert_format_keeps_measured_levels() {
+        let (store, id) = store_with_file();
+        let m = sample();
+        upsert_format(store.conn(), id, &m).unwrap();
+        let got = store.audio_meta(id).unwrap().unwrap();
+        assert_eq!((got.peak_dbfs, got.loudness_lufs), (None, None));
+        assert_eq!(got.duration_ms, 1_500);
+        store.put_audio_meta(id, &m).unwrap();
+        let shorter = BasicMeta {
+            duration_ms: 900,
+            ..sample()
+        };
+        upsert_format(store.conn(), id, &shorter).unwrap();
+        let got = store.audio_meta(id).unwrap().unwrap();
+        assert_eq!(got.duration_ms, 900);
+        assert_eq!(got.peak_dbfs, m.peak_dbfs);
+        assert_eq!(got.loudness_lufs, m.loudness_lufs);
     }
 
     #[test]

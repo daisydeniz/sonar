@@ -220,7 +220,7 @@ const MAX_RETRY_PAUSE: Duration = Duration::from_millis(50);
 /// return `SQLITE_BUSY` without invoking the busy handler
 /// (<https://www.sqlite.org/c3ref/busy_handler.html>). `op` must be
 /// idempotent.
-fn retry_busy<T>(mut op: impl FnMut() -> Result<T>) -> Result<T> {
+pub(crate) fn retry_busy<T>(mut op: impl FnMut() -> Result<T>) -> Result<T> {
     let deadline = Instant::now() + BUSY_TIMEOUT;
     let mut pause = Duration::from_millis(1);
     loop {
@@ -235,7 +235,7 @@ fn retry_busy<T>(mut op: impl FnMut() -> Result<T>) -> Result<T> {
 }
 
 /// True for SQLite lock conflicts (`SQLITE_BUSY`, `SQLITE_LOCKED`).
-fn is_busy(err: &Error) -> bool {
+pub(crate) fn is_busy(err: &Error) -> bool {
     let sqlite = match err {
         Error::Sqlite(e) | Error::Migration { source: e, .. } => e,
         _ => return false,

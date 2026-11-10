@@ -2,7 +2,7 @@
 //! operations in one `IMMEDIATE` transaction with cached prepared
 //! statements (atomic: a failed scan writes nothing).
 //!
-//! Only `files`, `audio_meta`, `analysis` and `libraries.online` are
+//! Only `files`, `audio_meta`, `analysis`, `file_stages` and `libraries.online` are
 //! written. User data tables are never touched; rows are never deleted, so
 //! user data on missing files survives.
 
@@ -34,10 +34,16 @@ pub(crate) fn load_files(conn: &Connection, library_id: i64) -> Result<Vec<DbFil
 /// `error`, so a stale `error` text (e.g. an analysis failure recorded
 /// before the file went missing) is cleared with it; the pipeline retries.
 const RESTORE_SQL: &str = "UPDATE files SET error = NULL, status = CASE \
-       WHEN EXISTS (SELECT 1 FROM analysis WHERE file_id = files.id) THEN 'analyzed' \
+       WHEN EXISTS (SELECT 1 FROM analysis WHERE file_id = files.id) \
+         OR EXISTS (SELECT 1 FROM file_stages WHERE file_id = files.id \
+                    AND stage = 'dsp' AND outcome <> 'error') THEN 'analyzed' \
        WHEN EXISTS (SELECT 1 FROM audio_meta WHERE file_id = files.id) THEN 'meta' \
        ELSE 'new' END \
      WHERE id = ?1";
+
+/// Failed stages are retried once the file is back (the failure may have
+/// been transient); successful stage rows stay.
+const RESTORE_RETRY_SQL: &str = "DELETE FROM file_stages WHERE file_id = ?1 AND outcome = 'error'";
 
 /// Applies `ops` for `library_id` and marks the library online.
 pub(crate) fn apply(conn: &mut Connection, library_id: i64, ops: &[Op]) -> Result<()> {
@@ -78,8 +84,11 @@ pub(crate) fn apply(conn: &mut Connection, library_id: i64, ops: &[Op]) -> Resul
                     .execute([id])?;
                 tx.prepare_cached("DELETE FROM analysis WHERE file_id = ?1")?
                     .execute([id])?;
+                tx.prepare_cached("DELETE FROM file_stages WHERE file_id = ?1")?
+                    .execute([id])?;
             }
             Op::Restore { id } => {
+                tx.prepare_cached(RESTORE_RETRY_SQL)?.execute([id])?;
                 tx.prepare_cached(RESTORE_SQL)?.execute([id])?;
             }
             Op::Move {
@@ -91,6 +100,7 @@ pub(crate) fn apply(conn: &mut Connection, library_id: i64, ops: &[Op]) -> Resul
                 tx.prepare_cached("UPDATE files SET rel_path = ?2, mtime = ?3 WHERE id = ?1")?
                     .execute(params![id, rel_path, mtime])?;
                 if *restore {
+                    tx.prepare_cached(RESTORE_RETRY_SQL)?.execute([id])?;
                     tx.prepare_cached(RESTORE_SQL)?.execute([id])?;
                 }
             }

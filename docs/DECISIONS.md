@@ -121,3 +121,42 @@ too). Spans < 400 ms: one block over the whole span
 `audio_meta`), never −∞/NaN; non-finite float samples are ignored. Store:
 schema 0001 `audio_meta` as is (no migration); `measured_s`/`partial` are
 not stored (partial goes to `files.status/error` in the pipeline, T1.5).
+
+## ADR-013 — Job pipeline (T1.5)
+Accepted. `sonar_core::jobs` runs the analysis stages in the background.
+- **Stages + versions.** `Stage {Meta, Dsp, Embed}`, each with a `VERSION`
+  const. Progress is the `file_stages(file_id, stage, version, outcome,
+  message, done_at)` table (migration 0002), not `files.status`. A file is
+  *pending* for a stage with no row or `version < current`; bumping a const
+  re-runs just that stage. Changed content (scan) deletes the file's rows;
+  moves keep them; a restored file loses its `error` rows (retried).
+  `Embed` is declared but not runnable until T5.2 (skipped explicitly).
+- **Staged priority** across the whole store: every pending `Meta` file
+  before the first `Dsp` file; ids ascending within a stage. Eligible: online
+  library, status new/meta/analyzed (plus an `error` row at an outdated
+  version, so a bump retries failures); `missing` and scan-level `error`
+  rows never.
+- **Meta stage** probes with 0 s analysis and 0 s meta windows (no buffer,
+  no meter): format + counted duration; `audio_meta` peak/loudness stay
+  NULL (format-only upsert, so a re-run never erases them). **Dsp stage**
+  decodes the 30 s analysis window and meters peak/loudness over the 600 s
+  default window (ADR-012). `BasicMeta.problem` carries why a result is
+  partial into `file_stages.message`.
+- **Atomicity.** One coordinator thread owns the connection; rayon workers
+  only decode. Each batch (default 128 files) is committed in a single
+  `IMMEDIATE` transaction (`audio_meta` + `file_stages` + `files`), so
+  `kill -9` leaves whole batches; `PRIMARY KEY (file_id, stage)` plus the
+  pending query make resume duplicate-free.
+- **Errors.** Decode/format error → `error` row + `files.status='error'`
+  (retried only after a content change or version bump); damaged but readable
+  → `partial` (message = problem); `Error::Io` (offline drive, permissions)
+  → nothing recorded, file stays pending, counted as skipped; a worker panic
+  → `error` row "internal error". Panic messages are silenced inside
+  guarded sections by a once-installed hook (`quiet_panic`).
+- **Stale claims.** `(size, mtime)` is captured at claim; the commit applies
+  a result only if the row still matches and is not `missing`, else it is
+  dropped (the scan already reset the file).
+- **Threading/control.** `jobs::start` opens its own connection and spawns
+  the job thread; `JobHandle` pause/resume (Condvar, no busy loop, between
+  files), cancel (stop claiming, in-flight files finish and commit), polled
+  `progress()` and an optional event callback.

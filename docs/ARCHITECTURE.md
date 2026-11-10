@@ -70,9 +70,11 @@ Location: `~/Library/Application Support/Sonar/` (override with
    `quick_hash` u64 stored bit-cast as INTEGER, `status ∈ {new, meta,
    analyzed, error, missing}`; schema in `store/migrations/*.sql`
    (versioned by `PRAGMA user_version`, tables STRICT)
-- Per-stage pipeline progress (T1.5) goes in its own table, e.g.
-  `file_stages(file_id, stage, version, error)`, rather than by widening
-  `files.status` (a CHECK change would need a table rebuild).
+- `file_stages(file_id, stage, version, outcome, message, done_at)` — PK
+  `(file_id, stage)`, `stage ∈ {meta, dsp, embed}`, `outcome ∈ {ok, partial,
+  error}`. A file is pending for a stage when it has no row or an older
+  `version` than the stage's current one (ADR-013). Deleted by the scanner
+  when content changes.
 - `audio_meta(file_id, duration_ms, sample_rate, channels, bit_depth,
    peak_db, loudness_lufs)`
 - `analysis(file_id, kind, kind_conf, bpm, bpm_conf, bpm_source, key,
@@ -96,8 +98,15 @@ write store + index
 - Basic meta (`sonar_core::meta`, ADR-012) runs inside the same decode pass
   (`Decoder::decode_with_meta`): format + counted duration, sample peak and
   BS.1770-4 integrated loudness at native rate over all channels, first
-  600 s; `sonar meta <file>...`.
+  600 s; `sonar meta <file>...`. The pipeline's fast `Meta` stage skips
+  the meter (0 s windows); `Dsp` measures peak/loudness.
 - Stages are idempotent and resumable; crash mid-scan = continue later.
+  `sonar_core::jobs` (ADR-013) runs them: `Meta` (probe with 0 s windows:
+  format + duration) for the whole store, then `Dsp` (30 s analysis decode +
+  peak/loudness), then `Embed` (not implemented yet). Workers decode on a
+  rayon pool; one coordinator thread commits each batch in one transaction,
+  so `kill -9` leaves whole batches and a restart resumes from what is
+  pending. Pause/resume/cancel, polled progress and events; `sonar analyze`.
 - Priorities: metadata first for everything (fast, browsable), then DSP,
   then CLAP last (most expensive). UI shows partial results immediately.
 - `rayon` pool for CPU stages; CLAP in batches on its own thread.

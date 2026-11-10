@@ -35,7 +35,6 @@ mod robust_tests;
 #[cfg(test)]
 mod tests;
 
-use std::panic::{catch_unwind, AssertUnwindSafe};
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -44,6 +43,7 @@ use serde::Serialize;
 
 use crate::meta::channels::channel_weights;
 use crate::meta::{BasicMeta, MetaOptions, Meter};
+use crate::quiet_panic;
 use crate::Result;
 use resample::MonoResampler;
 use source::decode_err;
@@ -197,7 +197,7 @@ impl Decoder {
         opts: &DecodeOptions,
         meta: Option<&MetaOptions>,
     ) -> Result<(Decoded, Option<BasicMeta>)> {
-        let result = catch_unwind(AssertUnwindSafe(|| self.decode_inner(path, opts, meta)));
+        let result = quiet_panic::guarded(|| self.decode_inner(path, opts, meta));
         let out = result.unwrap_or_else(|_| {
             *self = Self::default();
             Err(decode_err(path, "internal decoder panic"))
@@ -261,6 +261,7 @@ impl Decoder {
         let num_frames = outcome.total_frames;
         // Metering stopped at a bad packet: the measured span is short.
         let meta_partial = outcome.partial || outcome.meter_problem.is_some();
+        let meta_problem = outcome.problem.clone().or(outcome.meter_problem.clone());
         let decoded = Decoded {
             samples,
             sample_rate: target,
@@ -278,8 +279,9 @@ impl Decoder {
             partial: outcome.partial,
             problem: outcome.problem,
         };
-        let meta =
-            meta.map(|_| BasicMeta::from_measurement(&decoded.source, &self.meter, meta_partial));
+        let meta = meta.map(|_| {
+            BasicMeta::from_measurement(&decoded.source, &self.meter, meta_partial, meta_problem)
+        });
         Ok((decoded, meta))
     }
 }
