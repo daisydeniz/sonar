@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M2 (M0, M1 done, tags m0-done, m1-done)
-- Next task: T2.3
+- Next task: T2.4
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
@@ -23,6 +23,6 @@ manual tests, labeled data. Keep each item one line with the task id.)_
 _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 
 ## Log
+- 2026-11-10 — T2.3: filters/sort/facets (ADR-018). Index schema v2 adds fast fields with effective values (override ?? analysis ?? filename prior; NULL override clears): category, kind, BPM, key, duration, library, tags, favourite, hidden (excluded unless asked). Sets any-of, tags all-of, inclusive ranges, unknown never matches; compatible keys = Camelot same/±1/relative. Sort by any column, unknowns last; drill-sideways facets. CLI `sonar search --category/--kind/--bpm/--key --compatible/--duration/--library/--tag/--favorites/--sort/--facets`. Core lib 397 passed + 1 ignored. 500k RAM p95: text 2.9 ms, browse+facets 23 ms. Reviewer APPROVE round 1. Later: 9 T2.3 items. No eval (no text-query set).
 - 2026-11-10 — T2.2: Tantivy 0.27 text index (MIT, mmap + lz4 only; ADR-017) over the T2.1 chain (+ plural folding, `ANALYZER_VERSION` 2): fields name/path/tags/category/kind (user overrides win, missing files excluded). Query: AND of words, `-word`/`-"phrase"` exclusions (synonym-expanded), dis-max over alternatives + synonyms, prefix on the last word unless trailing space (no synonym expansion for prefixes). Synonyms `docs/synonyms.tsv` built in, overridden by `$SONAR_HOME/synonyms.tsv` or `--synonyms`. CLI `sonar search [opts] <query…>` (options before query words), `sonar index`; search builds on first use, scan refreshes. Core lib 377 passed + 1 ignored; CLI e2e scan→search→rescan. Reviewer APPROVE round 1 (0 blockers). Later: 8 T2.2 items (incremental refresh, watcher, cancel, prefix synonyms, …). No eval (no text-query set until T3.6/T5.4).
 - 2026-11-10 — T2.1: `sonar_core::text` tokenizer + filename priors (ADR-016), CLI `sonar tokenize [--query] [--json]`. Splits separators/camelCase/digits, folds accents (`unicode-normalization`, MIT/Apache), canonical `120bpm`, `key:c#m`/`note:c#` (sharps), configurable pack-noise stop list; query mode also maps lowercase `am`/`dbm`/`eb` to key tokens. BPM/key priors conservative (bare number only with loop word/key, single letter only after BPM). ~170 table rows; ~0.72 µs/path release. Reviewer APPROVE (round 1 blocker: lowercase key queries — fixed). Later: 5 T2.1 items (one-shot note letter, Fm, lowercase priors, -6dB, full-width digits). No eval (T3.6).
-- 2026-11-10 — T1.7d: exact PCM length (ADR-015 addendum). WAV/AIFF PCM counted by packet bytes (truncated WAV → exact surviving frames + `partial`; was up to +1,151 frames); AIFF `COMM` is the declared length (longer `SSND` capped, shorter → `partial`); truncated AIFF (was an error) read via a bounded chunk-walk header overlay → exact frames + `partial`. meta/dsp stage versions 1 → 2. Cost: meta 3k b128 warm 55,819 / 56,244 files/s vs 56,233 before (noise), cold `--clone` 57,692 / 55,195. Core lib 331 passed + 1 ignored. Reviewer APPROVE (round 1: ADR wording blocker fixed). Later: AIFF over-declared COMM → partial watch, `basic-toml` advisory. M1 complete (m1-done). No eval (T3.6).
