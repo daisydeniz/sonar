@@ -93,4 +93,5 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 ## Later (not picked by the loop — founder triages after M8)
 - (from T1.7c review) Resume pressed while a failed job is shutting down may start a few files that are stopped immediately.
 - (from T1.7c review) Loop guard against a loop that cannot happen today.
-- (from T1.7c) `cargo deny` advisories check failed once (not in check.sh, no deps changed); cause unconfirmed.
+- (from T1.7c) `cargo deny` advisories check failed once (not in check.sh, no deps changed); cause unconfirmed. (T1.7d: it is `basic-toml` unmaintained via `uniffi-bindgen`; ignore in `deny.toml` with a reason or bump.)
+- (from T1.7d) An intact AIFF whose writer over-declares `COMM` `numSampleFrames` is now `partial`; check AIFF `partial` counts on a real library / eval.
