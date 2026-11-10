@@ -981,6 +981,7 @@ dependencies = [
  "anyhow",
  "clap",
  "rusqlite",
+ "serde",
  "serde_json",
  "sonar-core",
  "tempfile",

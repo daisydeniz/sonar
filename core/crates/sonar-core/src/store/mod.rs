@@ -10,6 +10,7 @@
 pub mod audio_meta;
 mod libraries;
 mod migrations;
+mod stats;
 #[cfg(test)]
 mod tests;
 
@@ -23,6 +24,7 @@ use crate::{paths, Error, Result};
 
 pub use libraries::Library;
 pub use migrations::LATEST_VERSION;
+pub use stats::{LibraryStats, StageStats, StatusCounts, StoreStats};
 
 /// How long a connection waits for a lock held by another connection.
 pub const BUSY_TIMEOUT: Duration = Duration::from_millis(5000);

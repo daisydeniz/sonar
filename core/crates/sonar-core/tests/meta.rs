@@ -206,7 +206,9 @@ fn sine_loudness_matches_published_coefficient_anchors() {
 }
 
 /// Throughput of the pipeline decode with and without meta, over the full
-/// set, the 310 s file alone and a 600 s AAC file (printed).
+/// set, the 310 s file alone and a 600 s AAC file (printed). `sonar bench
+/// decode` (T1.7) supersedes the whole-set numbers; this stays for the
+/// long-file (310 s / 600 s AAC) timings the CLI bench does not isolate.
 #[test]
 #[ignore = "benchmark: cargo test --release --test meta -- --ignored --nocapture"]
 fn throughput_with_and_without_meta() {

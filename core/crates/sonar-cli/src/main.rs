@@ -1,9 +1,11 @@
 //! `sonar` — headless entry point to every core feature.
 
 mod analyze_cmd;
+mod bench_cmd;
 mod cli;
 mod decode_cmd;
 mod meta_cmd;
+mod stats_cmd;
 mod watch_cmd;
 
 use anyhow::{Context, Result};
@@ -57,6 +59,8 @@ fn main() -> Result<()> {
             json,
             debug_delay_ms,
         })?,
+        Command::Stats { json } => stats_cmd::run(json)?,
+        Command::Bench { command } => bench_cmd::run(command)?,
         Command::Watch { json, debounce_ms } => watch_cmd::run(json, debounce_ms)?,
         Command::Store {
             command: StoreCommand::Info,

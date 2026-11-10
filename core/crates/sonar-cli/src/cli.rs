@@ -142,6 +142,23 @@ pub enum Command {
         debounce_ms: u64,
     },
 
+    /// Library and store statistics: per library the root, online state,
+    /// file counts by status, total size and duration, per-stage progress
+    /// (ok/partial/error/pending), and the database size.
+    Stats {
+        /// Print JSON instead of text.
+        #[arg(long)]
+        json: bool,
+    },
+
+    /// Performance benchmarks in a temporary folder with its own store
+    /// (never yours). Use a release build for meaningful numbers.
+    Bench {
+        /// Which benchmark.
+        #[command(subcommand)]
+        command: crate::bench_cmd::BenchCommand,
+    },
+
     /// Inspect the SQLite store (location: $SONAR_HOME/sonar.db, else
     /// ~/Library/Application Support/Sonar/sonar.db).
     Store {

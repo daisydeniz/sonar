@@ -4,6 +4,7 @@
 //! talks to it through the UniFFI facade crate; the `sonar` CLI exposes every
 //! feature headless so it can be tested and benchmarked without UI.
 
+pub mod bench;
 pub mod decode;
 pub mod error;
 pub mod fixtures;
