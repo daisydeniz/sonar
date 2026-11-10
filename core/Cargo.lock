@@ -1450,6 +1450,7 @@ dependencies = [
  "hound",
  "notify",
  "rayon",
+ "realfft",
  "rubato",
  "rusqlite",
  "serde",

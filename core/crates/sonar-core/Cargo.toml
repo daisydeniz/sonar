@@ -9,6 +9,7 @@ description = "Sonar core: scan, analysis, index and search for local sample lib
 [dependencies]
 notify.workspace = true
 rayon.workspace = true
+realfft.workspace = true
 rubato.workspace = true
 rusqlite.workspace = true
 serde.workspace = true

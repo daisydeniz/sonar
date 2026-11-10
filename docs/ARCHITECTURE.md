@@ -123,6 +123,14 @@ write store + index
   remount and re-establishes the watch. `sonar watch` exposes it.
 
 ## 5. Features for similarity (aspects)
+Frame features (`sonar_core::dsp`, `DSP_VERSION` 1; `sonar dsp <file>...`):
+one `dsp::Analyzer` per worker computes the STFT power spectrogram once
+(n_fft 2048, hop 512 ≈ 43 frames/s, periodic Hann, centered, zero-padded)
+and derives log-mel (64 Slaney-scale/Slaney-normalized bands 20 Hz–Nyquist,
+dB with −100 dB floor), MFCC c0–c19 (orthonormal DCT-II), HTK deltas and the
+onset strength envelope (rectified log-mel flux, band mean, 80 dB range).
+Later features take `&Spectrogram` / `FeatureMatrix` from `dsp::Features`.
+
 Per file, fixed-length vectors, z-score normalized with library stats:
 - **Spectrum**: mel-band energy distribution stats (mean/std), centroid,
   rolloff, flatness.

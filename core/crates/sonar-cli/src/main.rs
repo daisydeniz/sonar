@@ -5,6 +5,7 @@ mod bench_cmd;
 mod bench_print;
 mod cli;
 mod decode_cmd;
+mod dsp_cmd;
 mod meta_cmd;
 mod search_args;
 mod search_cmd;
@@ -50,6 +51,7 @@ fn main() -> Result<()> {
             max_meta_secs,
             json,
         } => meta_cmd::run(&files, max_meta_secs, json)?,
+        Command::Dsp { files, json } => dsp_cmd::run(&files, json)?,
         Command::Analyze {
             stages,
             threads,

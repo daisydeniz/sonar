@@ -46,7 +46,7 @@ Owner tags map to subagents in `.claude/agents/`.
 
 ## M3 — Audio analysis (DSP)
 - [ ] T3.1 (dsp-analysis) STFT, mel filterbank, MFCC, onset strength envelope. AC: tests vs analytic signals.
-- [ ] T3.2 (dsp-analysis) Aspect vectors (Spectrum, Timbre, Pitch, Amplitude, Overall) per ARCHITECTURE §5; library-level normalization stats. AC: fixed dims documented; stable across runs.
+- [ ] T3.2 (dsp-analysis) Aspect vectors (Spectrum, Timbre, Pitch, Amplitude, Overall) per ARCHITECTURE §5; library-level normalization stats. AC: fixed dims documented; stable across runs. Note (T3.1): `dsp::N_MFCC` = 20 incl. c0 (loudness-dependent); decide whether Timbre drops c0 (Amplitude covers loudness).
 - [ ] T3.3 (dsp-analysis) Loop vs one-shot classifier (heuristics: duration, onset periodicity, tail, filename hints). AC: ≥ 95 % on fixtures.
 - [ ] T3.4 (dsp-analysis) BPM for loops only (onset autocorrelation/tempogram + filename prior, octave correction). AC: ≥ 95 % (±1 BPM) on fixtures; one-shots never get BPM.
 - [ ] T3.5 (dsp-analysis) Key (chroma + key profiles, filename prior) and pitch/note for tonal one-shots (YIN). AC: fixtures ≥ 90 % key, ≥ 95 % note.
@@ -122,3 +122,5 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T2.4) Bench first query is only cold-ish (OS cache warm); add an optional truly cold run (`purge` / fresh clone) for app-start latency.
 - (from T2.4) Full 500k index rebuild = 1.8 s; use it when deciding the T2.2 scan-rebuild vs `refresh_files` item.
 - (from T2.4 review) Browse classes have 3 queries (p95 ≈ max of 30 runs); raise default rounds or add queries. No test for the budget-miss non-zero exit (move check into core + unit test).
+- (from T3.1 review) `FeatureMatrix` has public fields; add a checked constructor so `data.len() == n_frames * n_cols` holds.
+- (from T3.1 review) DSP timing is only an `#[ignore]` test; add `sonar bench dsp` once T3.2 wires DSP into the pipeline.

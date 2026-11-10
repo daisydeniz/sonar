@@ -140,6 +140,14 @@ pub enum Error {
         path: PathBuf,
     },
 
+    /// A DSP analyzer was configured with unusable parameters (e.g. a
+    /// sample rate too low for the mel range, a zero hop or FFT size).
+    #[error("invalid DSP parameters: {reason}")]
+    Dsp {
+        /// Which parameter is wrong.
+        reason: String,
+    },
+
     /// The file at `path` is in a container or codec this build cannot
     /// decode (or is not recognised as audio at all).
     #[error("unsupported audio format in {}: {reason}", path.display())]

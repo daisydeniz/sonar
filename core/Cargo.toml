@@ -43,6 +43,9 @@ symphonia = { version = "0.6.1", default-features = false, features = [
 # MIT OR Apache-2.0. Band-limited resampling to the analysis rate (FFT
 # resampler: synchronous, fixed ratio, fast).
 rubato = "5.0.1"
+# MIT OR Apache-2.0. Real-input FFT (wraps rustfft) for the analysis STFT
+# (`sonar_core::dsp`); already in the tree through rubato.
+realfft = "3.5.1"
 # MIT OR Apache-2.0. NFD decomposition for diacritic folding in the text
 # tokenizer (`text`); macOS file names are often stored decomposed already.
 unicode-normalization = { version = "0.1.26", default-features = false, features = ["std"] }

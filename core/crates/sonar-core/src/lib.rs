@@ -6,6 +6,7 @@
 
 pub mod bench;
 pub mod decode;
+pub mod dsp;
 pub mod error;
 pub mod fixtures;
 pub mod index;

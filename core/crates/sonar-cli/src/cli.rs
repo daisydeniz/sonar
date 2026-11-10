@@ -105,6 +105,19 @@ pub enum Command {
         json: bool,
     },
 
+    /// Decode audio files like analysis does (mono 22.05 kHz, first 30 s)
+    /// and print a DSP feature summary: frame count, MFCC means and onset
+    /// envelope stats. Unreadable files are reported and skipped; exits
+    /// non-zero if any failed.
+    Dsp {
+        /// Audio files (wav, aif/aiff, flac, mp3, ogg, m4a).
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        /// Print a JSON array instead of text.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Run the analysis pipeline over every library in the store: `meta`
     /// (format, duration) for all files first, then `dsp` (analysis decode,
     /// peak, loudness). Resumable: only pending files are processed, so it can
