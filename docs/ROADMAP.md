@@ -39,7 +39,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T1.7d (dsp-analysis) (from T1.7a) Exact length for truncated/over-long PCM: symphonia counts a short final PCM packet as a full 1,152 frames (a WAV cut inside its last packet over-reports by ≤ 1,151 frames, not `partial`), and ignores AIFF COMM `numSampleFrames` (SSND longer than COMM over-reports). Count PCM packets by actual bytes / honour COMM; bump the meta stage version. AC: truncated WAV/AIFF tests report the exact surviving frame count + `partial`. (fd4ae10)
 
 ## M2 — Text search & filters
-- [ ] T2.1 (search-ranking) Tokenizer: separators, camelCase, numbers, `120bpm`/`120 BPM`, keys (`Cmin`, `C#m`, `F# minor`, `Gbmaj`), pack noise words; filename priors for BPM/key. AC: table-driven tests ≥ 60 cases.
+- [x] T2.1 (search-ranking) Tokenizer: separators, camelCase, numbers, `120bpm`/`120 BPM`, keys (`Cmin`, `C#m`, `F# minor`, `Gbmaj`), pack noise words; filename priors for BPM/key. AC: table-driven tests ≥ 60 cases. (b7022b4)
 - [ ] T2.2 (search-ranking) Tantivy index: fields name/path/tags/category/etc., synonyms map (`docs/synonyms.tsv`, editable), exclusion terms, prefix search for as-you-type. AC: unit tests + CLI `sonar search`.
 - [ ] T2.3 (search-ranking) Filters/facets/sort: category, kind, BPM range, key (+ compatible keys option), duration, library, tags, favorites; facet counts. AC: tests.
 - [ ] T2.4 (search-ranking) Latency: synthetic 500k-doc index, `sonar bench search`. AC: p95 < 50 ms recorded in STATUS.md.
