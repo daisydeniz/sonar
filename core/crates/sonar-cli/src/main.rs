@@ -6,6 +6,7 @@ mod bench_print;
 mod cli;
 mod decode_cmd;
 mod meta_cmd;
+mod search_args;
 mod search_cmd;
 mod stats_cmd;
 mod tokenize_cmd;
@@ -75,12 +76,14 @@ fn main() -> Result<()> {
             json,
             no_prefix,
             synonyms,
+            filters,
         } => search_cmd::run(&search_cmd::Args {
             query: &query,
             limit,
             json,
             no_prefix,
             synonyms: synonyms.as_deref(),
+            filters: &filters,
         })?,
         Command::Bench { command } => bench_cmd::run(command)?,
         Command::Watch { json, debounce_ms } => watch_cmd::run(json, debounce_ms)?,

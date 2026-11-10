@@ -7,13 +7,15 @@ use std::path::Path;
 use rusqlite::params;
 
 use super::*;
-use crate::search::{search, SearchOptions, Synonyms};
+use crate::search::keys::parse_key;
+use crate::search::{search, Filters, SearchOptions, Sort, SortField, Synonyms, ValueRange};
 use crate::Store;
 
 fn find(ix: &TextIndex, q: &str) -> Vec<i64> {
     let opts = SearchOptions {
         limit: 100,
         prefix: false,
+        ..SearchOptions::default()
     };
     let mut ids: Vec<i64> = search(ix, &Synonyms::builtin(), q, &opts)
         .expect("search")
@@ -101,6 +103,122 @@ fn rebuild_indexes_names_folders_tags_category_and_kind() {
     assert_eq!(find(&ix, "guitar"), [other]);
     // Rebuild replaces, never duplicates.
     assert_eq!(ix.rebuild(&store).expect("again").docs, 4);
+}
+
+/// Ids matching `filters` (no text), in `sort` order.
+fn filter(ix: &TextIndex, filters: Filters, sort: Sort) -> Vec<i64> {
+    let opts = SearchOptions {
+        limit: 100,
+        filters,
+        sort,
+        ..SearchOptions::default()
+    };
+    search(ix, &Synonyms::builtin(), "", &opts)
+        .expect("search")
+        .hits
+        .iter()
+        .map(|h| h.file_id)
+        .collect()
+}
+
+#[test]
+fn filter_values_are_effective_values() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let root = tmp.path().join("Lib");
+    fs::create_dir(&root).expect("mkdir");
+    let store = Store::open_in_memory().expect("store");
+    let lib = store.add_library(&root).expect("library").id;
+    let prior = add_file(&store, lib, "Loops/Bass_Loop_128_Am.wav");
+    let detected = add_file(&store, lib, "Loops/Pad 120 BPM Cm.wav");
+    let overridden = add_file(&store, lib, "Loops/Arp 124 BPM F#m.wav");
+    let hidden = add_file(&store, lib, "Shots/Snare.wav");
+    let fav = add_file(&store, lib, "Shots/Clap.wav");
+    let c = store.conn();
+    for (sql, id) in [
+        // Detected BPM beats the filename prior; the prior key stays.
+        (
+            "INSERT INTO analysis (file_id, bpm) VALUES (?1, 90.0)",
+            detected,
+        ),
+        // Override beats the prior; a NULL override clears the key.
+        (
+            "INSERT INTO overrides (file_id, field, value) VALUES (?1, 'bpm', 100)",
+            overridden,
+        ),
+        (
+            "INSERT INTO overrides (file_id, field, value) VALUES (?1, 'key', NULL)",
+            overridden,
+        ),
+        (
+            "INSERT INTO audio_meta (file_id, duration_ms) VALUES (?1, 250)",
+            hidden,
+        ),
+        ("INSERT INTO hidden (file_id) VALUES (?1)", hidden),
+        (
+            "INSERT INTO favorites (file_id, added_at) VALUES (?1, 0)",
+            hidden,
+        ),
+        (
+            "INSERT INTO favorites (file_id, added_at) VALUES (?1, 0)",
+            fav,
+        ),
+        (
+            "INSERT INTO analysis (file_id, key) VALUES (?1, 'G minor')",
+            fav,
+        ),
+    ] {
+        c.execute(sql, [id]).expect(sql);
+    }
+    let ix = TextIndex::in_ram().expect("index");
+    assert_eq!(ix.rebuild(&store).expect("rebuild").docs, 5);
+    let bpm = |b| Filters {
+        bpm: Some(ValueRange::new(Some(b), Some(b))),
+        ..Filters::default()
+    };
+    let by = Sort::default();
+    assert_eq!(filter(&ix, bpm(128.0), by), [prior]);
+    assert_eq!(filter(&ix, bpm(90.0), by), [detected]);
+    assert_eq!(filter(&ix, bpm(100.0), by), [overridden]);
+    let key = |k| Filters {
+        keys: vec![parse_key(k).expect("key")],
+        ..Filters::default()
+    };
+    assert_eq!(filter(&ix, key("Am"), by), [prior]);
+    assert_eq!(filter(&ix, key("Cm"), by), [detected]);
+    assert!(
+        filter(&ix, key("F#m"), by).is_empty(),
+        "cleared by override"
+    );
+    assert_eq!(filter(&ix, key("Gm"), by), [fav]);
+    let short = Filters {
+        duration_ms: Some(ValueRange::new(None, Some(300))),
+        ..Filters::default()
+    };
+    assert!(filter(&ix, short.clone(), by).is_empty(), "hidden");
+    let short = Filters {
+        include_hidden: true,
+        ..short
+    };
+    assert_eq!(filter(&ix, short, by), [hidden]);
+    let favs = Filters {
+        favorites_only: true,
+        ..Filters::default()
+    };
+    assert_eq!(filter(&ix, favs.clone(), by), [fav]);
+    let favs = Filters {
+        include_hidden: true,
+        ..favs
+    };
+    assert_eq!(filter(&ix, favs, by), [fav, hidden], "browse: by name");
+    let libs = Filters {
+        libraries: vec![lib],
+        ..Filters::default()
+    };
+    let by_bpm = Sort::by(SortField::Bpm);
+    assert_eq!(
+        filter(&ix, libs, by_bpm),
+        [detected, overridden, prior, fav]
+    );
 }
 
 #[test]

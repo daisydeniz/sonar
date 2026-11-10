@@ -1,9 +1,12 @@
 //! Full-text index (Tantivy) over file names, folders, tags, category and
-//! kind (docs/ARCHITECTURE.md §6, ADR-017). Queries: [`crate::search`].
+//! kind, plus filter/sort/facet fields (docs/ARCHITECTURE.md §6, ADR-017,
+//! ADR-018). Queries: [`crate::search`].
 //!
 //! - One document per indexable file ([`IndexDoc`]), keyed by the
 //!   `file_id` u64 field (indexed for delete-by-id, fast for reading hits).
 //! - Text fields use the Sonar analysis chain ([`analyzer`]) with positions.
+//! - `ff_*` fields hold effective values (override ?? detected ?? filename
+//!   prior) as raw strings / u64 fast fields for filters, sort and facets.
 //! - On disk under `<data dir>/index/text` with a version file holding the
 //!   schema and analyzer versions; a mismatch (or a build that never
 //!   finished) wipes the directory and reports [`OpenState::NeedsRebuild`],
@@ -30,8 +33,9 @@ use tantivy::{Index, IndexReader, ReloadPolicy, Searcher};
 
 pub use analyzer::SonarTokenizer;
 pub use schema::SCHEMA_VERSION;
-pub(crate) use schema::{Fields, FILE_ID as FILE_ID_FIELD};
+pub(crate) use schema::{ff, Fields, FILE_ID as FILE_ID_FIELD};
 pub use source::IndexDoc;
+pub(crate) use source::{bpm_centi, facet_value};
 pub use write::BuildReport;
 
 use crate::text::ANALYZER_VERSION;

@@ -50,6 +50,9 @@ pub(crate) struct Built {
     pub query: Box<dyn Query>,
     /// Per position and field, the single terms that are alternatives.
     pub blend: Vec<Vec<Term>>,
+    /// The query has positive text, so its scores mean relevance (else
+    /// every match scores the same).
+    pub scored: bool,
 }
 
 /// One query position: its alternative token texts and source offset.
@@ -101,6 +104,7 @@ pub(crate) fn build(text: &str, prefix: bool, syn: &Synonyms, fields: &Fields) -
             clauses.push((occur, q));
         }
     }
+    let scored = !clauses.is_empty();
     if !clauses.iter().any(|(o, _)| *o == Occur::Must) {
         clauses.push((Occur::Must, Box::new(AllQuery)));
     }
@@ -116,6 +120,7 @@ pub(crate) fn build(text: &str, prefix: bool, syn: &Synonyms, fields: &Fields) -
     Ok(Built {
         query: Box::new(BooleanQuery::new(clauses)),
         blend: b.blend,
+        scored,
     })
 }
 

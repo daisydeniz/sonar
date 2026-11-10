@@ -42,7 +42,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T2.1 (search-ranking) Tokenizer: separators, camelCase, numbers, `120bpm`/`120 BPM`, keys (`Cmin`, `C#m`, `F# minor`, `Gbmaj`), pack noise words; filename priors for BPM/key. AC: table-driven tests ≥ 60 cases. (b7022b4)
 - [x] T2.2 (search-ranking) Tantivy index: fields name/path/tags/category/etc., synonyms map (`docs/synonyms.tsv`, editable), exclusion terms, prefix search for as-you-type. AC: unit tests + CLI `sonar search`. (0040b47)
 - [ ] T2.3 (search-ranking) Filters/facets/sort: category, kind, BPM range, key (+ compatible keys option), duration, library, tags, favorites; facet counts. AC: tests.
-- [ ] T2.4 (search-ranking) Latency: synthetic 500k-doc index, `sonar bench search`. AC: p95 < 50 ms recorded in STATUS.md.
+- [ ] T2.4 (search-ranking) Latency: synthetic 500k-doc index, `sonar bench search`. AC: p95 < 50 ms recorded in STATUS.md. Note (T2.3): also bench browse-all + facets and range + facets (23 ms p95 at 500k in RAM) on an on-disk index.
 
 ## M3 — Audio analysis (DSP)
 - [ ] T3.1 (dsp-analysis) STFT, mel filterbank, MFCC, onset strength envelope. AC: tests vs analytic signals.
@@ -108,3 +108,12 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T2.2 review) `Error::Index(tantivy::TantivyError)` leaks a Tantivy type into the public API; store a `String` before FFI.
 - (from T2.2 review) Single-letter earlier words (`c mi` on the way to "c minor") still require the unfinished last word; results can blink empty while typing.
 - (from T2.2 review) Add an assertion that unfinished `c#` finds a `C#` file (proves regex escaping in `search/build.rs`).
+- (from T2.3) Natural sort of names (`Kick 2` before `Kick 10`); ties in field sorts fall back to name, not file id.
+- (from T2.3) BPM and duration histogram facets for range sliders.
+- (from T2.3) A "no value" facet bucket and a filter for unknown category/key.
+- (from T2.3) Optional half-time / double-time BPM matching.
+- (from T2.3) Show BPM, key and duration in `sonar search` result rows.
+- (from T2.3) Tag facet labels are lowercased; show the user's spelling from the `tags` table.
+- (from T2.3 review) Facet dense counters allocate up to 64k entries per dimension per segment per search; reuse/cap if T2.4 shows pressure.
+- (from T2.3 review) Non-numeric BPM override (`"128 bpm"`) becomes unknown with no prior fallback; override writer must store plain numbers.
+- (from T2.3 review) Future favourite/hidden/override/tag setters must call `TextIndex::refresh_files` (index only reflects them after refresh/rebuild).

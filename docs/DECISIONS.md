@@ -418,3 +418,35 @@ Accepted. `sonar_core::index` (Tantivy) + `sonar_core::search` (queries).
 - **CLI**: `sonar search [--json] [--limit N] [--no-prefix] [--synonyms F]
   <query...>`; options come **before** the query words (the query takes
   hyphen values so `-vinyl` works). `sonar index` rebuilds.
+
+## ADR-018 — Filters, sort and facets (T2.3)
+Accepted. `sonar_core::search::{Filters, Sort, Facets}` on extra index
+fields; `SCHEMA_VERSION` 2 (old indexes rebuild).
+- **Fields** (`ff_*`): folded name (sort), category, kind, tags (raw
+  folded strings, indexed + fast; tags multi-valued), key code
+  (`root*2+minor`, mode-less = major), BPM ×100, duration ms, library id,
+  favourite/hidden flags (u64). Unknown → no value.
+- **Effective value** = override (explicit NULL clears, no fallback) ??
+  analysis column ?? filename prior (BPM/key only, ADR-016, computed at
+  index time). Duration from `audio_meta`. No migration needed.
+- **Semantics**: sets any-of, tags all-of, ranges inclusive (`None` end =
+  open), unknown values never match an active filter. Strings compare
+  folded. Filters add no score (const 0), so BM25 order is unchanged.
+- **Compatible keys**: Camelot wheel — same key, ±1 (fifth up/down, same
+  mode), relative major/minor; 4 keys each.
+- **Hidden**: indexed with a flag, excluded unless `include_hidden`.
+- **Sort**: relevance (default; without text → name), name, bpm, key
+  (root then mode), duration, category, kind, library; asc/desc. Unknown
+  values last in both directions; ties by file id.
+- **Facets**: categories, kinds, keys, libraries, tags, favourites count;
+  BPM/duration not faceted (sliders, not chips). Any-of dimensions and
+  the favourites toggle ignore their own filter (multi-select chips),
+  counted in the same pass as the hits (drill-sideways, Lucene
+  `DrillSideways`); tags (all-of) count the final result. Without facets
+  every filter is in the Tantivy query.
+- **CLI**: `sonar search [--category C,..] [--kind K] [--bpm A-B]
+  [--key K [--compatible]] [--duration A-B (s, or ms suffix)]
+  [--library ID|PATH] [--tag T]... [--favorites] [--include-hidden]
+  [--sort F[:desc]] [--facets] [query...]`.
+- **Cost** (500k synthetic docs, in RAM, release, M-series): text `kick`
+  p95 2.9 ms; browse all + facets 23 ms; BPM range + facets 1.4 ms.

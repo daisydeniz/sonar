@@ -37,7 +37,11 @@ fn corpus() -> TextIndex {
 }
 
 fn run(ix: &TextIndex, q: &str, prefix: bool) -> SearchResults {
-    let opts = SearchOptions { limit: 100, prefix };
+    let opts = SearchOptions {
+        limit: 100,
+        prefix,
+        ..SearchOptions::default()
+    };
     search(ix, &Synonyms::builtin(), q, &opts).expect("search")
 }
 
@@ -83,6 +87,7 @@ fn single_word_synonyms_work_both_ways() {
     let opts = SearchOptions {
         limit: 10,
         prefix: false,
+        ..SearchOptions::default()
     };
     let r = search(&ix, &Synonyms::empty(), "bd", &opts).expect("search");
     assert_eq!(r.hits.iter().map(|h| h.file_id).collect::<Vec<_>>(), [2]);
@@ -191,6 +196,7 @@ fn limit_caps_hits_not_total() {
     let opts = SearchOptions {
         limit: 2,
         prefix: false,
+        ..SearchOptions::default()
     };
     let r = search(&ix, &Synonyms::builtin(), "kick", &opts).expect("search");
     assert_eq!((r.hits.len(), r.total), (2, 5));

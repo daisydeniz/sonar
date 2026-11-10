@@ -1,6 +1,7 @@
-//! Text search over the [`crate::index`] (docs/ARCHITECTURE.md §6,
-//! ADR-017): query syntax, synonyms, BM25 with field weights, exclusions
-//! and as-you-type prefix matching. Filters, facets and sort come in T2.3.
+//! Search over the [`crate::index`] (docs/ARCHITECTURE.md §6): text
+//! (ADR-017: query syntax, synonyms, BM25 with field weights, exclusions,
+//! as-you-type prefix matching) plus filters, sort and facet counts
+//! (ADR-018).
 //!
 //! ```text
 //! dark kick -vinyl     every word narrows, -word excludes
@@ -10,36 +11,60 @@
 //! 120 bpm / 120bpm     120bpm
 //! kic                  unfinished last word matches as a prefix
 //! ```
+//!
+//! [`Filters`] narrow on effective values (category, kind, BPM range,
+//! keys with optional Camelot-compatible expansion, duration range,
+//! libraries, tags, favourites; hidden files are left out by default).
+//! [`Sort`] orders by relevance or a field (unknown values last). Empty
+//! text + filters browses every matching file (by name). [`Facets`] count
+//! values over the matching set with multi-select semantics.
 
 mod build;
+mod collect;
+mod facets;
+mod filters;
+pub mod keys;
 mod parse;
+mod sideways;
+mod sort;
 mod stats;
 mod synonyms;
 
 #[cfg(test)]
+mod facet_tests;
+#[cfg(test)]
+mod filter_tests;
+#[cfg(test)]
 mod tests;
 
-use std::collections::HashMap;
-
 use serde::Serialize;
-use tantivy::collector::{Count, TopDocs};
+use tantivy::query::{BooleanQuery, Occur, Query};
 
+pub use facets::{FacetCount, Facets, LibraryCount};
+pub use filters::{normalize_kind, Filters, ValueRange};
+pub use sort::{ParseSortError, Sort, SortField};
 pub use synonyms::{Synonyms, BUILTIN_SYNONYMS, SYNONYMS_FILE};
 
-use crate::index::{TextIndex, FILE_ID_FIELD};
+use crate::index::TextIndex;
 use crate::Result;
 
 /// Default number of hits.
 pub const DEFAULT_LIMIT: usize = 50;
 
-/// How to run a text search.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// How to run a search.
+#[derive(Debug, Clone, PartialEq)]
 pub struct SearchOptions {
     /// Maximum number of hits returned (the total is always counted).
     pub limit: usize,
     /// As-you-type: an unfinished last word (no trailing space) also
     /// matches as a prefix.
     pub prefix: bool,
+    /// What to keep.
+    pub filters: Filters,
+    /// Result order.
+    pub sort: Sort,
+    /// Also count facets ([`SearchResults::facets`]).
+    pub facets: bool,
 }
 
 impl Default for SearchOptions {
@@ -47,6 +72,9 @@ impl Default for SearchOptions {
         Self {
             limit: DEFAULT_LIMIT,
             prefix: true,
+            filters: Filters::default(),
+            sort: Sort::default(),
+            facets: false,
         }
     }
 }
@@ -57,6 +85,7 @@ pub struct Hit {
     /// `files.id`.
     pub file_id: i64,
     /// Relevance score (higher is better; only comparable within a query).
+    /// 0 when results are not ordered by relevance (not computed).
     pub score: f32,
 }
 
@@ -65,11 +94,13 @@ pub struct Hit {
 pub struct SearchResults {
     /// Number of matching documents.
     pub total: usize,
-    /// Best hits, best first, at most [`SearchOptions::limit`].
+    /// Best hits in the requested order, at most [`SearchOptions::limit`].
     pub hits: Vec<Hit>,
+    /// Facet counts, if [`SearchOptions::facets`].
+    pub facets: Option<Facets>,
 }
 
-/// Runs `query` against `index` (see the module docs for the syntax).
+/// Runs `query` with `opts` against `index` (see the module docs).
 ///
 /// # Errors
 /// [`crate::Error::Index`].
@@ -79,33 +110,34 @@ pub fn search(
     query: &str,
     opts: &SearchOptions,
 ) -> Result<SearchResults> {
-    let built = build::build(query, opts.prefix, synonyms, index.fields())?;
+    let fields = index.fields();
+    let built = build::build(query, opts.prefix, synonyms, fields)?;
     let searcher = index.searcher();
     let stats = stats::BlendedStats::new(&searcher, &built.blend)?;
-    let collector = (
-        TopDocs::with_limit(opts.limit.max(1)).order_by_score(),
-        Count,
-    );
-    let (top, total) =
-        searcher.search_with_statistics_provider(built.query.as_ref(), &collector, &stats)?;
-    let mut columns = HashMap::new();
-    let mut hits = Vec::with_capacity(top.len());
-    for (score, addr) in top.into_iter().take(opts.limit) {
-        let column = match columns.entry(addr.segment_ord) {
-            std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
-            std::collections::hash_map::Entry::Vacant(e) => e.insert(
-                searcher
-                    .segment_reader(addr.segment_ord)
-                    .fast_fields()
-                    .u64(FILE_ID_FIELD)?,
-            ),
-        };
-        if let Some(id) = column
-            .first(addr.doc_id)
-            .and_then(|v| i64::try_from(v).ok())
-        {
-            hits.push(Hit { file_id: id, score });
-        }
-    }
-    Ok(SearchResults { total, hits })
+    // With facets, the facet dimensions are checked by the collector
+    // (drill-sideways); otherwise every filter is part of the query.
+    let mut clauses: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Must, built.query)];
+    clauses.extend(opts.filters.clauses(fields, !opts.facets));
+    let query = BooleanQuery::new(clauses);
+    let collector = collect::HitCollector {
+        order: collect::Order::resolve(opts.sort, built.scored),
+        limit: opts.limit,
+        facets: opts.facets.then(|| sideways::Sideways::new(&opts.filters)),
+    };
+    let fruit = searcher.search_with_statistics_provider(&query, &collector, &stats)?;
+    let hits = fruit
+        .hits
+        .into_iter()
+        .filter_map(|c| {
+            Some(Hit {
+                file_id: i64::try_from(c.file_id).ok()?,
+                score: c.score,
+            })
+        })
+        .collect();
+    Ok(SearchResults {
+        total: fruit.total,
+        hits,
+        facets: fruit.facets.map(facets::RawFacets::finish),
+    })
 }

@@ -44,6 +44,87 @@ fn hit_names(home: &Path, args: &[&str]) -> Vec<String> {
 }
 
 #[test]
+fn filters_sort_and_facets_from_filename_priors() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let lib = tmp.path().join("lib");
+    fs::create_dir_all(lib.join("Drums")).expect("mkdir");
+    for name in [
+        "Bass_Loop_120BPM_Cmin.wav",
+        "Lead 128 BPM Am.wav",
+        "Pad 90 BPM Em.wav",
+        "Chord Loop 126 BPM C.wav",
+        "Drums/Kick_Hard.wav",
+    ] {
+        fs::write(lib.join(name), b"x").expect("write");
+    }
+    let home = tmp.path().join("home");
+    ok(&sonar(&home, &["scan", lib.to_str().expect("utf-8")]));
+
+    let sorted = |mut v: Vec<String>| {
+        v.sort();
+        v
+    };
+    assert_eq!(
+        sorted(hit_names(&home, &["--bpm", "120-128"])),
+        [
+            "Bass_Loop_120BPM_Cmin.wav",
+            "Chord Loop 126 BPM C.wav",
+            "Lead 128 BPM Am.wav"
+        ]
+    );
+    // Am + Camelot neighbours (Dm, Em) + relative major (C).
+    assert_eq!(
+        sorted(hit_names(&home, &["--key", "am", "--compatible"])),
+        [
+            "Chord Loop 126 BPM C.wav",
+            "Lead 128 BPM Am.wav",
+            "Pad 90 BPM Em.wav"
+        ]
+    );
+    // Unknown BPM (the kick) comes last in both directions.
+    assert_eq!(
+        hit_names(&home, &["--sort", "bpm:desc"]),
+        [
+            "Lead 128 BPM Am.wav",
+            "Chord Loop 126 BPM C.wav",
+            "Bass_Loop_120BPM_Cmin.wav",
+            "Pad 90 BPM Em.wav",
+            "Kick_Hard.wav"
+        ]
+    );
+    // Text + filter; options before the words.
+    assert_eq!(
+        hit_names(&home, &["--bpm", "-125", "loop"]),
+        ["Bass_Loop_120BPM_Cmin.wav"]
+    );
+
+    let out = ok(&sonar(
+        &home,
+        &["search", "--json", "--facets", "--bpm", "100-"],
+    ));
+    let v: serde_json::Value = serde_json::from_str(&out).expect("json");
+    assert_eq!(v["total"], 3);
+    let keys: Vec<(&str, u64)> = v["facets"]["keys"]
+        .as_array()
+        .expect("keys")
+        .iter()
+        .map(|k| {
+            (
+                k["value"].as_str().expect("v"),
+                k["count"].as_u64().expect("n"),
+            )
+        })
+        .collect();
+    assert_eq!(keys, [("Am", 1), ("C", 1), ("Cm", 1)]);
+    let text = ok(&sonar(&home, &["search", "--facets", "--key", "Cm"]));
+    assert!(text.contains("1 of 1 results"), "{text}");
+    assert!(text.contains("key: Am 1, C 1, Cm 1, Em 1"), "{text}");
+
+    let err = sonar(&home, &["search", "--key", "kick"]);
+    assert!(!err.status.success());
+}
+
+#[test]
 fn scan_then_search_builds_and_refreshes_the_index() {
     let tmp = tempfile::tempdir().expect("tmp");
     let lib = tmp.path().join("lib");

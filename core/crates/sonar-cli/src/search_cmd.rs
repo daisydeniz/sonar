@@ -7,11 +7,15 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use serde::Serialize;
 use sonar_core::index::{OpenState, TextIndex};
-use sonar_core::search::{search, SearchOptions, Synonyms};
+use sonar_core::search::{search, FacetCount, Facets, SearchOptions, Synonyms};
 use sonar_core::Store;
+
+use crate::search_args::FilterArgs;
 
 /// `sonar search` arguments.
 pub struct Args<'a> {
+    /// Filters, sort, facets.
+    pub filters: &'a FilterArgs,
     /// Query words (joined with spaces).
     pub query: &'a [String],
     /// Maximum hits printed.
@@ -38,6 +42,8 @@ struct Report<'a> {
     total: usize,
     took_ms: f64,
     hits: Vec<Row>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    facets: Option<Facets>,
 }
 
 /// `sonar index`: rebuild the text index from the store.
@@ -87,6 +93,9 @@ pub fn run(args: &Args<'_>) -> Result<()> {
     let opts = SearchOptions {
         limit: args.limit,
         prefix: !args.no_prefix,
+        filters: args.filters.filters(&store)?,
+        sort: args.filters.sort.unwrap_or_default(),
+        facets: args.filters.facets,
     };
     let started = Instant::now();
     let results = search(&ix, &synonyms, &query, &opts).context("searching")?;
@@ -110,12 +119,42 @@ pub fn run(args: &Args<'_>) -> Result<()> {
         total: results.total,
         took_ms,
         hits,
+        facets: results.facets,
     };
     if args.json {
         println!("{}", serde_json::to_string_pretty(&report)?);
     } else {
         print_text(&report);
+        if let Some(f) = &report.facets {
+            print_facets(f, &store)?;
+        }
     }
+    Ok(())
+}
+
+/// Facet counts, one line per dimension (`category: kick 12, snare 9`).
+fn print_facets(f: &Facets, store: &Store) -> Result<()> {
+    let line = |name: &str, counts: &[FacetCount]| {
+        let items: Vec<String> = counts
+            .iter()
+            .map(|c| format!("{} {}", c.value, c.count))
+            .collect();
+        println!("{name:>10}: {}", items.join(", "));
+    };
+    line("category", &f.categories);
+    line("kind", &f.kinds);
+    line("key", &f.keys);
+    let mut libs = Vec::new();
+    for l in &f.libraries {
+        let root = store
+            .library(l.library_id)
+            .context("looking up libraries")?
+            .map_or_else(|| "?".into(), |lib| lib.root_path.display().to_string());
+        libs.push(format!("#{} {root} {}", l.library_id, l.count));
+    }
+    println!("{:>10}: {}", "library", libs.join(", "));
+    line("tag", &f.tags);
+    println!("{:>10}: {}", "favorites", f.favorites);
     Ok(())
 }
 

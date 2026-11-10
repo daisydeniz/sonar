@@ -136,7 +136,10 @@ Similarity = Σ wᵢ · dᵢ(q, x) over aspects (cosine/L2 on normalized vectors
 ## 6. Search
 Query = `{ text?, filters, sort?, similar_to?: {file_id | external_path,
 weights} }`.
-1. **Filters** → Tantivy fast fields / bitset of allowed docs.
+1. **Filters** → Tantivy fast fields / bitset of allowed docs (ADR-018:
+   effective category/kind/BPM/key/duration/library/tags/favourite in
+   `ff_*` fields; compatible keys via Camelot; hidden excluded; facet
+   counts drill-sideways in one collector pass; unknown values sort last).
 2. **Text** → BM25 over tokenized name/path/tags + synonyms; exclusions.
 3. **Semantic** → CLAP text embedding → kNN over CLAP audio vectors.
 4. **Fusion** → reciprocal-rank fusion (start) → tuned weighted fusion

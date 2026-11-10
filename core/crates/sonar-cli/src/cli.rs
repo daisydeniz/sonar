@@ -10,6 +10,8 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 use sonar_core::jobs::Stage;
 
+use crate::search_args::FilterArgs;
+
 /// `sonar` — headless access to every Sonar core feature.
 #[derive(Debug, Parser)]
 #[command(
@@ -184,7 +186,9 @@ pub enum Command {
     /// `am`, `120 bpm`). The last word also matches as a prefix unless the
     /// query ends with a space (as-you-type). No query lists everything.
     /// Prints rank, score, file id and path. Options go before the query:
-    /// from the first query word on, everything is query text.
+    /// from the first query word on, everything is query text. Filters
+    /// (`--category kick --bpm 120-128 --key Am --compatible`) work with
+    /// or without query words (no words: browse every match by name).
     Search {
         /// Query words (`kick -vinyl`, `"one shot" am`); after the options.
         #[arg(allow_hyphen_values = true)]
@@ -201,6 +205,9 @@ pub enum Command {
         /// Synonyms file to use instead of the default.
         #[arg(long, value_name = "FILE")]
         synonyms: Option<PathBuf>,
+        /// Filters, sort and facets.
+        #[command(flatten)]
+        filters: FilterArgs,
     },
 
     /// Performance benchmarks in a temporary folder with its own store
@@ -330,6 +337,7 @@ mod tests {
                 json: true,
                 no_prefix: false,
                 synonyms: None,
+                ..
             }) => assert_eq!(query, ["kick", "-vinyl", "dark"]),
             other => panic!("{other:?}"),
         }
