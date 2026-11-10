@@ -13,6 +13,7 @@ pub mod corpus;
 pub mod decode;
 pub mod scan;
 pub mod watch;
+mod watch_io;
 pub mod watch_pipeline;
 pub mod watch_stats;
 
@@ -24,6 +25,7 @@ pub use analyze::{bench_analyze, AnalyzeBench, AnalyzeBenchOptions};
 pub use decode::{bench_decode, DecodeBench, DecodeBenchOptions, DecodeRun};
 pub use scan::{bench_scan, ScanBench, ScanPhase};
 pub use watch::{bench_watch, ContendedPhase, WatchBench, WatchBenchOptions, WatchPhase};
+pub use watch_io::MIN_COPY_RATE;
 pub use watch_pipeline::PipelineRun;
 pub use watch_stats::ScanStats;
 

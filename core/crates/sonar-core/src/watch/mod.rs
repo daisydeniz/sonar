@@ -54,7 +54,7 @@
 //! bounds the duty cycle to about 1/3 (measured: 3-12 % at 250 files/s on
 //! 50k files). The bound is per sustained stream: the first scan of a burst
 //! is not delayed, so a short burst of e.g. 20,000 files followed by a quiet
-//! period spends 30-40 % of burst plus catch-up time in that one scan (still
+//! period spends 31-43 % of burst plus catch-up time in that one scan (still
 //! under 2 s on 50k files, see ADR-014). Small libraries react within the
 //! debounce. Root appearance/disappearance, manual rescans and retries
 //! bypass this spacing. A root that exists but is

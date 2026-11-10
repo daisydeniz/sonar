@@ -19,8 +19,6 @@
 //! After every copy phase the index is compared with the disk: file count
 //! and the summed size of the new files must match what was written.
 
-use std::fs;
-use std::io::Write;
 use std::path::Path;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread;
@@ -28,7 +26,8 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
-use super::corpus::{self, rel_path};
+use super::corpus;
+use super::watch_io::{index_totals, validate_rate, write_files};
 use super::watch_pipeline::{self, PipelineRun};
 use super::watch_stats::{duty_within, overlap, ScanStats, Span};
 use super::{machine, Machine};
@@ -82,6 +81,10 @@ pub struct WatchPhase {
     /// Share of the copy window (start to end of the copy) the watcher spent
     /// scanning; scans are clipped to the window.
     pub duty_cycle: f64,
+    /// Share of the window from the start of the copy to the end of the
+    /// catch-up the watcher spent scanning (the figure ADR-014 quotes for an
+    /// unthrottled burst).
+    pub duty_cycle_incl_catch_up: f64,
     /// Seconds from the end of the copy until the first scan that started
     /// after it had finished (so it saw every file).
     pub catch_up_secs: f64,
@@ -174,6 +177,7 @@ struct Env<'a> {
 /// does not start. Slow or failed catch-up is reported in the result, not
 /// as an error.
 pub fn bench_watch(work: &Path, opts: &WatchBenchOptions) -> Result<WatchBench> {
+    validate_rate(opts.copy_rate)?;
     let root = work.join("library");
     let db = work.join("bench.db");
     let t = Instant::now();
@@ -254,11 +258,18 @@ pub fn bench_watch(work: &Path, opts: &WatchBenchOptions) -> Result<WatchBench> 
 fn wait_first_scan(env: &Env<'_>) -> Result<u64> {
     let deadline = Instant::now() + env.opts.catch_up_timeout;
     while Instant::now() < deadline {
-        if let Some(ms) = lock(&env.log).iter().find_map(|r| match r {
-            Rec::Scan { duration_ms, .. } => Some(*duration_ms),
-            Rec::Error(_) => None,
-        }) {
-            return Ok(ms);
+        let first = lock(&env.log).first().map(|r| match r {
+            Rec::Scan { duration_ms, .. } => Ok(*duration_ms),
+            Rec::Error(msg) => Err(msg.clone()),
+        });
+        match first {
+            Some(Ok(ms)) => return Ok(ms),
+            Some(Err(msg)) => {
+                return Err(Error::Internal {
+                    reason: format!("the watcher failed before its start-up scan: {msg}"),
+                })
+            }
+            None => {}
         }
         thread::sleep(Duration::from_millis(10));
     }
@@ -276,7 +287,7 @@ fn run_phase(
     stages: Option<&Vec<Stage>>,
 ) -> Result<(WatchPhase, Option<PipeResult>)> {
     let m = env.opts.copy_files;
-    let (files_before, bytes_before) = index_totals(env)?;
+    let (files_before, bytes_before) = index_totals(env.db, env.library_id)?;
     let mark = lock(&env.log).len();
     let start = Instant::now();
     let (root, rate_hz) = (env.root.to_path_buf(), env.opts.copy_rate);
@@ -305,6 +316,8 @@ fn run_phase(
     }
     let end = caught_at.unwrap_or_else(Instant::now);
     let (mut spans, mut durations, mut errors) = (Vec::new(), Vec::new(), Vec::new());
+    // Errors are counted from `mark` with no time filter: any watcher error
+    // during the phase (even after catch-up) is a finding.
     for r in lock(&env.log).iter().skip(mark) {
         match r {
             Rec::Scan { span, duration_ms } if span.1 >= start && span.0 <= end => {
@@ -315,7 +328,7 @@ fn run_phase(
             Rec::Scan { .. } => {}
         }
     }
-    let (files_after, bytes_after) = index_totals(env)?;
+    let (files_after, bytes_after) = index_totals(env.db, env.library_id)?;
     let expected = files_before + m as u64;
     let bytes_indexed = bytes_after.saturating_sub(bytes_before);
     let phase = WatchPhase {
@@ -323,6 +336,7 @@ fn run_phase(
         copy_secs: copy_end.saturating_duration_since(start).as_secs_f64(),
         scans: ScanStats::of(&durations),
         duty_cycle: duty_within(&spans, (start, copy_end)),
+        duty_cycle_incl_catch_up: duty_within(&spans, (start, end)),
         catch_up_secs: end.saturating_duration_since(copy_end).as_secs_f64(),
         caught_up: caught_at.is_some(),
         expected_files: expected,
@@ -339,55 +353,6 @@ fn run_phase(
         (o.run, n, ms)
     });
     Ok((phase, pipe))
-}
-
-/// `(files not missing, summed size)` of the library in the index.
-fn index_totals(env: &Env<'_>) -> Result<(u64, u64)> {
-    let store = Store::open(env.db)?;
-    let (n, bytes): (i64, i64) = store.conn().query_row(
-        "SELECT COUNT(*), COALESCE(SUM(size), 0) FROM files \
-         WHERE library_id = ?1 AND status <> 'missing'",
-        [env.library_id],
-        |r| Ok((r.get(0)?, r.get(1)?)),
-    )?;
-    Ok((
-        u64::try_from(n).unwrap_or(0),
-        u64::try_from(bytes).unwrap_or(0),
-    ))
-}
-
-/// Creates files `first..first + count` of the corpus layout (new folders
-/// beyond the base library), written in 1 KB chunks, paced to `rate_hz`.
-/// Returns when the last file is closed, and the bytes written.
-fn write_files(
-    root: &Path,
-    first: usize,
-    count: usize,
-    rate_hz: Option<f64>,
-) -> Result<(Instant, u64)> {
-    let templates = corpus::templates();
-    let start = Instant::now();
-    let mut bytes = 0;
-    for i in 0..count {
-        if let Some(hz) = rate_hz.filter(|h| *h > 0.0) {
-            let due = start + Duration::from_secs_f64(i as f64 / hz);
-            if let Some(wait) = due.checked_duration_since(Instant::now()) {
-                thread::sleep(wait);
-            }
-        }
-        let path = root.join(rel_path(first + i));
-        if let Some(dir) = path.parent() {
-            fs::create_dir_all(dir).map_err(|e| Error::io(dir, e))?;
-        }
-        let data = corpus::content(&templates, first + i);
-        let mut f = fs::File::create(&path).map_err(|e| Error::io(&path, e))?;
-        for chunk in data.chunks(1024) {
-            f.write_all(chunk).map_err(|e| Error::io(&path, e))?;
-            thread::yield_now();
-        }
-        bytes += data.len() as u64;
-    }
-    Ok((Instant::now(), bytes))
 }
 
 #[cfg(test)]

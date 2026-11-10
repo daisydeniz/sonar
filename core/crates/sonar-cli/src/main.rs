@@ -2,6 +2,7 @@
 
 mod analyze_cmd;
 mod bench_cmd;
+mod bench_print;
 mod cli;
 mod decode_cmd;
 mod meta_cmd;
