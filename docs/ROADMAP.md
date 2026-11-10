@@ -117,3 +117,8 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T2.3 review) Facet dense counters allocate up to 64k entries per dimension per segment per search; reuse/cap if T2.4 shows pressure.
 - (from T2.3 review) Non-numeric BPM override (`"128 bpm"`) becomes unknown with no prior fallback; override writer must store plain numbers.
 - (from T2.3 review) Future favourite/hidden/override/tag setters must call `TextIndex::refresh_files` (index only reflects them after refresh/rebuild).
+- (from T2.4) 1-letter prefix + facets is the as-you-type tail (~32 ms on M4 Pro); measure on a base M1, consider 2-char minimum prefix or no facets for 1-letter queries.
+- (from T2.4) Browse-all + facets is a flat ~27–29 ms full scan; cache browse-all facet counts per index generation if slower Macs near the budget.
+- (from T2.4) Bench first query is only cold-ish (OS cache warm); add an optional truly cold run (`purge` / fresh clone) for app-start latency.
+- (from T2.4) Full 500k index rebuild = 1.8 s; use it when deciding the T2.2 scan-rebuild vs `refresh_files` item.
+- (from T2.4 review) Browse classes have 3 queries (p95 ≈ max of 30 runs); raise default rounds or add queries. No test for the budget-miss non-zero exit (move check into core + unit test).

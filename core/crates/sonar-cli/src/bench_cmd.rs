@@ -1,5 +1,5 @@
-//! `sonar bench scan|decode|analyze`: performance benchmarks (use a
-//! release build: `cargo run --release -p sonar-cli -- bench ...`).
+//! `sonar bench scan|decode|analyze|watch|search`: performance benchmarks
+//! (use a release build: `cargo run --release -p sonar-cli -- bench ...`).
 //!
 //! Benchmarks run in a temporary working folder with their own store, never
 //! the user's.
@@ -10,11 +10,12 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 use serde::Serialize;
 use sonar_core::bench::{
-    self, AnalyzeBenchOptions, DecodeBenchOptions, WatchBenchOptions, MIN_COPY_RATE,
+    self, AnalyzeBenchOptions, DecodeBenchOptions, SearchBenchOptions, WatchBenchOptions,
+    MIN_COPY_RATE,
 };
 use sonar_core::jobs::Stage;
 
-use crate::bench_print::{print_analyze, print_decode, print_scan, print_watch};
+use crate::bench_print::{print_analyze, print_decode, print_scan, print_search, print_watch};
 
 /// `sonar bench` subcommands.
 #[derive(Debug, Subcommand)]
@@ -123,6 +124,31 @@ pub enum BenchCommand {
         #[arg(long)]
         json: bool,
     },
+
+    /// Search latency on a synthetic library: builds the on-disk text
+    /// index from a generated store, then times as-you-type, text +
+    /// filters, browse-all and range queries (all with facets). Exits
+    /// with an error if any class has p95 >= 50 ms.
+    Search {
+        /// Files in the synthetic library.
+        #[arg(long, default_value_t = 500_000, value_parser = clap::value_parser!(u32).range(1..=5_000_000))]
+        docs: u32,
+        /// Timed passes over the query mix (after one warm-up pass).
+        #[arg(long, default_value_t = 10, value_parser = clap::value_parser!(u32).range(1..=1_000))]
+        rounds: u32,
+        /// Corpus seed (the default makes runs comparable).
+        #[arg(long, default_value_t = bench::search::DEFAULT_SEED)]
+        seed: u64,
+        /// Create the working folder inside this directory.
+        #[arg(long)]
+        dir: Option<PathBuf>,
+        /// Keep the working folder (store and index) and print its path.
+        #[arg(long)]
+        keep: bool,
+        /// Print JSON instead of text.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 /// Runs a benchmark and prints its result to stdout.
@@ -208,6 +234,36 @@ pub fn run(cmd: BenchCommand) -> Result<()> {
             };
             let b = bench::bench_watch(work.path(), &opts).context("watch benchmark")?;
             emit(json, &b, print_watch)
+        }
+        BenchCommand::Search {
+            docs,
+            rounds,
+            seed,
+            dir,
+            keep,
+            json,
+        } => {
+            let work = Work::new(dir.as_deref(), keep)?;
+            let opts = SearchBenchOptions {
+                docs: docs as usize,
+                rounds: rounds as usize,
+                seed,
+            };
+            let b = bench::bench_search(work.path(), &opts).context("search benchmark")?;
+            emit(json, &b, print_search)?;
+            let over: Vec<String> = b
+                .over_budget()
+                .iter()
+                .map(|c| format!("{} p95 {:.1} ms", c.class, c.p95_ms))
+                .collect();
+            if !over.is_empty() {
+                anyhow::bail!(
+                    "search latency budget (p95 < {} ms) missed: {}",
+                    b.budget_ms,
+                    over.join(", ")
+                );
+            }
+            Ok(())
         }
     }
 }

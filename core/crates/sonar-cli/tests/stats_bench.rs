@@ -274,6 +274,39 @@ fn bench_watch_smoke() {
 }
 
 #[test]
+fn bench_search_smoke_and_kept_folder_is_a_data_dir() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let home = tmp.path().join("home");
+    let dir = tmp.path().to_str().expect("utf-8");
+    let args = ["bench", "search", "--docs", "900", "--rounds", "1"];
+    let v = json(&sonar(
+        &home,
+        &[&args[..], &["--dir", dir, "--json", "--keep"]].concat(),
+    ));
+    assert_eq!(v["docs"], 900);
+    assert!(v["indexed_docs"].as_u64().is_some_and(|n| n > 850));
+    assert!(v["index_bytes"].as_u64().is_some_and(|n| n > 0));
+    let classes = v["classes"].as_array().expect("classes");
+    assert_eq!(classes.len(), 5);
+    assert!(classes.iter().all(|c| c["n"].as_u64() > Some(0)), "{v}");
+    assert!(!home.join("sonar.db").exists());
+    // The kept folder has the data-dir layout: `sonar search` can use it.
+    let kept = fs::read_dir(tmp.path())
+        .expect("ls")
+        .flatten()
+        .find(|e| e.file_name().to_string_lossy().starts_with("sonar-bench-"))
+        .expect("kept folder");
+    let r = json(&sonar(&kept.path(), &["search", "--json", "kick"]));
+    assert!(r["total"].as_u64().is_some_and(|n| n > 0), "{r}");
+
+    let text = ok_stdout(&sonar(&home, &args));
+    assert!(
+        text.contains("as_you_type") && text.contains("slowest query"),
+        "{text}"
+    );
+}
+
+#[test]
 fn bench_rejects_bad_arguments() {
     let tmp = tempfile::tempdir().expect("tmp");
     for args in [
@@ -283,6 +316,8 @@ fn bench_rejects_bad_arguments() {
         &["bench", "scan", "--files", "0"],
         &["bench", "analyze", "--stages", "nope"],
         &["bench", "decode", "--repeat", "0"],
+        &["bench", "search", "--docs", "0"],
+        &["bench", "search", "--rounds", "0"],
     ] {
         let out = sonar(tmp.path(), args);
         assert!(!out.status.success(), "{args:?}");

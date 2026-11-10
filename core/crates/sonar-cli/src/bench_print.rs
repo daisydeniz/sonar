@@ -1,7 +1,8 @@
 //! Human-readable output of `sonar bench ...`.
 
 use sonar_core::bench::{
-    self, AnalyzeBench, DecodeBench, PipelineRun, ScanBench, ScanPhase, WatchBench, WatchPhase,
+    self, AnalyzeBench, DecodeBench, PipelineRun, ScanBench, ScanPhase, SearchBench, WatchBench,
+    WatchPhase,
 };
 
 fn machine_line(m: &bench::Machine) -> String {
@@ -186,4 +187,55 @@ pub(crate) fn print_analyze(b: &AnalyzeBench) {
         );
     }
     println!("job total: {:.3} s", b.job_secs);
+}
+
+pub(crate) fn print_search(b: &SearchBench) {
+    println!("machine: {}", machine_line(&b.machine));
+    println!(
+        "corpus: {} files in {} libraries, {} indexed (seed {:#x}; store written in {:.1} s, untimed)",
+        b.docs, b.libraries, b.indexed_docs, b.seed, b.generate_secs
+    );
+    println!(
+        "index (on disk): built in {:.2} s, {:.1} MB, {} segment(s); re-open {:.1} ms",
+        b.build_secs,
+        b.index_bytes as f64 / 1e6,
+        b.segments,
+        b.open_ms
+    );
+    println!(
+        "first query after open (`{}` + facets): {:.2} ms, {} matches",
+        b.first_query.query, b.first_query.ms, b.first_query.matches
+    );
+    println!(
+        "{} timed round(s) after 1 warm-up, every query with facets; budget p95 < {} ms",
+        b.rounds, b.budget_ms
+    );
+    println!(
+        "{:<14} {:>6} {:>8} {:>8} {:>8} {:>8} {:>12}",
+        "class", "n", "p50 ms", "p95 ms", "p99 ms", "max ms", "mean matches"
+    );
+    for c in &b.classes {
+        println!(
+            "{:<14} {:>6} {:>8.2} {:>8.2} {:>8.2} {:>8.2} {:>12.0}{}",
+            c.class,
+            c.n,
+            c.p50_ms,
+            c.p95_ms,
+            c.p99_ms,
+            c.max_ms,
+            c.mean_matches,
+            if c.p95_ms >= b.budget_ms {
+                "  OVER BUDGET"
+            } else {
+                ""
+            }
+        );
+    }
+    println!("slowest query per class (median):");
+    for c in &b.classes {
+        println!(
+            "  {:<14} {:>8.2} ms  {}",
+            c.class, c.slowest_query_p50_ms, c.slowest_query
+        );
+    }
 }
