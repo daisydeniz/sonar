@@ -26,7 +26,7 @@
 //!   ([`JobHandle::progress`]) or pushed ([`JobOptions::on_event`]).
 
 mod progress;
-mod queue;
+pub(crate) mod queue;
 mod runner;
 mod stage;
 mod work;

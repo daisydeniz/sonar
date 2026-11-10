@@ -74,9 +74,14 @@ pub enum BenchCommand {
         /// Create the working folder inside this directory.
         #[arg(long)]
         dir: Option<PathBuf>,
-        /// Keep the working folder and print its path.
+        /// Keep the working folder and print its path. (The folder path is
+        /// always printed to stderr at start; after Ctrl-C delete it by hand.)
         #[arg(long)]
         keep: bool,
+        /// Skip the untimed cache warm-up pass. For a truly cold cache run
+        /// `sudo purge` first; files that were just written may still be cached.
+        #[arg(long)]
+        cold: bool,
         /// Print JSON instead of text.
         #[arg(long)]
         json: bool,
@@ -126,6 +131,7 @@ pub fn run(cmd: BenchCommand) -> Result<()> {
             batch,
             dir,
             keep,
+            cold,
             json,
         } => {
             let work = Work::new(dir.as_deref(), keep)?;
@@ -134,6 +140,7 @@ pub fn run(cmd: BenchCommand) -> Result<()> {
                 stages,
                 threads,
                 batch: batch as usize,
+                warm: !cold,
             };
             let b = bench::bench_analyze(work.path(), &opts).context("analyze benchmark")?;
             emit(json, &b, print_analyze)
@@ -167,9 +174,13 @@ impl Work {
         .context("creating the working folder")?;
         if keep {
             let path = tmp.keep();
-            eprintln!("keeping {}", path.display());
+            eprintln!("working folder (kept): {}", path.display());
             Ok(Self { path, _guard: None })
         } else {
+            eprintln!(
+                "working folder: {} (deleted at the end; remove by hand if interrupted)",
+                tmp.path().display()
+            );
             Ok(Self {
                 path: tmp.path().to_path_buf(),
                 _guard: Some(tmp),
@@ -197,8 +208,16 @@ fn print_scan(b: &ScanBench) {
     );
     let phase = |name: &str, p: &ScanPhase| {
         println!(
-            "{name}: {:.3} s, {:.0} files/s (added {}, changed {}, moved {}, removed {}, unchanged {}, errors {})",
-            p.secs, p.files_per_sec, p.added, p.changed, p.moved, p.removed, p.unchanged, p.errors
+            "{name}: {:.3} s, {:.0} files/s (added {}, changed {}, moved {}, removed {}, restored {}, unchanged {}, errors {})",
+            p.secs,
+            p.files_per_sec,
+            p.added,
+            p.changed,
+            p.moved,
+            p.removed,
+            p.restored,
+            p.unchanged,
+            p.errors
         );
     };
     phase("first scan   ", &b.first);
@@ -240,8 +259,16 @@ fn print_analyze(b: &AnalyzeBench) {
         b.batch
     );
     println!(
-        "setup (untimed): copy {:.1} s, scan {:.1} s",
-        b.generate_secs, b.scan_secs
+        "setup (untimed): write {:.1} s, scan {:.1} s, cache warm-up {:.1} s",
+        b.generate_secs, b.scan_secs, b.warmup_secs
+    );
+    println!(
+        "page cache: {}",
+        if b.warm_cache {
+            "warm (every file read once before the stages; numbers are CPU + database work)"
+        } else {
+            "as left by the writes (--cold; run `sudo purge` first for a truly cold cache)"
+        }
     );
     for s in &b.stages {
         println!(

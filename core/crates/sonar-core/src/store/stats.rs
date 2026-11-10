@@ -3,7 +3,7 @@
 //!
 //! Read-only and aggregate-only: every number comes from a `GROUP BY` over
 //! `files`, `audio_meta` or `file_stages`, never from per-row work, so the
-//! cost is a few sequential scans (about 0.1 s per million file rows).
+//! cost is one pass over `files` with primary-key lookups.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use serde::Serialize;
 
 use super::Store;
+use crate::jobs::queue::eligible;
 use crate::jobs::Stage;
 use crate::Result;
 
@@ -44,7 +45,10 @@ pub struct StageStats {
     pub partial: u64,
     /// Failed.
     pub error: u64,
-    /// Present files still to be processed.
+    /// Files still to be processed, by the job queue's own definition
+    /// (including `error` files whose stage result is from an older
+    /// version). For an offline library this is work that runs once the
+    /// volume is online again; the queue skips offline libraries.
     pub pending: u64,
 }
 
@@ -103,14 +107,20 @@ fn stats_sql() -> String {
     let mut joins = String::from(" FROM files f LEFT JOIN audio_meta a ON a.file_id = f.id");
     for (i, st) in STAGES.iter().enumerate() {
         let (name, v) = (st.as_str(), st.version());
-        let cur = format!("s{i}.version >= {v}");
+        let cur = format!("f.status <> 'missing' AND s{i}.version >= {v}");
         for outcome in ["ok", "partial", "error"] {
             select += &format!(", sum({cur} AND s{i}.outcome = '{outcome}')");
         }
-        select += &format!(
-            ", sum(+f.status IN ('new', 'meta', 'analyzed') \
-             AND (s{i}.file_id IS NULL OR s{i}.version < {v}))"
-        );
+        // Aliases/params are spelled out per stage (the macro needs
+        // literals); the const assert below forces an update here when a
+        // third runnable stage is added to `STAGES`.
+        const _: () = assert!(STAGES.len() == 2);
+        let eligible = if i == 0 {
+            eligible!("s0", "?1")
+        } else {
+            eligible!("s1", "?2")
+        };
+        select += &format!(", sum({eligible})");
         joins += &format!(
             " LEFT JOIN file_stages s{i} ON s{i}.file_id = f.id AND s{i}.stage = '{name}'"
         );
@@ -153,9 +163,9 @@ impl Store {
 
         // One pass over `files`, with primary-key lookups into `audio_meta`
         // and `file_stages`; grouped by (library, status), so the result has
-        // a handful of rows. ~1 s per million files.
+        // a handful of rows.
         let mut stmt = self.conn().prepare(&stats_sql())?;
-        let mut rows = stmt.query([])?;
+        let mut rows = stmt.query(rusqlite::params![STAGES[0].version(), STAGES[1].version()])?;
         while let Some(r) = rows.next()? {
             let lib: i64 = r.get(0)?;
             let status: String = r.get(1)?;
@@ -256,6 +266,62 @@ mod tests {
         let s = store.stats().expect("stats");
         eprintln!("stats over 1M files: {:.3} s", t.elapsed().as_secs_f64());
         assert_eq!(s.libraries[0].files.total, 1_000_000);
+    }
+
+    #[test]
+    fn pending_matches_the_job_queue_including_error_retries() {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let store = Store::open(tmp.path().join("t.db")).expect("open");
+        let mut ids = Vec::new();
+        for name in ["on", "off"] {
+            let dir = tmp.path().join(name);
+            fs::create_dir(&dir).expect("mkdir");
+            ids.push(store.add_library(&dir).expect("add").id);
+        }
+        let conn = store.conn();
+        conn.execute("UPDATE libraries SET online = 0 WHERE id = ?1", [ids[1]])
+            .expect("offline");
+        let mut n = 0;
+        for lib in &ids {
+            for st in ["new", "meta", "analyzed", "error", "error", "missing"] {
+                n += 1;
+                conn.execute(
+                    "INSERT INTO files (library_id, rel_path, size, mtime, status) \
+                     VALUES (?1, ?2, 100, 0, ?3)",
+                    rusqlite::params![lib, format!("f{n}.wav"), st],
+                )
+                .expect("insert");
+            }
+        }
+        // Stage rows for most files: error rows for `error` files, a mix of
+        // outdated (version 0) and current results otherwise.
+        for stage in ["meta", "dsp"] {
+            conn.execute(
+                "INSERT INTO file_stages \
+                 SELECT id, ?1, CASE WHEN id % 3 = 2 THEN 0 ELSE 99 END, \
+                        CASE WHEN status = 'error' THEN 'error' ELSE 'ok' END, NULL, 0 \
+                 FROM files WHERE id % 4 <> 0",
+                [stage],
+            )
+            .expect("stages");
+        }
+        let s = store.stats().expect("stats");
+        for (i, stage) in STAGES.iter().enumerate() {
+            let sum = |online: bool| -> u64 {
+                s.libraries
+                    .iter()
+                    .filter(|l| l.online == online)
+                    .map(|l| l.stages[i].pending)
+                    .sum()
+            };
+            let queue = crate::jobs::queue::count_pending(conn, *stage).expect("count");
+            assert!(queue > 0, "test must exercise pending work");
+            assert_eq!(sum(true), queue, "{stage:?}");
+            // id 2 (`meta`, outdated row) and id 5 (`error`, outdated error
+            // row: retried by the queue); the old SQL counted only id 2.
+            assert_eq!(sum(true), 2, "{stage:?}");
+            assert!(sum(false) > 0, "offline work is still reported");
+        }
     }
 
     #[test]

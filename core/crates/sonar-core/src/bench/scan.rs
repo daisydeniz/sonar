@@ -67,7 +67,9 @@ pub struct ScanBench {
     /// Seconds spent generating (not part of any timing below).
     pub generate_secs: f64,
     /// First scan: every file is new. The page cache is warm from
-    /// generation, so this measures the scanner, not the disk.
+    /// generation, so this measures the scanner, not the disk. The first
+    /// scan reads up to 128 KiB per file for `quick_hash`, so on a cold
+    /// library on a slow disk it is slower than this number.
     pub first: ScanPhase,
     /// Rescan with nothing changed.
     pub noop: ScanPhase,

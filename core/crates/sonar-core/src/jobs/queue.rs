@@ -44,6 +44,30 @@ macro_rules! pending_from {
     };
 }
 
+/// Stage eligibility of a file row `f` against its stage row `$s` (a table
+/// alias, possibly NULL from a `LEFT JOIN`) for the stage version `$v` (an SQL
+/// expression). Shared by the queue and `sonar stats` so both agree on
+/// "pending". Excludes the library's `online` flag and the id cursor, which
+/// only the queue applies.
+macro_rules! eligible {
+    ($s:literal, $v:literal) => {
+        concat!(
+            "((+f.status IN ('new', 'meta', 'analyzed') \
+              OR (+f.status = 'error' AND ",
+            $s,
+            ".outcome = 'error')) \
+             AND (",
+            $s,
+            ".file_id IS NULL OR ",
+            $s,
+            ".version < ",
+            $v,
+            "))"
+        )
+    };
+}
+pub(crate) use eligible;
+
 /// Files eligible for a stage: online library, a status the pipeline works
 /// on (`missing` and scan-level `error` rows never), and no row for the
 /// stage or one older than its version. A file with `status = 'error'` is
@@ -56,10 +80,7 @@ macro_rules! pending_from {
 /// remaining rows per batch.
 macro_rules! pending_where {
     () => {
-        "l.online = 1 AND f.id > ?2 AND \
-         (+f.status IN ('new', 'meta', 'analyzed') \
-          OR (+f.status = 'error' AND s.outcome = 'error')) \
-         AND (s.file_id IS NULL OR s.version < ?3)"
+        concat!("l.online = 1 AND f.id > ?2 AND ", eligible!("s", "?3"))
     };
 }
 

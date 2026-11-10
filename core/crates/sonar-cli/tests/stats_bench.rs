@@ -103,6 +103,8 @@ fn stats_shows_pending_before_analysis_and_missing_after_delete() {
     let l = &v["libraries"][0];
     assert_eq!(l["files"]["missing"], 1);
     assert_eq!(l["files"]["new"], 1);
+    // The deleted file's old stage rows no longer count.
+    assert_eq!(l["stages"][0]["ok"], 6);
     assert_eq!(l["stages"][0]["pending"], 1);
     assert_eq!(l["stages"][1]["pending"], 1);
 }
