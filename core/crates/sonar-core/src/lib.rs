@@ -12,6 +12,7 @@ pub mod error;
 pub mod fixtures;
 pub mod index;
 pub mod jobs;
+pub mod key;
 pub mod meta;
 pub mod paths;
 pub mod quiet_panic;

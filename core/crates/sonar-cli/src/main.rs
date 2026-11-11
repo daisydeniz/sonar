@@ -9,6 +9,7 @@ mod classify_cmd;
 mod cli;
 mod decode_cmd;
 mod dsp_cmd;
+mod key_cmd;
 mod meta_cmd;
 mod search_args;
 mod search_cmd;
@@ -66,6 +67,7 @@ fn main() -> Result<()> {
             json,
             no_names,
         } => bpm_cmd::run(&files, json, !no_names)?,
+        Command::Key(args) => key_cmd::run(&args)?,
         Command::Analyze {
             stages,
             threads,

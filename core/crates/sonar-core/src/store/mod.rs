@@ -10,6 +10,7 @@
 pub mod analysis;
 pub mod audio_meta;
 mod files;
+pub mod key_pitch;
 mod libraries;
 mod migrations;
 mod stats;

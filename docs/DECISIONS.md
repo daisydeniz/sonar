@@ -565,3 +565,47 @@ Accepted. `sonar_core::tempo` (`estimate_tempo`, `loop_tempo`),
   0.6–1.0 ms per 30 s window (analyzer 3.4 ms). `bench analyze --stages
   dsp`: 8776 → 5804 files/s (14 threads, warm cache) with analyzer +
   classify + tempo wired in.
+
+## ADR-022 — Key and one-shot note, key/pitch storage (T3.5)
+Accepted. `sonar_core::key` (`estimate_key`, `key_and_note`,
+`NoteTracker`), `KEY_VERSION` 1; `sonar key <file>... [--json]
+[--no-names]`.
+- **Tonal chroma** from the existing STFT (no second FFT): per frame,
+  prominent sinusoidal peaks (≥ 10 dB over bins ±3–4) in 80 Hz–5 kHz,
+  log-parabolic refinement (Smith & Serra 1987), magnitude into a 10-cent
+  pitch-class histogram; global tuning = weighted circular mean of the
+  deviation from 12-TET (Harte & Sandler 2005), folded to 12 classes
+  (HPCP idea, Gómez 2006 ch. 3). Frames > 60 dB below the loudest skipped.
+  *Tonal ratio* = peak power ÷ band power.
+- **Key**: Krumhansl–Schmuckler correlation against the 24 Temperley
+  (1999) profiles, each harmonically expanded (4 harmonics, decay 0.6;
+  Gómez 2006 §4.2). Gate: tonal ratio ≥ 0.5, ≥ 3 pitch classes at ≥ 25 %
+  of the strongest, best r ≥ 0.5. Confidence = r × min(1, margin over
+  runner-up / 0.1). Drums, noise, clicks and silence get no key.
+- **Note** (one-shots only): YIN (`dsp::yin`, de Cheveigné & Kawahara
+  2002) 30 Hz–4.3 kHz, window 1024 / hop 512 on ≤ 3 s from the onset
+  (−40 dB of peak); frames within 30 dB of the loudest; energy-weighted
+  median MIDI, then mean of frames within ±0.5 st, rounded. Gate: stable
+  frames ≥ 60 % of active energy (kick sweeps, noise → none). Signals
+  shorter than one frame get a signal-sized tracker. A one-shot with a note
+  takes the note's pitch class as a **mode-less key** (so the key filter
+  finds bass/808 hits); loops never get a note.
+- **Filename prior** (optional, eval hides it): +0.1 correlation for keys
+  matching the name key (both modes if the name has none), lends its mode
+  to a note on the same root, raises confidence (noisy-or) when it agrees,
+  and is the value (`source = filename`, confidence 0.6 explicit / 0.4
+  bare letter) when audio has no key or one below confidence 0.2.
+- **Storage**: no migration (columns exist since 0001). `dsp` stage keeps
+  one `NoteTracker` per worker and upserts only `analysis.key, key_conf,
+  key_source, pitch_midi, pitch_conf` (`store::key_pitch`) in the batch
+  transaction; missing values store NULL. Key stored in display form
+  (`C#m`, `D#maj`, `A` mode-less), read back by `parse_key`; the index
+  already prefers `analysis.key` over the name prior. Jobs `DSP_VERSION`
+  3 → 4.
+- **Results** (fixtures, names hidden, `tests/key.rs`): key 16/16 (100 %,
+  tonic + mode), note 52/52 (100 %, exact MIDI); no drum/noise/silence
+  fixture gets a key or note.
+- **Cost** (release, M4 Pro, 1 thread, warm): key 1.7–1.8 ms per 30 s
+  tonal window, note 1.3 ms (30 s window, ≤ 3 s analysed), 0.1–0.6 ms on
+  short files. `bench analyze --stages dsp`: 5804 → 4545 files/s
+  (14 threads, warm cache).

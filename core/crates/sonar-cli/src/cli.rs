@@ -168,6 +168,12 @@ pub enum Command {
         no_names: bool,
     },
 
+    /// Estimate the musical key (tonal chroma vs. key profiles, with a
+    /// lower-weight key from the names) and, for pitched one-shots, the
+    /// note (YIN). Drums, noise and silence get neither. Unreadable files
+    /// are reported and skipped; exits non-zero if any failed.
+    Key(crate::key_cmd::KeyArgs),
+
     /// Run the analysis pipeline over every library in the store: `meta`
     /// (format, duration) for all files first, then `dsp` (analysis decode,
     /// peak, loudness). Resumable: only pending files are processed, so it can

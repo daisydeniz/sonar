@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use crate::meta::BasicMeta;
 use crate::store::analysis::KindTempo;
+use crate::store::key_pitch::KeyPitch;
 
 /// Current version of the `meta` stage (format, duration). Bump it to
 /// re-run the stage on every file.
@@ -15,15 +16,17 @@ use crate::store::analysis::KindTempo;
 /// packet bytes), AIFF `COMM` length, truncated AIFF decodable.
 pub const META_VERSION: u32 = 2;
 /// Current version of the `dsp` stage (decode window, peak/loudness,
-/// loop/one-shot kind and tempo). Bump it to re-run the stage, also when
-/// [`crate::dsp::DSP_VERSION`], [`crate::classify::KIND_VERSION`] or
-/// [`crate::tempo::TEMPO_VERSION`] change.
+/// loop/one-shot kind, tempo, key and note). Bump it to re-run the stage,
+/// also when [`crate::dsp::DSP_VERSION`], [`crate::classify::KIND_VERSION`],
+/// [`crate::tempo::TEMPO_VERSION`] or [`crate::key::KEY_VERSION`] change.
 ///
 /// History: 2 (T1.7d) same length fixes as `META_VERSION` 2 (the stage
 /// stores `num_frames`; truncated AIFF no longer an error; an AIFF `SSND`
 /// past `COMM` is no longer metered). 3 (T3.4) stores `analysis.kind` /
-/// `kind_conf` and, for loops, `bpm` / `bpm_conf` / `bpm_source`.
-pub const DSP_VERSION: u32 = 3;
+/// `kind_conf` and, for loops, `bpm` / `bpm_conf` / `bpm_source`. 4 (T3.5)
+/// stores `key` / `key_conf` / `key_source` and, for pitched one-shots,
+/// `pitch_midi` / `pitch_conf`.
+pub const DSP_VERSION: u32 = 4;
 /// Version of the `embed` stage (T5.2). Declared so the stage name and
 /// version slot exist in the schema; there is no implementation yet.
 pub const EMBED_VERSION: u32 = 1;
@@ -116,6 +119,15 @@ impl Outcome {
     }
 }
 
+/// The `analysis` columns the `dsp` stage writes (ADR-021, ADR-022).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct DspAnalysis {
+    /// `kind`, `kind_conf`, `bpm`, `bpm_conf`, `bpm_source`.
+    pub kind_tempo: KindTempo,
+    /// `key`, `key_conf`, `key_source`, `pitch_midi`, `pitch_conf`.
+    pub key_pitch: KeyPitch,
+}
+
 /// What a worker produced for one claimed file.
 #[derive(Debug)]
 pub(crate) enum FileResult {
@@ -124,8 +136,8 @@ pub(crate) enum FileResult {
         /// Measured metadata (`meta.partial` / `meta.problem` say whether
         /// and why the result is partial).
         meta: BasicMeta,
-        /// Kind and tempo (`Dsp` stage only).
-        analysis: Option<KindTempo>,
+        /// Kind, tempo, key and note (`Dsp` stage only).
+        analysis: Option<DspAnalysis>,
     },
     /// Decode or format failure: recorded as an error row.
     Failed(String),
