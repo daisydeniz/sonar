@@ -4,6 +4,7 @@ mod analyze_cmd;
 mod aspects_cmd;
 mod bench_cmd;
 mod bench_print;
+mod classify_cmd;
 mod cli;
 mod decode_cmd;
 mod dsp_cmd;
@@ -54,6 +55,11 @@ fn main() -> Result<()> {
         } => meta_cmd::run(&files, max_meta_secs, json)?,
         Command::Dsp { files, json } => dsp_cmd::run(&files, json)?,
         Command::Aspects { files, json } => aspects_cmd::run(&files, json)?,
+        Command::Classify {
+            files,
+            json,
+            no_names,
+        } => classify_cmd::run(&files, json, !no_names)?,
         Command::Analyze {
             stages,
             threads,

@@ -5,6 +5,7 @@
 //! feature headless so it can be tested and benchmarked without UI.
 
 pub mod bench;
+pub mod classify;
 pub mod decode;
 pub mod dsp;
 pub mod error;

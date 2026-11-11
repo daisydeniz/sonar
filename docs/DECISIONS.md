@@ -482,3 +482,34 @@ ARCHITECTURE §5 and per-index docs in each submodule.
   four (each aspect ≈ equal share of the squared distance); tune in T4.4.
 - **Cost**: aspects 10.9 ms per 30 s file (analyzer + aspects 14.1 ms), 1
   thread, release, M-series. Wiring into jobs/vector store: T4.1/T4.2.
+
+## ADR-020 — Loop vs one-shot classifier (T3.3)
+Accepted. `sonar_core::classify` (`classify_kind`, `kind_scores`,
+`kind_hint`), `KIND_VERSION` 1; `sonar classify <file>... [--json]
+[--no-names]`.
+- **Evidence** from the existing DSP `Features` (no second STFT):
+  *periodicity* = best normalized autocorrelation of the onset envelope at
+  0.25–1.5 s lags after a 1 s moving-average detrend (Ellis 2007 §3.1,
+  Scheirer 1998), lag must fit twice in the window; *pulse* = std of the
+  detrended envelope; *true duration* (not the 30 s window); *tail* =
+  loudest frame of the last 15 % (≥ 0.25 s) re the loudest frame, unknown
+  when the file is longer than the window.
+- **Decision**: fixed, hand-set logistic. `z = 12·(P·min(1, pulse/1 dB) −
+  0.2) + clamp(1.5·log2(dur/2 s), −3, +1) + clamp((tail+12 dB)/8, −1, 0)`;
+  Loop iff `z > 0`, `p_loop = σ(z)`. Rhythm is the primary cue and must be
+  strong in absolute terms (the pulse gate stops steady tones/noise from
+  scoring on scale-free ripple); short files lean one-shot; long files
+  lean loop but cannot outvote missing rhythm; a decayed end leans
+  one-shot, a sustained end is no evidence (steady tones are sustained).
+- **Filename hint** (lower-weight prior): ADR-016 tokenizer on the stem,
+  then ≤ 2 parent folders; loop words/tempo tokens → Loop, `oneshot`/`hit`/
+  `one shot` → OneShot, conflicts → none. Adds ±2 to `z`: less than clear
+  rhythm (≥ +3.6) or a short decaying hit (≈ −4), so it only decides
+  ambiguous audio (rhythm-less pad loops). `source` records whether the
+  hint flipped the audio decision. Silent/empty audio → hint's kind, else
+  `Fallback` one-shot with confidence 0. Eval and the AC test pass no hint.
+- **Truth mapping** for fixtures/eval: `loop` → Loop; `one_shot`, `tone`,
+  `noise` → OneShot; `silence`/corrupt excluded. Fixtures: 105/105 with
+  names hidden.
+- **Cost**: 0.6 ms per 30 s window on top of the analyzer (3.2 ms), 1
+  thread, release, M-series. Not yet wired into jobs/store (pipeline task).

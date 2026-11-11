@@ -133,6 +133,23 @@ pub enum Command {
         json: bool,
     },
 
+    /// Classify audio files as loop or one-shot from their analysis window
+    /// (onset periodicity, true duration, decay tail) plus a lower-weight
+    /// hint from the file and folder names, and print the decision,
+    /// confidence and heuristic scores. Unreadable files are reported and
+    /// skipped; exits non-zero if any failed.
+    Classify {
+        /// Audio files (wav, aif/aiff, flac, mp3, ogg, m4a).
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        /// Print a JSON array instead of text.
+        #[arg(long)]
+        json: bool,
+        /// Ignore file and folder names (audio evidence only, as the eval).
+        #[arg(long)]
+        no_names: bool,
+    },
+
     /// Run the analysis pipeline over every library in the store: `meta`
     /// (format, duration) for all files first, then `dsp` (analysis decode,
     /// peak, loudness). Resumable: only pending files are processed, so it can
