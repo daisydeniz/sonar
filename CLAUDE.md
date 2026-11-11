@@ -15,7 +15,9 @@ approval; make reasonable decisions, record them (ADR / STATUS log), continue.
 
 ## The loop (one task per session)
 0. Git start: if a `task/*` branch with unfinished work is checked out (an
-   earlier session was interrupted), resume that task. Otherwise
+   earlier session was interrupted), resume that task: read
+   `logs/handoff.md` first (see "Handoff") and continue from the phase it
+   records, without redoing finished phases. Otherwise
    `git checkout main`, `git pull --ff-only` (if `origin` exists), then
    create `task/<id>-<slug>` (e.g. `task/t1-2-scanner`).
 1. Pick the first unchecked, non-`[HUMAN]` task in ROADMAP whose deps are done.
@@ -25,6 +27,8 @@ approval; make reasonable decisions, record them (ADR / STATUS log), continue.
 3. Delegate implementation to the owner subagent named in the task tag
    (`.claude/agents/`). Give it: task id, AC, relevant doc sections, files.
    Independent pieces may go to several subagents in parallel.
+   Run subagents in the foreground and wait for their result: never end
+   your turn (or print a `RESULT:` line) while a subagent is still working.
 4. Run `scripts/check.sh`. Fix until green (delegate fixes back if needed).
 5. Ask the **reviewer** subagent to review the diff against AC + rules below.
    Address every BLOCKING finding. **At most 2 review rounds**: round 2 only
@@ -32,7 +36,10 @@ approval; make reasonable decisions, record them (ADR / STATUS log), continue.
    otherwise add one line to ROADMAP `## Later`. If something non-critical is
    still open after round 2, move it to `## Later` and finish the task.
 6. For analysis/search changes: run eval (`eval` subagent) and compare to
-   BASELINE; regressions follow the rule in EVAL.md.
+   BASELINE; regressions follow the rule in EVAL.md. If `$SONAR_SILVER_DIR`
+   and/or `$SONAR_GOLDEN_DIR` are set (the founder's real samples, read-only),
+   also run `--silver` / `--golden` on them once `sonar eval` supports it and
+   report those numbers next to the fixture numbers in the STATUS log entry.
 7. Update ROADMAP (check box + short commit hash), STATUS (Current, Log entry,
    Needs human), commit on the task branch. **Log entry: max ~5 lines** —
    what changed, key numbers, open follow-ups (by Later reference). Details
@@ -49,6 +56,16 @@ yours: pick the option that best serves PRODUCT.md and write an ADR — do not
 park them for the founder. `[HUMAN]` tasks never block the loop. Set
 `Loop state: BLOCKED` only if **no** remaining task can proceed at all.
 When every non-human task is done, set `Loop state: ROADMAP COMPLETE`.
+
+## Handoff (a session can be cut off by the usage limit at any moment)
+After each phase of a task, overwrite `logs/handoff.md` (untracked) with at
+most 10 lines: task id + branch; phases finished (plan / implemented /
+check.sh green / review round N with verdict and still-open blockers / eval /
+docs updated / merged); the exact next step; and whatever a fresh session
+cannot rediscover from the diff (decisions taken, numbers measured, reviewer
+findings not yet fixed). A resumed session trusts this file if its task id
+matches the checked-out branch: it does not re-plan, re-implement or
+re-review finished phases. After the merge in step 8: `rm -f logs/handoff.md`.
 
 ## Engineering rules
 - **Architecture**: all product logic in Rust (`core/`); Swift renders and

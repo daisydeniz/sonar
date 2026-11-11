@@ -7,6 +7,9 @@
 #   MAX_ITER=10 scripts/autopilot.sh     # limit task attempts
 #   SONAR_MODEL=sonnet scripts/autopilot.sh   # orchestrator model (default opus)
 #   SONAR_YOLO=1 scripts/autopilot.sh    # skip ALL permission checks (not recommended)
+#   SONAR_OUTPUT_FORMAT=text scripts/autopilot.sh   # old plain-text logs, no usage.tsv
+#   SONAR_SILVER_DIR=~/Splice/sounds SONAR_GOLDEN_DIR=~/sonar-golden scripts/autopilot.sh
+#                                        # real-audio eval sets (see CLAUDE.md, loop step 6)
 #
 # Usage limits: when Claude reports "hit your … limit · resets <time>", the
 # loop sleeps until that time (+2 min) and retries. Limit waits do not count
@@ -15,7 +18,9 @@
 # The script runs from a temporary copy of itself, so agents may update
 # scripts/autopilot.sh in the repo while the loop is running.
 #
-# Logs: logs/<timestamp>-iterN.log   Live state: logs/autopilot.status
+# Logs: logs/<timestamp>-runN.log (final message), logs/<timestamp>-runN.json
+# (raw result), logs/usage.tsv (turns, duration, cost per run; per model when
+# reported).   Live state: logs/autopilot.status
 set -euo pipefail
 
 # ── locate repo root ────────────────────────────────────────────────────────
@@ -52,6 +57,7 @@ MAX_TURNS="${MAX_TURNS:-300}"
 MAX_FAILS="${MAX_FAILS:-5}"          # consecutive real failures (not limits)
 FAIL_BACKOFF_SECS="${FAIL_BACKOFF_SECS:-300}"
 MODEL="${SONAR_MODEL:-opus}"
+OUT_FORMAT="${SONAR_OUTPUT_FORMAT:-json}"   # json (usage logged) | text
 
 PERM_ARGS=(--permission-mode acceptEdits)
 if [[ "${SONAR_YOLO:-0}" == "1" ]]; then
@@ -123,6 +129,66 @@ sleep_until_epoch() {
   while (( $(date +%s) < $1 )); do sleep 60; done
 }
 
+# Turn the JSON result of `claude -p --output-format json` into the plain-text
+# log the rest of this script greps, and append one line to logs/usage.tsv.
+# If the output is not the expected JSON, the log is the raw output.
+render_log() {  # <raw json> <stderr file> <log>
+  python3 - "$1" "$2" "$3" <<'PY'
+import json, os, sys, time
+raw_path, err_path, log_path = sys.argv[1:4]
+raw = open(raw_path, errors="replace").read()
+err = open(err_path, errors="replace").read() if os.path.exists(err_path) else ""
+
+def pick(obj):
+    if isinstance(obj, dict) and obj.get("type") == "result":
+        return obj
+    if isinstance(obj, list):
+        for item in reversed(obj):
+            if isinstance(item, dict) and item.get("type") == "result":
+                return item
+    return None
+
+res = None
+try:
+    res = pick(json.loads(raw))
+except Exception:
+    for line in reversed(raw.splitlines()):
+        line = line.strip()
+        if not line.startswith(("{", "[")):
+            continue
+        try:
+            res = pick(json.loads(line))
+        except Exception:
+            res = None
+        if res:
+            break
+
+text = res.get("result") if res else None
+if not isinstance(text, str) or not text.strip():
+    text = raw
+with open(log_path, "w") as f:
+    f.write(err)
+    f.write(text if text.endswith("\n") else text + "\n")
+
+if res:
+    models = res.get("modelUsage")
+    per_model = ""
+    if isinstance(models, dict):
+        per_model = " ".join(
+            "%s=%s" % (name, usage.get("costUSD", "?"))
+            for name, usage in models.items() if isinstance(usage, dict))
+    row = [time.strftime("%Y-%m-%d %H:%M:%S"), os.path.basename(log_path),
+           res.get("num_turns", ""), res.get("duration_ms", ""),
+           res.get("total_cost_usd", ""), res.get("is_error", ""), per_model]
+    usage_path = os.path.join(os.path.dirname(log_path) or ".", "usage.tsv")
+    new = not os.path.exists(usage_path)
+    with open(usage_path, "a") as f:
+        if new:
+            f.write("time\tlog\tturns\tduration_ms\tcost_usd\tis_error\tper_model_cost\n")
+        f.write("\t".join(str(v) for v in row) + "\n")
+PY
+}
+
 PROMPT='Run the /next command (one iteration of the build loop). If slash commands are unavailable, read .claude/commands/next.md and follow it exactly.'
 
 attempt=0
@@ -140,14 +206,31 @@ while (( attempt < MAX_ITER )); do
   echo "── run $run (attempt $((attempt + 1))/$MAX_ITER, model $MODEL) → $log"
   status "running · run $run · attempt $((attempt + 1)) · $log"
   set +e
-  claude -p "$PROMPT" --model "$MODEL" "${PERM_ARGS[@]}" --max-turns "$MAX_TURNS" \
-    --output-format text 2>&1 | tee "$log"
-  code=${PIPESTATUS[0]}
+  if [[ "$OUT_FORMAT" == "json" ]]; then
+    raw="${log%.log}.json"
+    claude -p "$PROMPT" --model "$MODEL" "${PERM_ARGS[@]}" --max-turns "$MAX_TURNS" \
+      --output-format json > "$raw" 2> "$raw.err"
+    code=$?
+    render_log "$raw" "$raw.err" "$log" || cat "$raw.err" "$raw" > "$log"
+    rm -f "$raw.err"
+    cat "$log"
+  else
+    raw="$log"
+    claude -p "$PROMPT" --model "$MODEL" "${PERM_ARGS[@]}" --max-turns "$MAX_TURNS" \
+      --output-format text 2>&1 | tee "$log"
+    code=${PIPESTATUS[0]}
+  fi
   set -e
 
   # Usage limit → wait for reset; not an attempt, not a failure.
-  if grep -qiE "hit your .*limit|usage limit reached|limit reached.*resets" "$log"; then
-    secs="$(seconds_until_reset "$log")"
+  limit_file=""
+  for f in "$log" "$raw"; do
+    if grep -qiE "hit your .*limit|usage limit reached|limit reached.*resets" "$f"; then
+      limit_file="$f"; break
+    fi
+  done
+  if [[ -n "$limit_file" ]]; then
+    secs="$(seconds_until_reset "$limit_file")"
     until_epoch=$(( $(date +%s) + secs ))
     until_h="$(date -r "$until_epoch" '+%H:%M' 2>/dev/null || date -d "@$until_epoch" '+%H:%M')"
     echo "   usage limit — sleeping until ~$until_h"
@@ -158,6 +241,9 @@ while (( attempt < MAX_ITER )); do
 
   attempt=$((attempt + 1))
   result="$(grep -E '^RESULT:' "$log" | tail -1 || true)"
+  if [[ -z "$result" ]]; then   # result text not rendered (unexpected JSON shape)
+    result="$(grep -oE 'RESULT: (DONE|SKIPPED|BLOCKED|COMPLETE)[^"\\]*' "$raw" | tail -1 || true)"
+  fi
   echo "   ${result:-RESULT: (none)} (exit $code)"
 
   case "$result" in

@@ -11,6 +11,9 @@ Run exactly one iteration of "The loop" defined in CLAUDE.md.
    changed, update ROADMAP + STATUS, commit on the task branch, then merge
    per the Git section of CLAUDE.md (ff-merge to main, push, milestone tag).
    Do not ask for approval at any point.
-4. End your reply with one line:
+4. Print a `RESULT:` line exactly once, as the last line of your final
+   message, after everything (merge, push) is finished. No provisional
+   `RESULT:` lines; if you are waiting for a subagent, wait.
+   End your reply with one line:
    `RESULT: DONE <task-id>` or `RESULT: SKIPPED <task-id> <reason>` or
    `RESULT: BLOCKED <reason>` or `RESULT: COMPLETE`.
