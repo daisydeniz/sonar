@@ -14,10 +14,14 @@
 //! - Freshness: [`TextIndex::rebuild`] from the store, or
 //!   [`TextIndex::refresh_files`] with the ids a scan/watch/analysis batch
 //!   touched (re-reads them; deleted or missing files leave the index).
+//!
+//! Aspect vectors for similarity live next to it in [`vectors`]
+//! (`<data dir>/index/vectors`, ADR-023).
 
 pub mod analyzer;
 mod schema;
 mod source;
+pub mod vectors;
 mod write;
 
 #[cfg(test)]

@@ -157,6 +157,17 @@ pub enum Error {
         /// What is unsupported.
         reason: String,
     },
+
+    /// The aspect vector store at `path` cannot be used as is: a file of
+    /// another format/aspects version or dimension, not a Sonar vector
+    /// file, no store yet (readers), or locked by another writer.
+    #[error("vector store {}: {reason}", path.display())]
+    VectorStore {
+        /// File or directory concerned.
+        path: PathBuf,
+        /// What is wrong.
+        reason: String,
+    },
 }
 
 impl From<rusqlite::Error> for Error {

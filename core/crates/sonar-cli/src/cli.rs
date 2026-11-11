@@ -227,6 +227,17 @@ pub enum Command {
         json: bool,
     },
 
+    /// Aspect vector store statistics (rows live/dead, normalization
+    /// count, size, raw dims) written by `sonar analyze`.
+    Vectors {
+        /// Drop dead rows (deleted or re-analyzed files) first.
+        #[arg(long)]
+        compact: bool,
+        /// Print JSON instead of text.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Show how file names, paths or queries are tokenized for search
     /// (separators, camelCase, `120bpm`, keys → `key:c#m`/`note:c#`, pack
     /// noise dropped) and the BPM/key priors read from the file name.

@@ -9,6 +9,7 @@ use std::time::Duration;
 use rusqlite::Connection;
 
 mod control;
+mod vectors;
 mod versions;
 use tempfile::TempDir;
 

@@ -1448,6 +1448,7 @@ name = "sonar-core"
 version = "0.1.0"
 dependencies = [
  "hound",
+ "memmap2",
  "notify",
  "rayon",
  "realfft",

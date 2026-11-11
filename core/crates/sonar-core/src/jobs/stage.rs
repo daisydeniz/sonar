@@ -5,6 +5,7 @@ use std::str::FromStr;
 
 use serde::Serialize;
 
+use crate::dsp::aspects::AspectVectors;
 use crate::meta::BasicMeta;
 use crate::store::analysis::KindTempo;
 use crate::store::key_pitch::KeyPitch;
@@ -25,8 +26,10 @@ pub const META_VERSION: u32 = 2;
 /// past `COMM` is no longer metered). 3 (T3.4) stores `analysis.kind` /
 /// `kind_conf` and, for loops, `bpm` / `bpm_conf` / `bpm_source`. 4 (T3.5)
 /// stores `key` / `key_conf` / `key_source` and, for pitched one-shots,
-/// `pitch_midi` / `pitch_conf`.
-pub const DSP_VERSION: u32 = 4;
+/// `pitch_midi` / `pitch_conf`. 5 (T4.1) appends the raw aspect vectors to
+/// the vector store (ADR-023); bump it also when
+/// [`crate::dsp::aspects::ASPECTS_VERSION`] changes.
+pub const DSP_VERSION: u32 = 5;
 /// Version of the `embed` stage (T5.2). Declared so the stage name and
 /// version slot exist in the schema; there is no implementation yet.
 pub const EMBED_VERSION: u32 = 1;
@@ -119,13 +122,16 @@ impl Outcome {
     }
 }
 
-/// The `analysis` columns the `dsp` stage writes (ADR-021, ADR-022).
-#[derive(Debug, Clone, Copy, PartialEq)]
+/// What the `dsp` stage writes: `analysis` columns (ADR-021, ADR-022) and
+/// a vector store row (ADR-023).
+#[derive(Debug, Clone, PartialEq)]
 pub(crate) struct DspAnalysis {
     /// `kind`, `kind_conf`, `bpm`, `bpm_conf`, `bpm_source`.
     pub kind_tempo: KindTempo,
     /// `key`, `key_conf`, `key_source`, `pitch_midi`, `pitch_conf`.
     pub key_pitch: KeyPitch,
+    /// Raw aspect vectors, appended to the vector store.
+    pub aspects: AspectVectors,
 }
 
 /// What a worker produced for one claimed file.
@@ -136,8 +142,9 @@ pub(crate) enum FileResult {
         /// Measured metadata (`meta.partial` / `meta.problem` say whether
         /// and why the result is partial).
         meta: BasicMeta,
-        /// Kind, tempo, key and note (`Dsp` stage only).
-        analysis: Option<DspAnalysis>,
+        /// Kind, tempo, key, note and aspect vectors (`Dsp` stage only;
+        /// boxed, the vectors make it large).
+        analysis: Option<Box<DspAnalysis>>,
     },
     /// Decode or format failure: recorded as an error row.
     Failed(String),

@@ -4,8 +4,10 @@
 //!
 //! Workers never touch the database; they return a [`FileResult`] for the
 //! coordinator to commit. Each worker thread keeps one [`Decoder`], one
-//! DSP [`Analyzer`] and one [`NoteTracker`] (FFT plans and scratch buffers
-//! are reused across files).
+//! DSP [`Analyzer`], one [`NoteTracker`] and one [`AspectExtractor`] (FFT
+//! plans and scratch buffers are reused across files). The `dsp` stage also
+//! returns the file's raw aspect vectors, which the coordinator appends to
+//! the vector store (ADR-023).
 
 use std::cell::RefCell;
 use std::path::Path;
@@ -19,6 +21,7 @@ use super::stage::{DspAnalysis, FileResult, Stage};
 use super::BeforeFileHook;
 use crate::classify::{classify_kind, kind_hint};
 use crate::decode::{DecodeOptions, Decoded, Decoder};
+use crate::dsp::aspects::{AspectExtractor, AspectVectors};
 use crate::dsp::Analyzer;
 use crate::key::{key_and_note, NoteTracker};
 use crate::meta::MetaOptions;
@@ -41,6 +44,8 @@ thread_local! {
     static ANALYZER: RefCell<Option<Analyzer>> = const { RefCell::new(None) };
     /// Built on first use (at the decoded rate).
     static NOTE: RefCell<Option<NoteTracker>> = const { RefCell::new(None) };
+    /// Built on first use (at the decoded rate).
+    static ASPECTS: RefCell<Option<AspectExtractor>> = const { RefCell::new(None) };
 }
 
 /// Processes one claimed file for `stage`. Never panics: a panic (also from
@@ -78,6 +83,7 @@ pub(crate) fn reset_workers() {
     DECODER.with(|d| *d.borrow_mut() = Decoder::new());
     ANALYZER.with(|a| *a.borrow_mut() = None);
     NOTE.with(|n| *n.borrow_mut() = None);
+    ASPECTS.with(|x| *x.borrow_mut() = None);
 }
 
 /// Runs `f` with this thread's reusable decoder, analyzer and note tracker
@@ -86,12 +92,15 @@ pub(crate) fn with_workers<R>(f: impl FnOnce(&mut Workers<'_>) -> R) -> R {
     DECODER.with(|d| {
         ANALYZER.with(|a| {
             NOTE.with(|n| {
-                let mut workers = Workers {
-                    decoder: &mut d.borrow_mut(),
-                    analyzer: &mut a.borrow_mut(),
-                    note: &mut n.borrow_mut(),
-                };
-                f(&mut workers)
+                ASPECTS.with(|x| {
+                    let mut workers = Workers {
+                        decoder: &mut d.borrow_mut(),
+                        analyzer: &mut a.borrow_mut(),
+                        note: &mut n.borrow_mut(),
+                        aspects: &mut x.borrow_mut(),
+                    };
+                    f(&mut workers)
+                })
             })
         })
     })
@@ -104,6 +113,8 @@ pub(crate) struct Workers<'a> {
     pub analyzer: &'a mut Option<Analyzer>,
     /// `None` until the first `dsp` file.
     pub note: &'a mut Option<NoteTracker>,
+    /// `None` until the first `dsp` file.
+    pub aspects: &'a mut Option<AspectExtractor>,
 }
 
 /// Decode options per stage (ADR-013): `meta` probes with zero windows (no
@@ -140,7 +151,7 @@ fn run_stage(
         Ok((decoded, meta)) => {
             let analysis = match stage {
                 Stage::Dsp => match dsp_analysis(w, &decoded, path) {
-                    Ok(a) => Some(a),
+                    Ok(a) => Some(Box::new(a)),
                     Err(e) => return FileResult::Failed(e.to_string()),
                 },
                 _ => None,
@@ -160,12 +171,16 @@ fn run_stage(
 
 /// DSP features of the analysis window, loop/one-shot decision, (loops
 /// only) tempo, key and (one-shots only) note, with the file and folder
-/// names as lower-weight priors (ADR-020, ADR-021, ADR-022).
+/// names as lower-weight priors (ADR-020, ADR-021, ADR-022), plus the raw
+/// aspect vectors (ADR-019, ADR-023).
 fn dsp_analysis(w: &mut Workers<'_>, decoded: &Decoded, path: &Path) -> crate::Result<DspAnalysis> {
-    let a = analyze_window(w, decoded, kind_hint(path), filename_prior(path))?;
+    let a = analyze_window(w, decoded, kind_hint(path), filename_prior(path), true)?;
     Ok(DspAnalysis {
         kind_tempo: KindTempo::new(&a.kind, a.tempo.as_ref()),
         key_pitch: KeyPitch::new(&a.key_note),
+        aspects: a.aspects.ok_or_else(|| Error::Internal {
+            reason: "aspect vectors missing".into(),
+        })?,
     })
 }
 
@@ -174,15 +189,19 @@ pub(crate) struct WindowAnalysis {
     pub kind: crate::classify::KindResult,
     pub tempo: Option<crate::tempo::Tempo>,
     pub key_note: crate::key::KeyNote,
+    /// Raw aspect vectors (only when asked for).
+    pub aspects: Option<AspectVectors>,
 }
 
 /// Loop/one-shot, tempo, key and note of `decoded` with the given name
-/// hint and priors (`None`/default = names hidden, as `sonar eval` runs it).
+/// hint and priors (`None`/default = names hidden, as `sonar eval` runs it),
+/// and the raw aspect vectors if `with_aspects`.
 pub(crate) fn analyze_window(
     w: &mut Workers<'_>,
     decoded: &Decoded,
     hint: Option<crate::classify::Kind>,
     prior: crate::text::FilenamePrior,
+    with_aspects: bool,
 ) -> crate::Result<WindowAnalysis> {
     let sr = decoded.sample_rate;
     let slot = &mut *w.analyzer;
@@ -200,10 +219,21 @@ pub(crate) fn analyze_window(
     let kind = classify_kind(&features, duration, hint);
     let tempo = loop_tempo(&kind, &features, duration, prior.bpm);
     let key_note = key_and_note(&kind, &features, &decoded.samples, tracker, prior.key)?;
+    let aspects = if with_aspects {
+        let slot = &mut *w.aspects;
+        let extractor = match slot {
+            Some(x) if x.sample_rate() == sr => x,
+            _ => slot.insert(AspectExtractor::new(sr)?),
+        };
+        Some(extractor.extract(&decoded.samples, &features)?)
+    } else {
+        None
+    };
     Ok(WindowAnalysis {
         kind,
         tempo,
         key_note,
+        aspects,
     })
 }
 
@@ -226,11 +256,12 @@ mod tests {
         };
         let manifest = generate(tmp.path(), &opts).unwrap();
         let mut dec = Decoder::new();
-        let (mut analyzer, mut note) = (None, None);
+        let (mut analyzer, mut note, mut aspects) = (None, None, None);
         let mut w = Workers {
             decoder: &mut dec,
             analyzer: &mut analyzer,
             note: &mut note,
+            aspects: &mut aspects,
         };
         let cancel = Arc::new(AtomicBool::new(false));
         let (mut ok, mut corrupt) = (0, 0);
@@ -276,11 +307,12 @@ mod tests {
         };
         let manifest = generate(tmp.path(), &opts).unwrap();
         let mut dec = Decoder::new();
-        let (mut analyzer, mut note) = (None, None);
+        let (mut analyzer, mut note, mut aspects) = (None, None, None);
         let mut w = Workers {
             decoder: &mut dec,
             analyzer: &mut analyzer,
             note: &mut note,
+            aspects: &mut aspects,
         };
         let cancel = Arc::new(AtomicBool::new(false));
         let (mut loops, mut one_shots, mut keys, mut notes) = (0, 0, 0, 0);
@@ -295,6 +327,11 @@ mod tests {
                 panic!("{}: not done", f.path);
             };
             let analysis = analysis.unwrap_or_else(|| panic!("{}: no analysis", f.path));
+            let dims = analysis
+                .aspects
+                .parts()
+                .map(|(asp, v)| (v.len(), asp.dim()));
+            assert!(dims.iter().all(|(n, d)| n == d), "{}: {dims:?}", f.path);
             let (a, kp) = (analysis.kind_tempo, analysis.key_pitch);
             if let Some(want) = &f.truth.key {
                 let got = kp.key.unwrap_or_else(|| panic!("{}: no key", f.path));

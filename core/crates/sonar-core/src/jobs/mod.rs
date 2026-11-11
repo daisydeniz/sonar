@@ -20,6 +20,10 @@
 //!   `files.status = 'error'`); damaged-but-readable files are `partial`; an
 //!   `Error::Io` records nothing and the file stays pending. A result is
 //!   dropped if the file's size/mtime changed since it was claimed.
+//! - **Vectors**: the `Dsp` stage also extracts the raw aspect vectors and
+//!   appends them to the vector store next to the database
+//!   (`<db dir>/index/vectors`) right before each batch commit; see
+//!   `vectors.rs` for reconciliation and compaction (ADR-023).
 //! - **Control**: [`JobHandle::pause`] stops workers starting new files
 //!   (files in flight finish and are committed; the rest of the batch is
 //!   re-dispatched after [`JobHandle::resume`], no busy loop),
@@ -32,6 +36,7 @@ mod progress;
 pub(crate) mod queue;
 mod runner;
 mod stage;
+mod vectors;
 pub(crate) mod work;
 
 #[cfg(test)]

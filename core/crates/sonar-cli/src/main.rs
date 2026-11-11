@@ -16,6 +16,7 @@ mod search_args;
 mod search_cmd;
 mod stats_cmd;
 mod tokenize_cmd;
+mod vectors_cmd;
 mod watch_cmd;
 
 use anyhow::{Context, Result};
@@ -84,6 +85,7 @@ fn main() -> Result<()> {
             debug_delay_ms,
         })?,
         Command::Stats { json } => stats_cmd::run(json)?,
+        Command::Vectors { compact, json } => vectors_cmd::run(compact, json)?,
         Command::Tokenize {
             inputs,
             query,

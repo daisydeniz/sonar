@@ -55,7 +55,7 @@ fn analyze(item: &Item) -> Result<Observation, String> {
                 .decoder
                 .decode(&item.path, &DecodeOptions::default())
                 .map_err(|e| e.to_string())?;
-            let a = analyze_window(w, &decoded, None, FilenamePrior::default())
+            let a = analyze_window(w, &decoded, None, FilenamePrior::default(), false)
                 .map_err(|e| e.to_string())?;
             Ok(Observation {
                 kind: a.kind.kind,

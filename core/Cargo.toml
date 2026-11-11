@@ -56,6 +56,9 @@ notify = { version = "8.2.2", default-features = false, features = ["macos_fseve
 # on-disk index, `lz4-compression` for the doc store; no stemmer/stopwords
 # (we bring our own analysis chain, `sonar_core::text`), no zstd.
 tantivy = { version = "0.27.0", default-features = false, features = ["mmap", "lz4-compression"] }
+# MIT OR Apache-2.0. Read-only memory maps of the aspect vector matrices
+# (T4.1, ADR-023); already in the tree through tantivy's `mmap` feature.
+memmap2 = "0.9.12"
 # Test-only (dev-dependencies).
 hound = "3.5.1"      # Apache-2.0; independent WAV reader to verify our writer
 tempfile = "3.27.0"  # MIT OR Apache-2.0

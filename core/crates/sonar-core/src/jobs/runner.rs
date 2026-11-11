@@ -6,11 +6,11 @@ use std::time::Instant;
 
 use rayon::ThreadPoolBuilder;
 
-use super::batches;
 use super::progress::{JobEvent, JobSummary, Shared};
 use super::stage::Stage;
 use super::work::WorkOptions;
 use super::JobOptions;
+use super::{batches, vectors};
 use crate::{Error, Result, Store};
 
 /// Runs the job to completion (or cancellation).
@@ -54,7 +54,17 @@ pub(crate) fn run(mut store: Store, opts: &JobOptions, shared: &Arc<Shared>) -> 
         if shared.is_cancelled() {
             break;
         }
-        let s = batches::run_stage(&mut store, stage, opts, &pool, &work, shared)?;
+        let s = if stage == Stage::Dsp {
+            let mut vs = vectors::open(&mut store)?;
+            let s =
+                batches::run_stage(&mut store, stage, opts, &pool, &work, shared, Some(&mut vs))?;
+            if !shared.is_cancelled() {
+                vectors::finish(&mut vs)?;
+            }
+            s
+        } else {
+            batches::run_stage(&mut store, stage, opts, &pool, &work, shared, None)?
+        };
         summary.stages.push(s);
     }
     summary.cancelled = shared.is_cancelled();

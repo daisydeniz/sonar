@@ -32,6 +32,7 @@ use super::queue::{self, Claim};
 use super::stage::{FileResult, Stage};
 use super::work::{self, WorkOptions};
 use super::JobOptions;
+use crate::index::vectors::VectorStore;
 use crate::{Error, Result, Store};
 
 /// How long a batch commit keeps retrying while another writer (e.g. a long
@@ -83,7 +84,8 @@ fn spawn_batch(
     rx
 }
 
-/// Runs one stage over everything pending, in id order.
+/// Runs one stage over everything pending, in id order. `vectors` (the
+/// `dsp` stage) receives each batch's aspect vectors before its commit.
 pub(super) fn run_stage(
     store: &mut Store,
     stage: Stage,
@@ -91,6 +93,7 @@ pub(super) fn run_stage(
     pool: &rayon::ThreadPool,
     work: &Arc<WorkOptions>,
     shared: &Arc<Shared>,
+    mut vectors: Option<&mut VectorStore>,
 ) -> Result<StageSummary> {
     let started = Instant::now();
     let total = queue::count_pending(store.conn(), stage)?;
@@ -172,6 +175,10 @@ pub(super) fn run_stage(
         }
 
         let t = Instant::now();
+        // Vectors first: a crash before the commit only re-runs the batch.
+        if let Some(vs) = vectors.as_deref_mut() {
+            tri!(super::vectors::append(vs, &results));
+        }
         let c = tri!(queue::commit_retrying(
             store.conn_mut(),
             stage,

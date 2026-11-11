@@ -142,3 +142,8 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T3.5) Loops never get a note (e.g. bass-loop root); tonal material without a clear onset only gets a chroma key.
 - (from T3.5 review) `key::chroma` allocates per-file totals; reuse scratch if profiling shows pressure.
 - (from T3.6 review) No CLI test for `sonar eval --check` exiting non-zero on a regression (core logic is tested); add one with a temp baseline.
+- (from T4.1 review) Vector `append` bumps headers without fsyncing aspect rows: power loss can leave live all-zero vectors that are never re-queued; `sync_data` before `set_rows` or detect zero rows on open.
+- (from T4.1 review) Writer overwrites tombstoned id slots that other processes may hold as `&[i64]` (theoretical aliasing UB); use `read_volatile` or the in-memory map only.
+- (from T4.1 review) A re-analysis that now fails keeps the file's old vector row live until the next dsp-stage reconcile; tombstone `Failed` ids in `jobs::vectors::append`.
+- (from T4.1 review) After a lost/reset vector store, reconcile re-queues offline files too (they show as unanalysed until their volume returns); restrict to present files.
+- (from T4.1) Two concurrent `sonar analyze` processes: the second fails at the dsp stage on the vector writer lock; add a job-level guard.

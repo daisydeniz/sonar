@@ -609,3 +609,30 @@ Accepted. `sonar_core::key` (`estimate_key`, `key_and_note`,
   tonal window, note 1.3 ms (30 s window, ≤ 3 s analysed), 0.1–0.6 ms on
   short files. `bench analyze --stages dsp`: 5804 → 4545 files/s
   (14 threads, warm cache).
+
+## ADR-023 — Vector store: mmap aspect matrices outside SQLite (T4.1)
+Accepted. `sonar_core::index::vectors`; `sonar vectors [--compact] [--json]`.
+- **Layout**: `<db dir>/index/vectors/gen-<n>/` with `ids.i64` + one
+  matrix file per stored aspect (spectrum, timbre, pitch, amplitude), each
+  with a 64-byte header (format version, kind, dims, value size,
+  `ASPECTS_VERSION`, committed rows). Raw `f32` rows, read via `memmap2`
+  (MIT/Apache-2.0, already in the tree via tantivy). Overall is not stored;
+  it is built from normalized aspects at query time.
+- **Mapping**: row ↔ file id rebuilt in memory from `ids.i64` on open; a
+  re-analysed file appends a new row, last row wins, older rows are dead.
+- **Crash safety**: append writes rows, then all headers; open takes the
+  minimum header count and a writer truncates any torn tail. Single writer
+  (lock file), many readers. Corrupt file / version or dims mismatch →
+  error for readers; a writer resets to an empty store and the dsp stage
+  reconciles.
+- **Compaction**: new `gen-<n+1>` with live rows only + exact recomputed
+  norm, switched by atomic rename of `CURRENT`. Pipeline compacts at ≥ 25 %
+  dead rows.
+- **LibraryNorm**: `gen-<n>/norm.json`, merged per batch (Chan); rebuilt by
+  rayon fold/merge when missing, corrupt or behind the rows.
+- **Pipeline**: dsp stage computes raw aspects and appends them before the
+  batch's SQLite commit; at stage start it reconciles with `file_stages`
+  (orphan rows dropped, files analysed without vectors re-queued). Jobs
+  `DSP_VERSION` 4 → 5.
+- **Result**: 1M × 135 f32 (548 MB) opens in 17 ms (release, warm cache);
+  first full pass 87 ms (`tests/vectors.rs`, ignored).
