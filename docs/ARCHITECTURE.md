@@ -42,7 +42,8 @@ Rules:
 `model`, `store` (SQLite + migrations), `scan` (walk, identity, watch),
 `decode` (symphonia + resample to analysis rate), `dsp` (stft, mel, mfcc,
 pitch, onset, tempo, key, envelope), `features` (aspect vectors),
-`classify` (loop/one-shot, category), `embed` (CLAP via `ort`), `text`
+`classify` (loop/one-shot, category), `embed` (CLAP via `ort`; model, front
+end and `scripts/fetch-models.sh` → `models/`: ADR-026), `text`
 (tokenizer, synonyms), `index` (Tantivy + vector store), `search` (query
 model, hybrid ranking), `dupes`, `jobs` (pipeline, priorities, cancellation,
 progress), `eval`.

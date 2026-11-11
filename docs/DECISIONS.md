@@ -31,7 +31,7 @@ Amendment (T0.2): also allowed `Apache-2.0 WITH LLVM-exception` and
 Accepted. Preset search moves to v2. See docs/PRODUCT.md.
 
 ## ADR-006 — Local CLAP embeddings via ONNX Runtime
-Accepted (model choice pending, see M5). Audio+text joint embeddings for
+Accepted (model: ADR-026). Audio+text joint embeddings for
 natural-language search and zero-shot categories. Run via `ort` with the
 CoreML execution provider on macOS (Neural Engine/GPU), CPU fallback.
 
@@ -701,3 +701,94 @@ filter and scoring phases timed separately; M4 Pro, 14 cores, release).
   default-weight, unfiltered queries (ef ≥ 128, re-rank ≥ 200) and brute
   force for the rest. The filter phase (7 ms, linear in matches) is the
   next cost to cut.
+
+## ADR-026 — CLAP model: LAION CLAP HTSAT-unfused, int8 audio / fp32 text (T5.1)
+Accepted. Measured with a throwaway Rust crate outside git (`ort`
+2.0.0-rc.10 = ONNX Runtime 1.22, own front end per the spec below).
+- **Model**: `laion/clap-htsat-unfused` (Wu et al. 2023, arXiv:2211.06687;
+  HTSAT-tiny audio + RoBERTa-base text, trained on LAION-Audio-630K).
+  ONNX: `Xenova/clap-htsat-unfused` at commit
+  `c28f2883575e590e04d3146ff0713c2448d691ba` (transformers.js export of
+  those weights, separate audio and text graphs with projection heads).
+- **License**: weights Apache-2.0
+  (<https://huggingface.co/laion/clap-htsat-unfused>, card `license:
+  apache-2.0`); LAION-AI/CLAP code CC0-1.0. The Xenova repo declares no
+  license of its own; it is a format conversion + quantization of the
+  Apache-2.0 weights (`base_model: laion/clap-htsat-unfused`), so
+  Apache-2.0 governs. **Commercial redistribution inside the paid app is
+  allowed**; duties: ship the Apache-2.0 text and an attribution notice
+  ("LAION CLAP, converted to ONNX and int8-quantized"). Residual risk,
+  shared by every public CLAP: LAION-Audio-630K mixes sources under other
+  terms (some non-commercial); no dataset audio is shipped.
+- **Files** (`bash scripts/fetch-models.sh` → `${SONAR_MODELS_DIR:-<repo>/models}/
+  clap-htsat-unfused/`; pinned URLs + SHA-256 in the script, re-run is a
+  no-op, bad file deleted and fetched again, failed check exits 1):
+  `audio_model_quantized.onnx` 34.3 MB, `text_model.onnx` 501.5 MB,
+  `tokenizer.json` 2.1 MB, `preprocessor_config.json`, `config.json`
+  (reference). Total ≈ 538 MB.
+- **Graphs**: audio `input_features` f32 `[B,1,1001,64]` → `audio_embeds`
+  f32 `[B,512]`; text `input_ids` i64 `[1,L]` → `text_embeds` f32 `[1,512]`.
+  The text graph has **no attention_mask input**: one query per run, never
+  pad. Outputs are **not** L2-normalised (norms 3.8–6.8 audio, 4.0–4.6
+  text): normalise, then cosine = dot.
+- **Audio front end** (= HF `ClapFeatureExtractor`, non-fusion path;
+  fusion off):
+  - mono (channel mean) at **48 kHz**; clip = 480,000 samples (10 s).
+  - longer: first 480,000 samples (HF crops at a random offset; we stay
+    deterministic). Shorter ("repeatpad"): tile the clip
+    ⌊480000/len⌋ times, then zero-pad to 480,000. Empty audio (len 0)
+    is rejected (no embedding), never divided by.
+  - STFT: n_fft 1024, periodic Hann 1024, hop 480, centred with **reflect**
+    padding of 512 per side → 1001 frames; power |X|².
+  - mel: 64 bands, 50–14,000 Hz, **Slaney** mel scale + Slaney area norm
+    (librosa `htk=False, norm="slaney"`), on 513 bins at k·46.875 Hz.
+  - 10·log10(max(mel, 1e-10)), ref 1.0, no top_db clip, no further
+    normalisation (the model has its own BatchNorm). Layout time-major
+    `[1001][64]`. Cost: 1.8 ms/clip on one core (realfft).
+  - Rate: the 22.05 kHz analysis decode upsampled to 48 kHz loses
+    11–14 kHz: embedding cosine vs native→48 kHz mean 0.968, min 0.81
+    (hats, noise); fixture zero-shot unchanged. Resample from the native
+    rate to 48 kHz for embed.
+- **Tokenizer**: RoBERTa byte-level BPE from `tokenizer.json` (HF
+  `tokenizers` format, case-sensitive), `<s>`=0 … `</s>`=2 added;
+  truncate to 77 tokens **including** `<s>`/`</s>` (content ≤ 75, then
+  add the specials; LAION training length). "a kick drum" →
+  `[0, 102, 3151, 12638, 2]`.
+- **int8 vs fp32** — zero-shot top-1, prompts "a kick drum", "a snare
+  drum", "a closed hi-hat", …: fixtures 95 files / 10 classes (coarse:
+  64 files / 6 classes kick, snare, hi-hat, sine, white noise, drum loop);
+  silver: 420 local one-shots, 7 classes by folder name (kick, snare,
+  clap, hi-hat, cymbal, bass, synth), 60 each; NN-1 = nearest audio
+  neighbour has the same class.
+
+  | audio / text | fixt. 10 | fixt. 6 | silver | silver NN-1 |
+  |---|---|---|---|---|
+  | fp32 / fp32 | 0.800 | 0.984 | 0.638 | 0.871 |
+  | **int8 / fp32** | 0.800 | 0.984 | 0.631 | 0.874 |
+  | int8 / int8 | 0.789 | 0.984 | 0.619 | 0.874 |
+
+  Audio fp32 vs int8 cosine mean 0.9984, min 0.9949 → **audio int8**
+  (1.5–2× faster, 34 vs 118 MB). Text int8 cosine mean 0.979, min 0.942
+  and −1.2 to −1.7 pt silver → **text fp32** (fp16 text: same silver
+  accuracy, 251 MB, but 15.9 ms/query on CPU).
+- **Speed** (Apple M4 Pro 10P+4E, 48 GB; release; CPU EP, graph opt
+  level 3). Audio int8: one session × 10 intra threads 61 (batch 1) /
+  76 (16) / 72 (32) clips/s; **N sessions × 1 thread: 8 → 122, 10 → 158
+  (batch 1), 14 → 153 clips/s**. Audio fp32: 42 / 50 / 47; 5 sessions ×
+  2 threads 66. CoreML EP: dynamic shapes 26–39 clips/s; with free-dim
+  overrides + MLProgram fp32 batch 16 79 clips/s but 33 s compile per
+  session load, int8 51; NeuralNetwork format 12–14. Text fp32 4.8 ms /
+  query (4 threads; int8 2.0, tokenize 4 µs), session load 0.2 s.
+  DSP is ≈ 3 ms CPU per file (≈ 4.5k files/s), so CLAP dominates:
+  **> 100 files/s is reachable on CPU** with ≥ 8 single-thread int8
+  sessions; CoreML (GPU/ANE) is a possible add-on next to them, not the
+  default. Memory per session not measured.
+- **Rejected**: `laion/larger_clap_general` (Apache-2.0, HTSAT-base,
+  music+speech data): same quality here (silver 0.636, NN-1 0.883;
+  fixtures coarse 0.938), ~2× slower (int8 70 clips/s with 10 sessions),
+  78 MB int8 audio — revisit if golden NL search needs it.
+  `laion/clap-htsat-fused`: 4-channel fusion input with random chunks
+  (non-deterministic), slower, few samples exceed 10 s. `microsoft/msclap`:
+  MS-PL (not on the ADR-004 list), no ONNX. Own export (optimum/torch):
+  needs a Python toolchain; the pinned, checksummed hosted export is the
+  same weights.

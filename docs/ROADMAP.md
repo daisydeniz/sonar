@@ -156,4 +156,9 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T4.3) Similar latency measured on M4 Pro only (4-thread p95 25.7 ms as proxy); re-run `sonar bench similar` on a base M1/M2.
 - (from T4.3) `bench/search_corpus.rs` is 403 lines (just over the ~400 guideline); split when next touched.
 - (from T4.4 review) Parity test: eval similarity ranking (`eval::similarity::ranking`, default config) == `similar::rank` on the fixture library, so the re-implemented formula cannot drift.
+- (from T5.1) Ship the Apache-2.0 text + "LAION CLAP, converted to ONNX and int8-quantized" attribution in the app's About/licenses screen (ADR-026).
+- (from T5.1) CoreML EP with static shapes + a compiled-model cache next to the CPU sessions (79 clips/s fp32, but 33 s compile per load uncached).
+- (from T5.1) Memory per CLAP session not measured; consider shared prepacked weights across the N single-thread sessions.
+- (from T5.1) Re-compare `laion/larger_clap_general` once golden NL queries exist (same quality on silver, ~2× slower).
+- (from T5.1) `scripts/fetch-models.sh` lacks the exec bit (chmod blocked in the agent sandbox); `git update-index --chmod=+x` it.
 - (from T4.4) Fixture sweep favoured L1 (P@10 87.29 vs 81.51), no-pitch 85.42, amp ×2 86.53; defaults kept (synthetic-fixture overfit risk). Re-run `sonar eval --golden --similar-sweep` once labels + `similar.jsonl` exist and decide then.
