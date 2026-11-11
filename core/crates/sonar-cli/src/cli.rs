@@ -150,6 +150,24 @@ pub enum Command {
         no_names: bool,
     },
 
+    /// Estimate the tempo of audio files: loop/one-shot decision first
+    /// (one-shots never get a BPM), then onset autocorrelation with octave
+    /// correction, the loop-length prior and a lower-weight BPM from the
+    /// file and folder names. Prints kind, BPM, confidence and source.
+    /// Unreadable files are reported and skipped; exits non-zero if any
+    /// failed.
+    Bpm {
+        /// Audio files (wav, aif/aiff, flac, mp3, ogg, m4a).
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        /// Print a JSON array instead of text.
+        #[arg(long)]
+        json: bool,
+        /// Ignore file and folder names (audio evidence only, as the eval).
+        #[arg(long)]
+        no_names: bool,
+    },
+
     /// Run the analysis pipeline over every library in the store: `meta`
     /// (format, duration) for all files first, then `dsp` (analysis decode,
     /// peak, loudness). Resumable: only pending files are processed, so it can

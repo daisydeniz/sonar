@@ -513,3 +513,55 @@ Accepted. `sonar_core::classify` (`classify_kind`, `kind_scores`,
   names hidden.
 - **Cost**: 0.6 ms per 30 s window on top of the analyzer (3.2 ms), 1
   thread, release, M-series. Not yet wired into jobs/store (pipeline task).
+
+## ADR-021 — Loop tempo (BPM) and kind/tempo storage (T3.4)
+Accepted. `sonar_core::tempo` (`estimate_tempo`, `loop_tempo`),
+`TEMPO_VERSION` 1; `sonar bpm <file>... [--json] [--no-names]`.
+- **Envelope**: accent = half-wave rectified flux of μ-law compressed
+  (μ = 100) mel band powers (Klapuri, Eronen & Astola 2006), from the
+  existing log-mel (no second STFT). The dB onset envelope (T3.1) makes
+  ghost notes/hats nearly as strong as kick/snare and flattens the metrical
+  hierarchy. Triangular smoothing (5 frames), 1 s detrend (Ellis 2007).
+  When the window holds the whole file (a loop) the envelope, its
+  autocorrelation and the beat grid wrap around (circular), and frame 0
+  gets the flux from the last frame so the downbeat is kept.
+- **Tempo family**: comb salience = mean normalized ACF at every multiple
+  of the beat period up to 8 s / half the window (Scheirer 1998; Grosche &
+  Müller 2011 autocorrelation tempogram), on a 0.1 BPM grid over 40–250
+  BPM, parabolic peak refinement; best peak × weights wins.
+- **Octave correction**: ACF alone ranks the half-bar above the beat for
+  backbeat/breakbeat patterns, and no tempo-only prior can then get both an
+  85 and a 175 BPM breakbeat right. The ×¼…×4 alternatives of the family
+  winner are re-scored by **clock fit** (Povel & Essens 1985): best-phase
+  beat grid, recall (accent mass on ticks) × precision (ticks filled,
+  relative to the median strong event). Weights: log-Gaussian tempo prior
+  (centre 110 BPM, σ 1.5 octaves: a tie-breaker); **loop-length prior**
+  when the window is the whole file: `bpm·duration/60` within 0.2 beats of
+  a whole count `n` (true decoded duration, not the 30 s window), `n` =
+  4·2^k → 1, other whole 4/4 bars 0.85, 3/4 bars 0.7, other 0.4, off-grid
+  0.3; filename BPM ×3 within 3 %.
+- **Refinement**: a winner that fits the loop length is snapped to exactly
+  `n·60/duration` (`beats` reported); otherwise the parabolic estimate.
+- **Filename prior** (optional, eval hides it): weights candidates
+  (octave ties), raises confidence when it agrees, and is the value
+  (`source = filename`, confidence 0.6 explicit / 0.4 bare number) when
+  detection is missing or below confidence 0.2.
+- **Confidence** = min(1, salience/0.5) × score margin over the best other
+  octave alternative.
+- **Gating**: `loop_tempo` returns None unless the T3.3 classifier says
+  Loop (not Fallback); `KindTempo::new` drops a tempo for non-loops too.
+  The text index no longer fills a one-shot's BPM from its filename prior.
+- **Storage / pipeline**: the `dsp` job stage (one `Analyzer` per worker
+  thread, like the decoder) runs features → `classify_kind` (name hint) →
+  `loop_tempo` (name BPM prior) and the coordinator upserts only
+  `analysis.kind, kind_conf, bpm, bpm_conf, bpm_source` (other columns
+  untouched; Fallback → kind NULL; one-shot → bpm NULL) in the batch
+  transaction. Jobs `DSP_VERSION` 2 → 3 so every file is re-analysed. The
+  index already used analysis BPM over the filename prior (ADR-018).
+- **Results** (fixtures, names hidden, `tests/tempo.rs`): 33/34 loops
+  within ±1 BPM (97.1 %), octave errors 1/34 — the half-time pattern at 140
+  (→ 70), documented as ambiguous by the generator; no one-shot gets a BPM.
+- **Cost** (release, M4 Pro, 1 thread): tempo 0.1–0.4 ms on short loops,
+  0.6–1.0 ms per 30 s window (analyzer 3.4 ms). `bench analyze --stages
+  dsp`: 8776 → 5804 files/s (14 threads, warm cache) with analyzer +
+  classify + tempo wired in.

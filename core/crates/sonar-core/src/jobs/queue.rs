@@ -1,7 +1,8 @@
 //! Database side of the pipeline: which files are pending, claiming them in
 //! batches, and committing a whole batch of results in one transaction.
 //!
-//! Atomicity: a batch's `audio_meta`, `file_stages` and `files` writes share
+//! Atomicity: a batch's `audio_meta`, `analysis` (kind/tempo columns of the
+//! `dsp` stage), `file_stages` and `files` writes share
 //! one `IMMEDIATE` transaction, so a crash (kill -9) leaves either the whole
 //! batch or nothing. `file_stages` has `PRIMARY KEY (file_id, stage)` and
 //! the pending query keys off it, so re-running after a crash cannot
@@ -13,7 +14,7 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 use super::stage::{FileResult, Outcome, Stage};
-use crate::store::{audio_meta, is_busy};
+use crate::store::{analysis as store_analysis, audio_meta, is_busy};
 use crate::Result;
 
 /// A file taken from the queue, with the identity it had at claim time.
@@ -212,7 +213,7 @@ pub(crate) fn commit(
             FileResult::Unstarted => {}
             FileResult::Skipped => counts.skipped += 1,
             _ if !still_current(&tx, claim)? => counts.skipped += 1,
-            FileResult::Done { meta } => {
+            FileResult::Done { meta, analysis } => {
                 let outcome = if meta.partial {
                     Outcome::Partial
                 } else {
@@ -229,6 +230,9 @@ pub(crate) fn commit(
                     }
                     _ => {
                         audio_meta::upsert(&tx, claim.id, meta)?;
+                        if let Some(a) = analysis {
+                            store_analysis::upsert_kind_tempo(&tx, claim.id, a)?;
+                        }
                         "analyzed"
                     }
                 };

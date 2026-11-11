@@ -222,6 +222,31 @@ fn filter_values_are_effective_values() {
 }
 
 #[test]
+fn one_shots_get_no_bpm_from_their_name() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let root = tmp.path().join("Lib");
+    fs::create_dir(&root).expect("mkdir");
+    let store = Store::open_in_memory().expect("store");
+    let lib = store.add_library(&root).expect("library").id;
+    let shot = add_file(&store, lib, "Shots/Kick 120 BPM.wav");
+    let unknown = add_file(&store, lib, "Loops/Beat 120 BPM.wav");
+    store
+        .conn()
+        .execute(
+            "INSERT INTO analysis (file_id, kind) VALUES (?1, 'one_shot')",
+            [shot],
+        )
+        .expect("analysis");
+    let ix = TextIndex::in_ram().expect("index");
+    ix.rebuild(&store).expect("rebuild");
+    let f = Filters {
+        bpm: Some(ValueRange::new(Some(120.0), Some(120.0))),
+        ..Filters::default()
+    };
+    assert_eq!(filter(&ix, f, Sort::default()), [unknown]);
+}
+
+#[test]
 fn refresh_files_follows_the_store() {
     let tmp = tempfile::tempdir().expect("tmp");
     let (store, [kick, snare, _, gone, _]) = store_with_files(tmp.path());

@@ -152,8 +152,9 @@ fn odd_frames(secs: f32, fps: f32) -> usize {
 }
 
 /// `x` minus its centred moving average over `width` frames (shrinking at
-/// the edges): a crude high-pass that keeps beat-rate pulses.
-fn detrend(x: &[f32], width: usize) -> Vec<f32> {
+/// the edges): a crude high-pass that keeps beat-rate pulses. Also used by
+/// [`crate::tempo`].
+pub(crate) fn detrend(x: &[f32], width: usize) -> Vec<f32> {
     let half = width / 2;
     let mut prefix = Vec::with_capacity(x.len() + 1);
     prefix.push(0.0f64);

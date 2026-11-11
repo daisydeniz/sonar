@@ -128,3 +128,9 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T3.3 review) Loop/one-shot weights are hand-tuned on synthetic fixtures; re-check on the silver/golden eval (T3.6/T3.7). Weakest fixture: 1.9 s loop at p_loop 0.70.
 - (from T3.3 review) Classifier timing is only an `#[ignore]` test; add it to `sonar bench` when wired into the pipeline.
 - (from T3.3 review) Hint word `beat` tags "Beat Kits/" folders (mostly one-shots) as loop (±2 logit); consider dropping it.
+- (from T3.4) Half-time feels are read at half tempo (fixture 140 → 70); better octave cues (separate kick/snare bands) once silver/golden data exist.
+- (from T3.4) Re-check tempo prior centre (110 BPM) and prior weights on the silver set (T3.6).
+- (from T3.4) Triplet-feel alternatives (×⅔ / ×3⁄2) are not scored in octave correction.
+- (from T3.4) `sonar-cli/src/cli.rs` is 508 lines; split argument definitions.
+- (from T3.4 review) User kind override `one_shot` on a detected loop still shows the analysis BPM in the index; skip it unless BPM is overridden.
+- (from T3.4 review) Tempo allocates per-file scratch buffers; reuse them like `Analyzer` if profiling shows pressure.

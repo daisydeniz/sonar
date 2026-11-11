@@ -216,6 +216,8 @@ fn from_row(row: &Row<'_>) -> rusqlite::Result<IndexDoc> {
             .parse::<f64>()
             .ok()
             .filter(|&b| bpm_centi(b).is_some()),
+        // One-shots never get a tempo, not even from their name (ADR-021).
+        None if doc.kind.as_deref() == Some("one_shot") => None,
         None => prior.and_then(|p| p.bpm).map(|b| f64::from(b.bpm)),
     };
     doc.key = match key {

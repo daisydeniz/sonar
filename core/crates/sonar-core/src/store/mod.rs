@@ -7,6 +7,7 @@
 //! [`LATEST_VERSION`]; a database from a newer build is refused before
 //! anything is written to it.
 
+pub mod analysis;
 pub mod audio_meta;
 mod files;
 mod libraries;

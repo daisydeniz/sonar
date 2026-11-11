@@ -18,6 +18,7 @@ pub mod quiet_panic;
 pub mod scan;
 pub mod search;
 pub mod store;
+pub mod tempo;
 pub mod text;
 pub mod watch;
 

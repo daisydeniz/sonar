@@ -4,6 +4,7 @@ mod analyze_cmd;
 mod aspects_cmd;
 mod bench_cmd;
 mod bench_print;
+mod bpm_cmd;
 mod classify_cmd;
 mod cli;
 mod decode_cmd;
@@ -60,6 +61,11 @@ fn main() -> Result<()> {
             json,
             no_names,
         } => classify_cmd::run(&files, json, !no_names)?,
+        Command::Bpm {
+            files,
+            json,
+            no_names,
+        } => bpm_cmd::run(&files, json, !no_names)?,
         Command::Analyze {
             stages,
             threads,
