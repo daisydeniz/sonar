@@ -9,6 +9,7 @@ pub mod classify;
 pub mod decode;
 pub mod dsp;
 pub mod error;
+pub mod eval;
 pub mod fixtures;
 pub mod index;
 pub mod jobs;

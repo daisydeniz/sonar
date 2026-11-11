@@ -174,6 +174,11 @@ pub enum Command {
     /// are reported and skipped; exits non-zero if any failed.
     Key(crate::key_cmd::KeyArgs),
 
+    /// Measure loop/one-shot, BPM, key and note accuracy against fixtures,
+    /// a silver set (labels in file names) and/or the golden set, write a
+    /// report to eval/reports and optionally check it against BASELINE.md.
+    Eval(crate::eval_cmd::EvalArgs),
+
     /// Run the analysis pipeline over every library in the store: `meta`
     /// (format, duration) for all files first, then `dsp` (analysis decode,
     /// peak, loudness). Resumable: only pending files are processed, so it can

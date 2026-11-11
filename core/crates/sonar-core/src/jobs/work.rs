@@ -64,25 +64,36 @@ pub(crate) fn process(
             std::thread::sleep(opts.delay);
         }
         let cancel = shared.cancel_flag();
-        DECODER.with(|d| {
-            ANALYZER.with(|a| {
-                NOTE.with(|n| {
-                    let mut workers = Workers {
-                        decoder: &mut d.borrow_mut(),
-                        analyzer: &mut a.borrow_mut(),
-                        note: &mut n.borrow_mut(),
-                    };
-                    run_stage(&mut workers, stage, &claim.path, cancel)
-                })
-            })
-        })
+        with_workers(|w| run_stage(w, stage, &claim.path, cancel))
     });
     run.unwrap_or_else(|msg| {
-        // The thread's decoder/analyzer may be mid-state: start over.
-        DECODER.with(|d| *d.borrow_mut() = Decoder::new());
-        ANALYZER.with(|a| *a.borrow_mut() = None);
-        NOTE.with(|n| *n.borrow_mut() = None);
+        reset_workers();
         FileResult::Failed(format!("internal error: {msg}"))
+    })
+}
+
+/// Drops this thread's decoder/analyzer/note state after a caught panic
+/// (it may be mid-update), so the next file starts clean.
+pub(crate) fn reset_workers() {
+    DECODER.with(|d| *d.borrow_mut() = Decoder::new());
+    ANALYZER.with(|a| *a.borrow_mut() = None);
+    NOTE.with(|n| *n.borrow_mut() = None);
+}
+
+/// Runs `f` with this thread's reusable decoder, analyzer and note tracker
+/// (also used by `sonar eval`, which must measure the same code path).
+pub(crate) fn with_workers<R>(f: impl FnOnce(&mut Workers<'_>) -> R) -> R {
+    DECODER.with(|d| {
+        ANALYZER.with(|a| {
+            NOTE.with(|n| {
+                let mut workers = Workers {
+                    decoder: &mut d.borrow_mut(),
+                    analyzer: &mut a.borrow_mut(),
+                    note: &mut n.borrow_mut(),
+                };
+                f(&mut workers)
+            })
+        })
     })
 }
 
@@ -151,6 +162,28 @@ fn run_stage(
 /// only) tempo, key and (one-shots only) note, with the file and folder
 /// names as lower-weight priors (ADR-020, ADR-021, ADR-022).
 fn dsp_analysis(w: &mut Workers<'_>, decoded: &Decoded, path: &Path) -> crate::Result<DspAnalysis> {
+    let a = analyze_window(w, decoded, kind_hint(path), filename_prior(path))?;
+    Ok(DspAnalysis {
+        kind_tempo: KindTempo::new(&a.kind, a.tempo.as_ref()),
+        key_pitch: KeyPitch::new(&a.key_note),
+    })
+}
+
+/// Everything the `dsp` stage derives from a decoded window.
+pub(crate) struct WindowAnalysis {
+    pub kind: crate::classify::KindResult,
+    pub tempo: Option<crate::tempo::Tempo>,
+    pub key_note: crate::key::KeyNote,
+}
+
+/// Loop/one-shot, tempo, key and note of `decoded` with the given name
+/// hint and priors (`None`/default = names hidden, as `sonar eval` runs it).
+pub(crate) fn analyze_window(
+    w: &mut Workers<'_>,
+    decoded: &Decoded,
+    hint: Option<crate::classify::Kind>,
+    prior: crate::text::FilenamePrior,
+) -> crate::Result<WindowAnalysis> {
     let sr = decoded.sample_rate;
     let slot = &mut *w.analyzer;
     let analyzer = match slot {
@@ -164,13 +197,13 @@ fn dsp_analysis(w: &mut Workers<'_>, decoded: &Decoded, path: &Path) -> crate::R
     };
     let features = analyzer.analyze(&decoded.samples)?;
     let duration = decoded.source.duration_s;
-    let prior = filename_prior(path);
-    let kind = classify_kind(&features, duration, kind_hint(path));
+    let kind = classify_kind(&features, duration, hint);
     let tempo = loop_tempo(&kind, &features, duration, prior.bpm);
     let key_note = key_and_note(&kind, &features, &decoded.samples, tracker, prior.key)?;
-    Ok(DspAnalysis {
-        kind_tempo: KindTempo::new(&kind, tempo.as_ref()),
-        key_pitch: KeyPitch::new(&key_note),
+    Ok(WindowAnalysis {
+        kind,
+        tempo,
+        key_note,
     })
 }
 

@@ -141,3 +141,4 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T3.5 review) Mode-less stored keys (one-shot notes, e.g. `A`) are treated as major by the key filter, so `key:Am` misses an `A` 808; match both modes.
 - (from T3.5) Loops never get a note (e.g. bass-loop root); tonal material without a clear onset only gets a chroma key.
 - (from T3.5 review) `key::chroma` allocates per-file totals; reuse scratch if profiling shows pressure.
+- (from T3.6 review) No CLI test for `sonar eval --check` exiting non-zero on a regression (core logic is tested); add one with a temp baseline.

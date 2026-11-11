@@ -43,12 +43,25 @@ fn no_arguments_prints_usage_and_fails() {
 
 #[test]
 fn unknown_subcommand_fails() {
-    // `eval` in particular must stay unknown until the eval gate lands
-    // (scripts/check.sh keys off `sonar eval --help`).
-    for args in [&["frobnicate"][..], &["eval", "--help"][..]] {
-        let out = sonar(args);
-        assert!(!out.status.success(), "{args:?} should fail");
-    }
+    let out = sonar(&["frobnicate"]);
+    assert!(!out.status.success());
+}
+
+/// `scripts/check.sh` keys off `sonar eval --help`; `eval` without a tier
+/// or a golden dir fails with a message instead of passing silently.
+#[test]
+fn eval_help_works_and_misuse_fails_clearly() {
+    assert!(sonar(&["eval", "--help"]).status.success());
+    let none = sonar(&["eval"]);
+    assert!(!none.status.success());
+    assert!(String::from_utf8_lossy(&none.stderr).contains("--fixtures"));
+    let out = Command::new(env!("CARGO_BIN_EXE_sonar"))
+        .args(["eval", "--golden"])
+        .env_remove("SONAR_GOLDEN_DIR")
+        .output()
+        .expect("failed to spawn sonar binary");
+    assert!(!out.status.success());
+    assert!(String::from_utf8_lossy(&out.stderr).contains("SONAR_GOLDEN_DIR"));
 }
 
 #[test]

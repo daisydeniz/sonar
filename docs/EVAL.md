@@ -134,7 +134,11 @@ worst 0.046 LU.
 ```
 sonar eval --fixtures            # always; part of check.sh
 sonar eval --silver <dir>        # real files with labeled names
-sonar eval --golden              # uses $SONAR_GOLDEN_DIR
+sonar eval --golden              # uses $SONAR_GOLDEN_DIR (or --golden-dir <dir>)
+sonar eval --fixtures --check    # non-zero exit on regression vs BASELINE.md
+sonar eval --fixtures --write-baseline   # accept current numbers into BASELINE.md
+sonar eval --init-golden <dir>   # write labels.csv template (never overwrites)
+# --baseline <file> / --out <dir> override BASELINE.md / eval/reports
 ```
 Reports: `eval/reports/<date>-<gitsha>.{json,md}` (gitignored except
 `eval/reports/BASELINE.md`, which records the current accepted numbers).

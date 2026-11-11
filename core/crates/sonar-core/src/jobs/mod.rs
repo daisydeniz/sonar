@@ -32,7 +32,7 @@ mod progress;
 pub(crate) mod queue;
 mod runner;
 mod stage;
-mod work;
+pub(crate) mod work;
 
 #[cfg(test)]
 mod tests;
