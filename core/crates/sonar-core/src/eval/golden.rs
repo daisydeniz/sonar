@@ -8,7 +8,7 @@
 //! `note` is scientific pitch (`A4` = 69, `C4` = 60). A cell that does not
 //! parse is ignored and reported as a warning.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
 use crate::classify::Kind;
@@ -18,9 +18,12 @@ use crate::{Error, Result};
 
 use super::csv;
 use super::dataset::{audio_files, Dataset, Item, Labels, Tier};
+use super::similarity::parse_similar_jsonl;
 
 /// Label file name inside the golden directory.
 pub const LABELS_FILE: &str = "labels.csv";
+/// Similarity judgments next to it (optional, see [`super::similarity`]).
+pub const SIMILAR_FILE: &str = "similar.jsonl";
 /// Header of the label file.
 pub const LABELS_HEADER: [&str; 7] = ["path", "category", "kind", "bpm", "key", "note", "notes"];
 /// Default number of files in a template.
@@ -118,6 +121,8 @@ pub fn golden_dataset(dir: &Path) -> Result<Dataset> {
         unlabeled: 0,
         missing: Vec::new(),
         warnings: Vec::new(),
+        similar_queries: Vec::new(),
+        similar_extra: Vec::new(),
     };
     for (i, row) in rows.iter().enumerate().skip(1) {
         let cell = |c: Option<usize>| {
@@ -173,7 +178,44 @@ pub fn golden_dataset(dir: &Path) -> Result<Dataset> {
             ds.missing.push(rel.to_string());
         }
     }
+    load_similar(&mut ds, dir);
     Ok(ds)
+}
+
+/// Reads `dir/similar.jsonl` if present: its queries, and the files it
+/// names that `labels.csv` does not (they join the similarity pool).
+/// Unreadable or malformed lines become warnings.
+fn load_similar(ds: &mut Dataset, dir: &Path) {
+    let path = dir.join(SIMILAR_FILE);
+    let text = match std::fs::read_to_string(&path) {
+        Ok(t) => t,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return,
+        Err(e) => {
+            ds.warnings.push(format!("{}: {e}", path.display()));
+            return;
+        }
+    };
+    let (queries, warnings) = parse_similar_jsonl(&text, dir);
+    ds.warnings.extend(warnings);
+    let mut known: HashSet<PathBuf> = ds.items.iter().map(|i| i.path.clone()).collect();
+    for p in queries
+        .iter()
+        .flat_map(|q| std::iter::once(&q.query).chain(q.relevant.iter()))
+    {
+        if p.is_file() && known.insert(p.clone()) {
+            let id = p
+                .strip_prefix(dir)
+                .unwrap_or(p)
+                .to_string_lossy()
+                .into_owned();
+            ds.similar_extra.push(Item {
+                id,
+                path: p.clone(),
+                labels: Labels::default(),
+            });
+        }
+    }
+    ds.similar_queries = queries;
 }
 
 /// FNV-1a, for a stable pseudo-random order that does not depend on

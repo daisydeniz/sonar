@@ -18,7 +18,6 @@ pub const REPORT_SCHEMA_VERSION: u32 = 1;
 /// Metric families the docs define that have no implementation yet.
 pub const NOT_AVAILABLE: &[&str] = &[
     "category (top-1, macro-F1, confusion): needs the category classifier (T5.3)",
-    "similarity (P@10, MRR): needs similarity search (M4)",
     "text / NL search (NDCG@10, recall@50): needs NL search (T5.4)",
 ];
 
@@ -172,10 +171,32 @@ fn tier_markdown(s: &mut String, t: &TierReport, baseline: Option<&Baseline>) {
     if let Some(n) = &m.note {
         parts.push(format!("note {}", n.total));
     }
+    if let Some(x) = &m.similar {
+        let pitch = x.pitch.as_ref().map_or(String::new(), |p| {
+            format!(", pitch-only {} seeds", p.queries)
+        });
+        let skipped = if x.skipped > 0 {
+            format!(", {} golden entries not in the pool", x.skipped)
+        } else {
+            String::new()
+        };
+        parts.push(format!(
+            "similarity {} seeds over {} files{skipped}{pitch}",
+            x.queries, x.pool
+        ));
+    }
     if parts.is_empty() {
         parts.push("none".into());
     }
     let _ = writeln!(s, " {}.", parts.join("; "));
+    if let Some(x) = m.similar.as_ref().filter(|x| !x.sweep.is_empty()) {
+        s.push_str(
+            "\nSimilarity sweep (report only):\n\n| Configuration | P@10 (%) | MRR (%) |\n|---|---:|---:|\n",
+        );
+        for r in &x.sweep {
+            let _ = writeln!(s, "| {} | {:.2} | {:.2} |", r.name, r.p10_pct, r.mrr_pct);
+        }
+    }
     if !t.notes.is_empty() {
         s.push_str("\nNotes:\n\n");
         for n in &t.notes {

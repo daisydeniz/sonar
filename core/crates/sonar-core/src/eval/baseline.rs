@@ -85,6 +85,24 @@ pub const METRICS: &[MetricInfo] = &[
         tracked: true,
     },
     MetricInfo {
+        key: "similar.p10_pct",
+        label: "Similarity P@10, k = min(10, relevant) (%)",
+        target: ">= 70",
+        tracked: true,
+    },
+    MetricInfo {
+        key: "similar.mrr_pct",
+        label: "Similarity MRR (%)",
+        target: "report only",
+        tracked: true,
+    },
+    MetricInfo {
+        key: "similar.pitch_p10_pct",
+        label: "Similarity, pitch-only, same pitch class P@10 (%)",
+        target: "report only",
+        tracked: false,
+    },
+    MetricInfo {
         key: "decode.unexpected_errors",
         label: "Unexpected decode errors (count)",
         target: "0",
@@ -123,6 +141,13 @@ pub fn values(t: &TierReport) -> BTreeMap<String, f64> {
     if let Some(n) = &m.note {
         put("note.pitch_class_pct", n.pitch_class_pct);
         put("note.midi_pct", n.midi_pct);
+    }
+    if let Some(s) = &m.similar {
+        put("similar.p10_pct", s.p10_pct);
+        put("similar.mrr_pct", s.mrr_pct);
+        if let Some(p) = &s.pitch {
+            put("similar.pitch_p10_pct", p.p10_pct);
+        }
     }
     put("decode.unexpected_errors", t.unexpected_errors as f64);
     v

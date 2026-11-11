@@ -125,10 +125,43 @@ worst 0.046 LU.
 | Key | exact + MIREX weighted score | ≥ 80 % weighted |
 | Note (tonal one-shots) | exact pitch class / exact MIDI | ≥ 90 % |
 | Category | top-1 accuracy, macro-F1, confusion matrix | ≥ 90 % top-1 |
-| Similarity | P@10, MRR | P@10 ≥ 0.7 |
+| Similarity | P@10, MRR (definition below; percent) | P@10 ≥ 70 % |
 | Text / NL search | NDCG@10, recall@50 | track, no regressions |
 | Latency | search p50/p95 at 500k docs | p95 < 50 ms |
 | Throughput | scan files/s, analysis files/s | ≥ 2,000 / ≥ 100 |
+
+### Similarity (P@10, MRR)
+`sonar eval` ranks the evaluated files exactly as `sonar similar` does with
+default weights (ADR-024: library z-score over the evaluated pool, per-aspect
+RMS distance, equal weights; seed excluded; ties by position) from the raw
+aspect vectors, in memory.
+
+- **Relevance, fixtures:** same *family* from manifest truth (category +
+  kind, hats merged): sine, sine burst, pluck, chords, kick, snare, hat,
+  drum loop, click, noise. Pool = fixtures with a family; `formats/` (20
+  identical sines), `containers/`, corrupt, silent and categoryless files are
+  left out. Seeds without another family member do not count.
+- **Relevance, golden:** the lists of `$SONAR_GOLDEN_DIR/similar.jsonl`
+  (paths relative to the golden dir, or absolute). Pool = every file of
+  `labels.csv` (distractors) plus the files only named in `similar.jsonl`.
+  Entries naming a file that is missing or failed to decode are dropped and
+  counted in the report ("not in the pool"); a seed left without a relevant
+  file does not count.
+- **Silver:** names carry no category, so no similarity metric.
+- **P@10:** per seed `k = min(10, |relevant|)` and precision over the top `k`
+  (R-precision capped at 10; plain P@10 cannot exceed `|relevant|/10` for
+  groups under 10). Mean over seeds, in percent. **MRR:** mean of `1/rank`
+  of the first relevant file in the full ranking, in percent.
+- **Pitch-only variant** (report only): pitch aspect alone among files with a
+  labeled note, relevant = same pitch class.
+- Tracked keys: `similar.p10_pct`, `similar.mrr_pct` (a drop > 1 point is a
+  regression); `similar.pitch_p10_pct` is report only.
+- `sonar eval --fixtures --similar-sweep` adds a report-only table of aspect
+  weights and L1/L2 per-aspect distance (never baselined; cannot combine
+  with `--check` / `--write-baseline`). Use it, on golden when available,
+  before changing the default weights (ADR-024).
+- Fixture numbers measure the aspect features on synthetic sounds; the
+  target (P@10 ≥ 70 %) is only meaningful on golden.
 
 ## Running
 ```

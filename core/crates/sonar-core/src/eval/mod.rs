@@ -5,10 +5,12 @@
 //! - [`run`]: analysis with names hidden, the same function the `dsp` job
 //!   stage stores kind / BPM / key / note with;
 //! - [`metrics`]: loop/one-shot, BPM (+ octave errors), key (MIREX), note;
+//! - [`similarity`]: P@10 / MRR of the aspect-weighted `similar` ranking
+//!   (fixture families, golden `similar.jsonl`);
 //! - [`report`]: JSON + markdown with deltas;
 //! - [`baseline`]: `eval/reports/BASELINE.md` and the regression rule.
 //!
-//! Category, similarity and text-search metrics are listed as "not
+//! Category and text-search metrics are listed as "not
 //! available yet" ([`report::NOT_AVAILABLE`]); they become more keys in
 //! [`baseline::METRICS`] when their features exist.
 
@@ -19,6 +21,7 @@ pub mod golden;
 pub mod metrics;
 pub mod report;
 pub mod run;
+pub mod similarity;
 
 use std::path::Path;
 
@@ -29,7 +32,7 @@ pub use baseline::{compare, Baseline, Comparison, Regression};
 pub use dataset::{silver_dataset, Dataset, Tier};
 pub use golden::{golden_dataset, init_template};
 pub use report::EvalReport;
-pub use run::{evaluate, TierReport};
+pub use run::{evaluate, evaluate_with, EvalOptions, TierReport};
 
 /// Generates the fixture set (default seed; `include_long` adds the 310 s
 /// file, which only costs generation time) into `dir` and returns its

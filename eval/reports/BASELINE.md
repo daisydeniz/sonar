@@ -4,7 +4,7 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
 
 ## fixtures
 
-120 files, generated (sonar fixtures, default seed), revision 8587d00 (2026-11-11)
+120 files, generated (sonar fixtures, default seed), revision 68d3011 (2026-11-11)
 
 | Metric | Value | Target |
 |---|---:|---|
@@ -15,6 +15,8 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
 | Key MIREX weighted (%) | 100.00 | >= 80 |
 | Note exact pitch class (%) | 100.00 | >= 90 |
 | Note exact MIDI (%) | 100.00 | >= 90 |
+| Similarity P@10, k = min(10, relevant) (%) | 81.51 | >= 70 |
+| Similarity MRR (%) | 99.33 | report only |
 | Unexpected decode errors (count) | 0 | 0 |
 
 ```json
@@ -23,7 +25,7 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
   "tiers": {
     "fixtures": {
       "date": "2026-11-11",
-      "git_sha": "8587d00",
+      "git_sha": "68d3011",
       "files": 120,
       "source": "generated (sonar fixtures, default seed)",
       "metrics": {
@@ -34,7 +36,9 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
         "key.mirex_pct": 100.0,
         "kind.accuracy_pct": 100.0,
         "note.midi_pct": 100.0,
-        "note.pitch_class_pct": 100.0
+        "note.pitch_class_pct": 100.0,
+        "similar.mrr_pct": 99.33333333333333,
+        "similar.p10_pct": 81.5111111111111
       }
     }
   }

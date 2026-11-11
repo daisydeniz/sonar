@@ -37,6 +37,10 @@ pub struct EvalArgs {
     /// overwrites an existing `labels.csv`.
     #[arg(long, value_name = "DIR", conflicts_with_all = ["fixtures", "silver", "golden", "check", "write_baseline"])]
     pub init_golden: Option<PathBuf>,
+    /// Also score a fixed grid of aspect weights and L1/L2 distances for
+    /// similarity (report only, never recorded in the baseline).
+    #[arg(long, conflicts_with_all = ["check", "write_baseline"])]
+    pub similar_sweep: bool,
     /// Exit non-zero when a tracked metric regressed against the baseline
     /// (a percentage dropped by more than 1 point, or a must-be-zero count
     /// rose). Only tiers present in the baseline are compared.
@@ -75,6 +79,9 @@ pub fn run(args: &EvalArgs) -> Result<()> {
         .clone()
         .unwrap_or_else(|| root.join("eval/reports/BASELINE.md"));
 
+    let opts = eval::EvalOptions {
+        similar_sweep: args.similar_sweep,
+    };
     let mut tiers = Vec::new();
     // Keeps the generated fixtures alive until the end of the run.
     let mut _fixture_dir = None;
@@ -83,7 +90,7 @@ pub fn run(args: &EvalArgs) -> Result<()> {
         eprintln!("generating fixtures...");
         let ds = eval::fixtures_dataset(tmp.path(), !args.skip_long)
             .context("generating the fixtures")?;
-        tiers.push(analyse(&ds));
+        tiers.push(analyse(&ds, opts));
         _fixture_dir = Some(tmp);
     }
     if let Some(dir) = &args.silver {
@@ -96,7 +103,7 @@ pub fn run(args: &EvalArgs) -> Result<()> {
                 ds.unlabeled
             );
         }
-        tiers.push(analyse(&ds));
+        tiers.push(analyse(&ds, opts));
     }
     if args.golden {
         let dir = golden_dir(args.golden_dir.as_deref())?;
@@ -110,7 +117,7 @@ pub fn run(args: &EvalArgs) -> Result<()> {
                 ds.missing.len()
             );
         }
-        tiers.push(analyse(&ds));
+        tiers.push(analyse(&ds, opts));
     }
 
     let report = EvalReport::new(&git_sha(&root), tiers);
@@ -146,13 +153,13 @@ pub fn run(args: &EvalArgs) -> Result<()> {
 }
 
 /// Evaluates one dataset with a progress line on stderr.
-fn analyse(ds: &Dataset) -> eval::TierReport {
+fn analyse(ds: &Dataset, opts: eval::EvalOptions) -> eval::TierReport {
     eprintln!(
         "evaluating {}: {} files...",
         ds.tier.as_str(),
-        ds.items.len()
+        ds.items.len() + ds.similar_extra.len()
     );
-    eval::evaluate(ds)
+    eval::evaluate_with(ds, opts)
 }
 
 /// `--check`: fail on regressions, or when there is nothing to compare to.

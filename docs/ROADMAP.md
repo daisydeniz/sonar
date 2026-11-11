@@ -155,3 +155,5 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T4.3) `filtered_file_ids` is now the largest similar() cost (~7 ms of ~14 ms at 500k, grows with matches); cache the unfiltered id set / bitset if needed.
 - (from T4.3) Similar latency measured on M4 Pro only (4-thread p95 25.7 ms as proxy); re-run `sonar bench similar` on a base M1/M2.
 - (from T4.3) `bench/search_corpus.rs` is 403 lines (just over the ~400 guideline); split when next touched.
+- (from T4.4 review) Parity test: eval similarity ranking (`eval::similarity::ranking`, default config) == `similar::rank` on the fixture library, so the re-implemented formula cannot drift.
+- (from T4.4) Fixture sweep favoured L1 (P@10 87.29 vs 81.51), no-pitch 85.42, amp ×2 86.53; defaults kept (synthetic-fixture overfit risk). Re-run `sonar eval --golden --similar-sweep` once labels + `similar.jsonl` exist and decide then.

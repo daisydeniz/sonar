@@ -23,6 +23,8 @@ use crate::scan::is_audio_name;
 use crate::text::{filename_prior, Key, Mode};
 use crate::{Error, Result};
 
+use super::similarity::{fixture_family, SimilarQuery};
+
 /// A dataset tier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -62,6 +64,9 @@ pub struct Labels {
     pub category: Option<String>,
     /// Decoding is expected to fail (corrupt fixture).
     pub expect_error: bool,
+    /// Fixture sound family: relevance class of the similarity metric
+    /// ([`super::similarity::fixture_family`]); `None` = not in the pool.
+    pub family: Option<String>,
 }
 
 impl Labels {
@@ -101,6 +106,20 @@ pub struct Dataset {
     pub missing: Vec<String>,
     /// Label cells that could not be parsed (ignored), e.g. `row 7: bad key "H"`.
     pub warnings: Vec<String>,
+    /// Golden similarity queries (`similar.jsonl`); empty = relevance comes
+    /// from the items' fixture family.
+    pub similar_queries: Vec<SimilarQuery>,
+    /// Files named only by `similar_queries`: analysed for the similarity
+    /// pool, never scored for the other metrics.
+    pub similar_extra: Vec<Item>,
+}
+
+impl Dataset {
+    /// True if similarity can be measured (fixture families or golden
+    /// queries).
+    pub fn has_similarity(&self) -> bool {
+        !self.similar_queries.is_empty() || self.items.iter().any(|i| i.labels.family.is_some())
+    }
 }
 
 /// Fixture truth → loop/one-shot label (ADR-020).
@@ -133,6 +152,7 @@ pub fn fixtures_dataset(manifest: &Manifest, dir: &Path) -> Dataset {
             note_midi: t.note_midi.filter(|_| tonal),
             category: None,
             expect_error: t.corrupt.is_some(),
+            family: fixture_family(f).map(str::to_string),
         };
         if labels.any_scored() {
             items.push(Item {
@@ -151,6 +171,8 @@ pub fn fixtures_dataset(manifest: &Manifest, dir: &Path) -> Dataset {
         unlabeled,
         missing: Vec::new(),
         warnings: Vec::new(),
+        similar_queries: Vec::new(),
+        similar_extra: Vec::new(),
     }
 }
 
@@ -197,6 +219,8 @@ pub fn silver_dataset(root: &Path) -> Result<Dataset> {
         unlabeled,
         missing: Vec::new(),
         warnings: Vec::new(),
+        similar_queries: Vec::new(),
+        similar_extra: Vec::new(),
     })
 }
 

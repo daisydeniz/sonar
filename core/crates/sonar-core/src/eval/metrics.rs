@@ -15,6 +15,7 @@ use crate::classify::Kind;
 use crate::text::{Key, Mode};
 
 use super::dataset::Labels;
+use super::similarity::SimilarMetrics;
 
 /// BPM tolerance (BPM) of "correct".
 pub const BPM_TOL: f64 = 1.0;
@@ -177,6 +178,10 @@ pub struct Metrics {
     pub key: Option<KeyMetrics>,
     /// Note.
     pub note: Option<NoteMetrics>,
+    /// Similarity (P@10, MRR), see [`super::similarity`]; set by the runner,
+    /// not by the [`Accumulator`].
+    #[serde(default)]
+    pub similar: Option<SimilarMetrics>,
 }
 
 /// Scores observations one by one.
