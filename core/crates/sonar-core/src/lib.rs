@@ -19,6 +19,7 @@ pub mod paths;
 pub mod quiet_panic;
 pub mod scan;
 pub mod search;
+pub mod similar;
 pub mod store;
 pub mod tempo;
 pub mod text;

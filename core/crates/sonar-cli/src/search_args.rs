@@ -1,6 +1,7 @@
 //! `sonar search` filter, sort and facet flags (ADR-018), flattened into
 //! the `search` subcommand. Like every search option they go before the
-//! query words.
+//! query words. The filter flags alone ([`FilterFlags`]) are shared with
+//! `sonar similar`.
 
 use anyhow::{bail, Context, Result};
 use clap::Args;
@@ -12,6 +13,23 @@ use sonar_core::Store;
 /// Filters, sort and facets for `sonar search`.
 #[derive(Debug, Clone, Default, Args)]
 pub struct FilterArgs {
+    /// Which files to keep.
+    #[command(flatten)]
+    pub flags: FilterFlags,
+    /// Order: relevance (default; by name without query text), name, bpm,
+    /// key, duration, category, kind, library; `:desc` reverses
+    /// (`bpm:desc`). Unknown values always come last.
+    #[arg(long, value_name = "FIELD[:desc]")]
+    pub sort: Option<Sort>,
+    /// Also print facet counts (category, kind, key, library, tag,
+    /// favourites).
+    #[arg(long)]
+    pub facets: bool,
+}
+
+/// Filter flags of `sonar search` and `sonar similar` (ADR-018).
+#[derive(Debug, Clone, Default, Args)]
+pub struct FilterFlags {
     /// Only these categories (any of; comma-separated or repeated).
     #[arg(long, value_name = "NAME", value_delimiter = ',')]
     pub category: Vec<String>,
@@ -45,18 +63,9 @@ pub struct FilterArgs {
     /// Also show files the user hid.
     #[arg(long)]
     pub include_hidden: bool,
-    /// Order: relevance (default; by name without query text), name, bpm,
-    /// key, duration, category, kind, library; `:desc` reverses
-    /// (`bpm:desc`). Unknown values always come last.
-    #[arg(long, value_name = "FIELD[:desc]")]
-    pub sort: Option<Sort>,
-    /// Also print facet counts (category, kind, key, library, tag,
-    /// favourites).
-    #[arg(long)]
-    pub facets: bool,
 }
 
-impl FilterArgs {
+impl FilterFlags {
     /// The core filters; library paths are resolved in `store`.
     pub fn filters(&self, store: &Store) -> Result<Filters> {
         let mut libraries = Vec::new();
@@ -183,10 +192,10 @@ mod tests {
                 ..
             }) => {
                 assert_eq!(query, ["dark", "--json"]);
-                assert_eq!(f.category, ["kick", "snare"]);
-                assert_eq!(f.bpm.and_then(|r| r.max), Some(128.0));
-                assert_eq!(f.tag, ["dark", "punchy"]);
-                assert!(f.compatible && f.facets);
+                assert_eq!(f.flags.category, ["kick", "snare"]);
+                assert_eq!(f.flags.bpm.and_then(|r| r.max), Some(128.0));
+                assert_eq!(f.flags.tag, ["dark", "punchy"]);
+                assert!(f.flags.compatible && f.facets);
                 assert_eq!(f.sort, Some(Sort::desc(SortField::Bpm)));
             }
             other => panic!("{other:?}"),

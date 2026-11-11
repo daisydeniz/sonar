@@ -295,6 +295,11 @@ pub enum Command {
         filters: FilterArgs,
     },
 
+    /// Files that sound like a library file (by id) or any audio file
+    /// (`--file`), nearest first, with per-aspect weights and the filters
+    /// of `sonar search`. Needs `sonar analyze` (aspect vectors).
+    Similar(crate::similar_cmd::SimilarArgs),
+
     /// Performance benchmarks in a temporary folder with its own store
     /// (never yours). Use a release build for meaningful numbers.
     Bench {

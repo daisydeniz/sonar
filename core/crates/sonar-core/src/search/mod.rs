@@ -19,6 +19,7 @@
 //! text + filters browses every matching file (by name). [`Facets`] count
 //! values over the matching set with multi-select semantics.
 
+mod allowed;
 mod build;
 mod collect;
 mod facets;
@@ -40,6 +41,7 @@ mod tests;
 use serde::Serialize;
 use tantivy::query::{BooleanQuery, Occur, Query};
 
+pub use allowed::filtered_file_ids;
 pub use facets::{FacetCount, Facets, LibraryCount};
 pub use filters::{normalize_kind, Filters, ValueRange};
 pub use sort::{ParseSortError, Sort, SortField};

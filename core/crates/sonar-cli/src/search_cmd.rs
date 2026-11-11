@@ -73,16 +73,7 @@ pub fn index(json: bool) -> Result<()> {
 /// from another version) and print rank, score, file id and path.
 pub fn run(args: &Args<'_>) -> Result<()> {
     let store = Store::open_default().context("opening the Sonar store")?;
-    let (ix, state) = TextIndex::open_default().context("opening the search index")?;
-    if let OpenState::NeedsRebuild(reason) = state {
-        eprintln!("building the search index ({reason})...");
-        let r = ix.rebuild(&store).context("building the search index")?;
-        eprintln!(
-            "indexed {} files in {:.2} s",
-            r.docs,
-            r.elapsed.as_secs_f64()
-        );
-    }
+    let ix = open_index(&store)?;
     let synonyms = match args.synonyms {
         Some(path) => {
             Synonyms::load(path).with_context(|| format!("reading synonyms {}", path.display()))?
@@ -93,7 +84,7 @@ pub fn run(args: &Args<'_>) -> Result<()> {
     let opts = SearchOptions {
         limit: args.limit,
         prefix: !args.no_prefix,
-        filters: args.filters.filters(&store)?,
+        filters: args.filters.flags.filters(&store)?,
         sort: args.filters.sort.unwrap_or_default(),
         facets: args.filters.facets,
     };
@@ -130,6 +121,22 @@ pub fn run(args: &Args<'_>) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// Opens the default text index, building it from `store` first if it is
+/// missing or from another version (says so on stderr).
+pub fn open_index(store: &Store) -> Result<TextIndex> {
+    let (ix, state) = TextIndex::open_default().context("opening the search index")?;
+    if let OpenState::NeedsRebuild(reason) = state {
+        eprintln!("building the search index ({reason})...");
+        let r = ix.rebuild(store).context("building the search index")?;
+        eprintln!(
+            "indexed {} files in {:.2} s",
+            r.docs,
+            r.elapsed.as_secs_f64()
+        );
+    }
+    Ok(ix)
 }
 
 /// Facet counts, one line per dimension (`category: kick 12, snare 9`).

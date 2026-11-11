@@ -204,11 +204,7 @@ pub(crate) fn analyze_window(
     with_aspects: bool,
 ) -> crate::Result<WindowAnalysis> {
     let sr = decoded.sample_rate;
-    let slot = &mut *w.analyzer;
-    let analyzer = match slot {
-        Some(a) if a.sample_rate() == sr => a,
-        _ => slot.insert(Analyzer::new(sr)?),
-    };
+    let analyzer = analyzer_for(w.analyzer, sr)?;
     let slot = &mut *w.note;
     let tracker = match slot {
         Some(t) if t.sample_rate() == sr => t,
@@ -220,11 +216,7 @@ pub(crate) fn analyze_window(
     let tempo = loop_tempo(&kind, &features, duration, prior.bpm);
     let key_note = key_and_note(&kind, &features, &decoded.samples, tracker, prior.key)?;
     let aspects = if with_aspects {
-        let slot = &mut *w.aspects;
-        let extractor = match slot {
-            Some(x) if x.sample_rate() == sr => x,
-            _ => slot.insert(AspectExtractor::new(sr)?),
-        };
+        let extractor = extractor_for(w.aspects, sr)?;
         Some(extractor.extract(&decoded.samples, &features)?)
     } else {
         None
@@ -235,6 +227,37 @@ pub(crate) fn analyze_window(
         key_note,
         aspects,
     })
+}
+
+/// Raw aspect vectors of `decoded` alone, computed exactly as the `dsp`
+/// stage computes them (same analyzer, same extractor, same window), for
+/// similarity seeds outside the library (ADR-024).
+pub(crate) fn window_aspects(
+    w: &mut Workers<'_>,
+    decoded: &Decoded,
+) -> crate::Result<AspectVectors> {
+    let sr = decoded.sample_rate;
+    let features = analyzer_for(w.analyzer, sr)?.analyze(&decoded.samples)?;
+    extractor_for(w.aspects, sr)?.extract(&decoded.samples, &features)
+}
+
+/// The slot's analyzer, (re)built for `sr` if needed.
+fn analyzer_for(slot: &mut Option<Analyzer>, sr: u32) -> crate::Result<&mut Analyzer> {
+    match slot.take() {
+        Some(a) if a.sample_rate() == sr => Ok(slot.insert(a)),
+        _ => Ok(slot.insert(Analyzer::new(sr)?)),
+    }
+}
+
+/// The slot's aspect extractor, (re)built for `sr` if needed.
+fn extractor_for(
+    slot: &mut Option<AspectExtractor>,
+    sr: u32,
+) -> crate::Result<&mut AspectExtractor> {
+    match slot.take() {
+        Some(x) if x.sample_rate() == sr => Ok(slot.insert(x)),
+        _ => Ok(slot.insert(AspectExtractor::new(sr)?)),
+    }
 }
 
 #[cfg(test)]

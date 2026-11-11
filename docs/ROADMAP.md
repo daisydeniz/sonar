@@ -55,7 +55,7 @@ Owner tags map to subagents in `.claude/agents/`.
 
 ## M4 — Similarity search
 - [x] T4.1 (search-ranking) Vector store: mmap matrices per aspect, row-id mapping, incremental append, compaction. AC: tests; 1M×(dims) load < 1 s. Note (T3.2): the `jobs` Dsp stage does not compute aspect vectors yet; wire `AspectExtractor` (raw vectors stored) + `LibraryNorm` (rayon fold/merge, persisted) into the pipeline here. (64d2548)
-- [ ] T4.2 (search-ranking) `similar` query: seed = file id or external file (analyzed on the fly), aspect weights, filters respected. AC: CLI `sonar similar`; fixtures sanity (same synth/pitch family ranks first).
+- [x] T4.2 (search-ranking) `similar` query: seed = file id or external file (analyzed on the fly), aspect weights, filters respected. AC: CLI `sonar similar`; fixtures sanity (same synth/pitch family ranks first).
 - [ ] T4.3 (search-ranking) Performance: SIMD brute force vs USearch ANN + re-rank; pick by benchmark. AC: p95 < 50 ms at 500k; decision recorded as ADR.
 - [ ] T4.4 (eval) Similarity metrics (P@10) in eval; tune aspect features against silver/golden. AC: numbers in STATUS.md.
 
@@ -147,3 +147,8 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T4.1 review) A re-analysis that now fails keeps the file's old vector row live until the next dsp-stage reconcile; tombstone `Failed` ids in `jobs::vectors::append`.
 - (from T4.1 review) After a lost/reset vector store, reconcile re-queues offline files too (they show as unanalysed until their volume returns); restrict to present files.
 - (from T4.1) Two concurrent `sonar analyze` processes: the second fails at the dsp stage on the vector writer lock; add a job-level guard.
+- (from T4.2) Per-aspect L1 scored 2 seeds better than L2 on fixture top-3 (31 vs 29/34); re-decide on silver/golden in T4.4.
+- (from T4.2) Pitch aspect is dominated by its 12 chroma dims (pitch-only same pitch class 19/22, octaves weakly separated); weight f0 vs chroma in T4.4.
+- (from T4.2) External-file seeds are re-analysed on every query; cache by path+mtime if the UI drags the same file repeatedly.
+- (from T4.2 review) `sonar similar` has no Ctrl-C cancel flag for external-seed decode (Engine/FFI will pass one).
+- (from T4.2 review) Similarity fixture-sanity thresholds sit 1 seed below measured; loosen by one seed if parallel norm merge order ever flips a near-tie.

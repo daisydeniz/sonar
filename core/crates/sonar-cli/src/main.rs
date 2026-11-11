@@ -14,6 +14,7 @@ mod key_cmd;
 mod meta_cmd;
 mod search_args;
 mod search_cmd;
+mod similar_cmd;
 mod stats_cmd;
 mod tokenize_cmd;
 mod vectors_cmd;
@@ -107,6 +108,7 @@ fn main() -> Result<()> {
             synonyms: synonyms.as_deref(),
             filters: &filters,
         })?,
+        Command::Similar(args) => similar_cmd::run(&args)?,
         Command::Bench { command } => bench_cmd::run(command)?,
         Command::Watch { json, debounce_ms } => watch_cmd::run(json, debounce_ms)?,
         Command::Store {

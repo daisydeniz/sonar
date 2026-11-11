@@ -151,7 +151,8 @@ Library normalization: `LibraryNorm` holds a `NormStats` (Welford mean/M2,
 mergeable across rayon workers by Chan's formula, serde JSON) per aspect;
 z = (x − mean) / max(std, 1e-3), clamped to ±8. Persisting stats and vectors
 is the vector store's job (T4.1).
-Similarity = Σ wᵢ · dᵢ(q, x) over aspects (cosine/L2 on normalized vectors).
+Similarity = Σ wᵢ · dᵢ(q, x) / Σ wᵢ over aspects, dᵢ = RMS difference of
+the z-scored vectors (L2/√dimᵢ); `sonar_core::similar`, ADR-024.
 
 ## 6. Search
 Query = `{ text?, filters, sort?, similar_to?: {file_id | external_path,

@@ -168,6 +168,22 @@ pub enum Error {
         /// What is wrong.
         reason: String,
     },
+
+    /// A similarity seed file has no aspect vectors: unknown file id, or
+    /// the file was not analyzed (yet), or its analysis failed.
+    #[error("file #{file_id} has no aspect vectors (unknown file or not analyzed yet)")]
+    NoVectors {
+        /// The seed's `files.id`.
+        file_id: i64,
+    },
+
+    /// Query parameters that cannot be used (e.g. similarity weights that
+    /// are negative, not finite or all zero).
+    #[error("invalid query: {reason}")]
+    InvalidQuery {
+        /// What is wrong.
+        reason: String,
+    },
 }
 
 impl From<rusqlite::Error> for Error {

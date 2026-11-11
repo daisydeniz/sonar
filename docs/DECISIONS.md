@@ -636,3 +636,35 @@ Accepted. `sonar_core::index::vectors`; `sonar vectors [--compact] [--json]`.
   `DSP_VERSION` 4 → 5.
 - **Result**: 1M × 135 f32 (548 MB) opens in 17 ms (release, warm cache);
   first full pass 87 ms (`tests/vectors.rs`, ignored).
+
+## ADR-024 — Similarity query: distance, weights, filters (T4.2)
+Accepted. `sonar_core::similar`; `sonar similar <id | --file PATH>
+[--weights a=w,..] [filter flags of sonar search] [--limit N] [--json]`.
+- **Distance**: raw rows z-scored on the fly with the library stats (same
+  floor/clamp as `LibraryNorm`). Per aspect dₐ = RMS z-difference
+  (L2/√dimₐ; ≈ √2 for unrelated files), combined as the weighted mean
+  D = Σ wₐ·dₐ / Σ wₐ (ARCHITECTURE §5). Measured on the fixture library
+  (34 tonal + drum one-shot seeds / 75 seeds incl. chords, loops, noise;
+  same-family top-1, top-3 majority): Σ of squared dₐ (= L2 on Overall)
+  29/34, 23/34 (68/75); **Σ dₐ (chosen) 34/34, 29/34 (74/75, 68/75)**;
+  per-aspect L1 34/34, 31/34 (74/75, 70/75); cosine 32/34, 30/34. L2
+  chosen over L1 (difference = 2 seeds, noise): it is the documented
+  form and the per-aspect metric an ANN index (T4.3) can serve; L1 stays
+  a T4.4 candidate.
+- **Weights**: `AspectWeights` (spectrum, timbre, pitch, amplitude; ≥ 0,
+  finite, Σ > 0, relative). Default all 1 (= `OVERALL_WEIGHTS`). CLI
+  `--weights`: listed aspects only, `overall=w` adds w to all four.
+- **Seeds**: file id → stored row (`Error::NoVectors` if none); external
+  file → decode + aspects through the dsp stage's own path
+  (`jobs::work::window_aspects`, same 30 s window/analyzer/extractor),
+  panic-guarded; an external copy of a library file is found at D ≈ 0.
+- **Filters**: same `Filters` as text search; `search::filtered_file_ids`
+  runs them on the text index (hidden excluded unless asked) and only
+  those ids with a live row are scored, brute force, bounded top-K heap,
+  ties by file id; the seed file is never a hit. Cancel flag checked
+  every 4096 candidates. New errors: `NoVectors`, `InvalidQuery`.
+  Candidates come from the text index, so files analysed after its last
+  build are missing until the Engine keeps it in sync (T5.5).
+- **Pitch-only** finds the same pitch class (note or octave) top-1 for
+  19/22 tonal seeds: chroma (12 of 18 dims) dominates Pitch; octave
+  weighting is a T4.4 question.
