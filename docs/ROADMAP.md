@@ -49,7 +49,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T3.2 (dsp-analysis) Aspect vectors (Spectrum, Timbre, Pitch, Amplitude, Overall) per ARCHITECTURE §5; library-level normalization stats. AC: fixed dims documented; stable across runs. Note (T3.1): `dsp::N_MFCC` = 20 incl. c0 (loudness-dependent); decide whether Timbre drops c0 (Amplitude covers loudness). (75739b4)
 - [x] T3.3 (dsp-analysis) Loop vs one-shot classifier (heuristics: duration, onset periodicity, tail, filename hints). AC: ≥ 95 % on fixtures. (c24ef7c)
 - [x] T3.4 (dsp-analysis) BPM for loops only (onset autocorrelation/tempogram + filename prior, octave correction). AC: ≥ 95 % (±1 BPM) on fixtures; one-shots never get BPM. Note (T3.3): `classify::classify_kind` is not run by the `jobs` Dsp stage nor stored as analysis `kind` yet; wire it here (BPM gating needs it). (0896203)
-- [ ] T3.5 (dsp-analysis) Key (chroma + key profiles, filename prior) and pitch/note for tonal one-shots (YIN). AC: fixtures ≥ 90 % key, ≥ 95 % note.
+- [x] T3.5 (dsp-analysis) Key (chroma + key profiles, filename prior) and pitch/note for tonal one-shots (YIN). AC: fixtures ≥ 90 % key, ≥ 95 % note. (be47de5)
 - [ ] T3.6 (eval) `sonar eval`: metrics per EVAL.md over fixtures, silver set (filename-labeled real files) and golden set; JSON + markdown report into `eval/reports/`; `--check` exits non-zero on regression vs `eval/reports/BASELINE.md` (used by `scripts/check.sh`). AC: report generated; baseline written to BASELINE.md + STATUS.md.
 - [ ] T3.7 [HUMAN] Founder points `SONAR_GOLDEN_DIR` at a real sample folder and labels ~300 files (CSV template from `sonar eval --init-golden`). Agents continue with silver/fixtures meanwhile.
 
@@ -134,3 +134,8 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T3.4) `sonar-cli/src/cli.rs` is 508 lines; split argument definitions.
 - (from T3.4 review) User kind override `one_shot` on a detected loop still shows the analysis BPM in the index; skip it unless BPM is overridden.
 - (from T3.4 review) Tempo allocates per-file scratch buffers; reuse them like `Analyzer` if profiling shows pressure.
+- (from T3.5) Key validated only on 16 synthetic chord progressions; re-measure on silver/golden (T3.6/T3.7).
+- (from T3.5) One global key per 30 s window (no modulation); tonality gates (ratio 0.5, ≥ 3 pitch classes) untuned on real material.
+- (from T3.5 review) Mode-less stored keys (one-shot notes, e.g. `A`) are treated as major by the key filter, so `key:Am` misses an `A` 808; match both modes.
+- (from T3.5) Loops never get a note (e.g. bass-loop root); tonal material without a clear onset only gets a chroma key.
+- (from T3.5 review) `key::chroma` allocates per-file totals; reuse scratch if profiling shows pressure.
