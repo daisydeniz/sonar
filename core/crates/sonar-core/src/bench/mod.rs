@@ -15,6 +15,8 @@ pub mod scan;
 pub mod search;
 pub mod search_corpus;
 pub mod search_queries;
+pub mod similar;
+mod similar_corpus;
 pub mod watch;
 mod watch_io;
 pub mod watch_pipeline;
@@ -31,6 +33,10 @@ pub use search::{
     bench_search, ClassLatency, FirstQuery, SearchBench, SearchBenchOptions, SEARCH_BUDGET_MS,
 };
 pub use search_queries::QueryClass;
+pub use similar::{
+    bench_similar, Percentiles, SimilarBench, SimilarBenchOptions, SimilarClass,
+    SimilarClassLatency,
+};
 pub use watch::{bench_watch, ContendedPhase, WatchBench, WatchBenchOptions, WatchPhase};
 pub use watch_io::MIN_COPY_RATE;
 pub use watch_pipeline::PipelineRun;

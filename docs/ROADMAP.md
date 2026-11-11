@@ -152,3 +152,6 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T4.2) External-file seeds are re-analysed on every query; cache by path+mtime if the UI drags the same file repeatedly.
 - (from T4.2 review) `sonar similar` has no Ctrl-C cancel flag for external-seed decode (Engine/FFI will pass one).
 - (from T4.2 review) Similarity fixture-sanity thresholds sit 1 seed below measured; loosen by one seed if parallel norm merge order ever flips a near-tie.
+- (from T4.3) `filtered_file_ids` is now the largest similar() cost (~7 ms of ~14 ms at 500k, grows with matches); cache the unfiltered id set / bitset if needed.
+- (from T4.3) Similar latency measured on M4 Pro only (4-thread p95 25.7 ms as proxy); re-run `sonar bench similar` on a base M1/M2.
+- (from T4.3) `bench/search_corpus.rs` is 403 lines (just over the ~400 guideline); split when next touched.

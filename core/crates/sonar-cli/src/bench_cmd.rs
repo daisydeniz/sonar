@@ -10,12 +10,14 @@ use anyhow::{Context, Result};
 use clap::Subcommand;
 use serde::Serialize;
 use sonar_core::bench::{
-    self, AnalyzeBenchOptions, DecodeBenchOptions, SearchBenchOptions, WatchBenchOptions,
-    MIN_COPY_RATE,
+    self, AnalyzeBenchOptions, DecodeBenchOptions, SearchBenchOptions, SimilarBenchOptions,
+    WatchBenchOptions, MIN_COPY_RATE,
 };
 use sonar_core::jobs::Stage;
 
-use crate::bench_print::{print_analyze, print_decode, print_scan, print_search, print_watch};
+use crate::bench_print::{
+    print_analyze, print_decode, print_scan, print_search, print_similar, print_watch,
+};
 
 /// `sonar bench` subcommands.
 #[derive(Debug, Subcommand)]
@@ -149,6 +151,34 @@ pub enum BenchCommand {
         #[arg(long)]
         json: bool,
     },
+
+    /// Similarity latency on a synthetic library with an on-disk text
+    /// index and vector store: times end-to-end `similar` queries (default
+    /// weights, custom weights, filtered, unfiltered) and their filter and
+    /// scoring phases. Exits with an error if any class has p95 >= 50 ms.
+    Similar {
+        /// Files in the synthetic library.
+        #[arg(long, default_value_t = 500_000, value_parser = clap::value_parser!(u32).range(1..=5_000_000))]
+        docs: u32,
+        /// Timed queries per class (after a short warm-up).
+        #[arg(long, default_value_t = 60, value_parser = clap::value_parser!(u32).range(1..=10_000))]
+        queries: u32,
+        /// Threads the queries may use (0 = all cores, as in the app).
+        #[arg(long, default_value_t = 0)]
+        threads: usize,
+        /// Corpus seed (the default makes runs comparable).
+        #[arg(long, default_value_t = bench::search::DEFAULT_SEED)]
+        seed: u64,
+        /// Create the working folder inside this directory.
+        #[arg(long)]
+        dir: Option<PathBuf>,
+        /// Keep the working folder (store and indexes) and print its path.
+        #[arg(long)]
+        keep: bool,
+        /// Print JSON instead of text.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 /// Runs a benchmark and prints its result to stdout.
@@ -259,6 +289,38 @@ pub fn run(cmd: BenchCommand) -> Result<()> {
             if !over.is_empty() {
                 anyhow::bail!(
                     "search latency budget (p95 < {} ms) missed: {}",
+                    b.budget_ms,
+                    over.join(", ")
+                );
+            }
+            Ok(())
+        }
+        BenchCommand::Similar {
+            docs,
+            queries,
+            threads,
+            seed,
+            dir,
+            keep,
+            json,
+        } => {
+            let work = Work::new(dir.as_deref(), keep)?;
+            let opts = SimilarBenchOptions {
+                docs: docs as usize,
+                queries: queries as usize,
+                seed,
+                threads,
+            };
+            let b = bench::bench_similar(work.path(), &opts).context("similar benchmark")?;
+            emit(json, &b, print_similar)?;
+            let over: Vec<String> = b
+                .over_budget()
+                .iter()
+                .map(|c| format!("{} p95 {:.1} ms", c.class, c.total.p95_ms))
+                .collect();
+            if !over.is_empty() {
+                anyhow::bail!(
+                    "similarity latency budget (p95 < {} ms) missed: {}",
                     b.budget_ms,
                     over.join(", ")
                 );

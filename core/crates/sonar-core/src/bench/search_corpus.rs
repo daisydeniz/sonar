@@ -26,7 +26,7 @@ use crate::{Error, Result, Store};
 /// Files per leaf folder.
 const PER_LEAF: usize = 50;
 /// Files per pack (one leaf per category).
-const PER_PACK: usize = PER_LEAF * CATS.len();
+pub(crate) const PER_PACK: usize = PER_LEAF * CATS.len();
 
 /// Library folder names; packs go to them in the ratio of [`LIBRARY_OF_PACK`].
 pub const LIBRARY_NAMES: [&str; 5] = [
@@ -136,14 +136,14 @@ pub struct SearchCorpus {
 }
 
 /// Small deterministic PRNG (SplitMix64, Steele et al., OOPSLA 2014).
-struct Rng(u64);
+pub(crate) struct Rng(u64);
 
 impl Rng {
-    fn new(seed: u64, i: usize) -> Self {
+    pub(crate) fn new(seed: u64, i: usize) -> Self {
         Self(seed ^ (i as u64).wrapping_mul(0x9E37_79B9_7F4A_7C15))
     }
 
-    fn next(&mut self) -> u64 {
+    pub(crate) fn next(&mut self) -> u64 {
         self.0 = self.0.wrapping_add(0x9E37_79B9_7F4A_7C15);
         let mut z = self.0;
         z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
@@ -181,13 +181,23 @@ pub(crate) struct FileRow {
     pub category_override: Option<&'static str>,
 }
 
-/// File number `i` of the corpus with `seed`; depends on nothing else.
-pub(crate) fn file_row(seed: u64, i: usize) -> FileRow {
-    let mut r = Rng::new(seed, i);
+/// Number of folder categories (see [`pack_and_family`]).
+pub(crate) const FAMILIES: usize = CATS.len();
+
+/// Pack number and folder category (index into the category table; the
+/// truth, before the analysis "unknown" gaps) of file number `i`.
+pub(crate) fn pack_and_family(i: usize) -> (usize, usize) {
     let pack = i / PER_PACK;
     let leaf = (i % PER_PACK) / PER_LEAF;
     // `pack * 5 + leaf` (mod 16) runs over every category once per pack.
-    let c = &CATS[(pack * 5 + leaf) % CATS.len()];
+    (pack, (pack * 5 + leaf) % CATS.len())
+}
+
+/// File number `i` of the corpus with `seed`; depends on nothing else.
+pub(crate) fn file_row(seed: u64, i: usize) -> FileRow {
+    let mut r = Rng::new(seed, i);
+    let (pack, family) = pack_and_family(i);
+    let c = &CATS[family];
     let (pack_name, abbr) = PACKS[pack % PACKS.len()];
     let nn = i % PER_LEAF + 1;
     let word = *r.pick(c.words);

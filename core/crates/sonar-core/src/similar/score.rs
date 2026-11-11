@@ -2,7 +2,8 @@
 //! library z-score is applied on the fly to each raw row (no normalized
 //! copy of the store, no per-row allocation), per-aspect RMS
 //! z-differences are combined with the normalized weights, and a bounded
-//! max-heap keeps the best `limit` candidates.
+//! max-heap keeps the best `limit` candidates ([`TopK`]; one per parallel
+//! work item, merged, ADR-025).
 
 use std::cmp::Ordering;
 use std::collections::BinaryHeap;
@@ -230,6 +231,20 @@ impl TopK {
         }
     }
 
+    /// Offers every candidate of `other` (same `k`): the result keeps the
+    /// `k` smallest of both, whatever the merge order (total order).
+    pub(super) fn merge(self, other: Self) -> Self {
+        let (mut big, small) = if self.heap.len() >= other.heap.len() {
+            (self, other)
+        } else {
+            (other, self)
+        };
+        for c in small.heap {
+            big.push(c);
+        }
+        big
+    }
+
     /// Best first.
     pub(super) fn into_sorted(self) -> Vec<Cand> {
         self.heap.into_sorted_vec()
@@ -266,6 +281,41 @@ mod tests {
             row: 0,
         });
         assert!(empty.into_sorted().is_empty());
+    }
+
+    /// The parallel scan's per-chunk heaps merge to the sequential result
+    /// whatever the split (ties included).
+    #[test]
+    fn merged_top_k_equals_one_pass_for_any_split() {
+        let cands: Vec<Cand> = (0..500i64)
+            .map(|id| Cand {
+                distance: ((id * 7919) % 97) as f32 / 8.0,
+                file_id: id,
+                row: id as usize,
+            })
+            .collect();
+        let one_pass = |cs: &[Cand]| {
+            let mut t = TopK::new(25);
+            for &c in cs {
+                t.push(c);
+            }
+            t
+        };
+        let ids = |t: TopK| -> Vec<(u32, i64)> {
+            t.into_sorted()
+                .iter()
+                .map(|c| (c.distance.to_bits(), c.file_id))
+                .collect()
+        };
+        let want = ids(one_pass(&cands));
+        for split in [1, 3, 64, 499] {
+            let merged = cands
+                .chunks(split)
+                .rev()
+                .map(one_pass)
+                .fold(TopK::new(25), TopK::merge);
+            assert_eq!(ids(merged), want, "split {split}");
+        }
     }
 
     #[test]

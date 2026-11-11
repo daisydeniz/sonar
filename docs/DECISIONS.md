@@ -668,3 +668,36 @@ Accepted. `sonar_core::similar`; `sonar similar <id | --file PATH>
 - **Pitch-only** finds the same pitch class (note or octave) top-1 for
   19/22 tonal seeds: chroma (12 of 18 dims) dominates Pitch; octave
   weighting is a T4.4 question.
+
+## ADR-025 — Similarity at scale: exact parallel brute force, no ANN (T4.3)
+Accepted. `sonar bench similar [--docs N] [--queries N] [--threads N]`
+(500k synthetic files: real store, on-disk text index and vector store
+with clustered random rows; 4 classes × 60 end-to-end `similar` calls,
+filter and scoring phases timed separately; M4 Pro, 14 cores, release).
+- **Before** (sequential scan): p50 / p95 ms overall 63 / 89, custom
+  weights 53 / 89, filtered 5 / 33, unfiltered 65 / 91 — over budget;
+  scoring ≈ 60 ms, `filtered_file_ids` ≈ 7 ms of it.
+- **Chosen: rayon scan** over 4096-id chunks of the allowed set, one
+  bounded top-K per worker, merged under the total (distance, file id)
+  order: results bit-identical to the sequential scan for any thread
+  count; cancel flag checked per chunk. Distance code unchanged.
+  **After**: overall 13.5 / 16.9, weighted 12.6 / 13.9, filtered 2.1 / 6.3,
+  unfiltered 12.7 / 15.6 (scoring ≈ 6.4 ms, filter ≈ 7 ms);
+  `--threads 4`: 23.8 / 25.7 worst class.
+- **Tried, rejected**: 8-lane accumulator kernel with branch-free
+  clamp — no gain (single thread 60 → 60 ms scoring; the per-row cost is
+  not the arithmetic) and it would change float rounding; reverted.
+- **USearch** (2.x, Apache-2.0; scratch crate outside the repo) HNSW on
+  the z-scored Overall (L2² = Σ msdₐ), M=16, efC=128, top-M then exact
+  aspect-weighted re-rank, 200 seeds, recall@10 vs exact: build 12.7 s
+  (f32, 343 MB) / 6.5 s (f16, 208 MB) on 14 threads, on top of the
+  273 MB raw rows. Query 0.3–2 ms. Recall@10: default weights 0.92–0.985
+  (ef 64–256, M 100–500); mixed weights 0.51–0.76; pitch-only 0.12–0.22;
+  filters would need predicate search. Fast but inexact for default
+  weights and wrong for custom weights/filters (the product's sliders).
+- **Decision**: exact brute force only; no ANN index files, no `usearch`
+  dependency. **Revisit** when a library passes ~1.5M vector rows or
+  `sonar bench similar --threads 4` p95 exceeds 35 ms; then ANN only for
+  default-weight, unfiltered queries (ef ≥ 128, re-rank ≥ 200) and brute
+  force for the rest. The filter phase (7 ms, linear in matches) is the
+  next cost to cut.

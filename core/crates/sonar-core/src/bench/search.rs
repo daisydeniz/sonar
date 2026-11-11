@@ -222,7 +222,7 @@ fn run_mix(ix: &TextIndex, synonyms: &Synonyms, mix: &[Case]) -> Result<Vec<(Dur
         .collect()
 }
 
-fn ms(d: Duration) -> f64 {
+pub(crate) fn ms(d: Duration) -> f64 {
     d.as_secs_f64() * 1e3
 }
 
@@ -273,7 +273,7 @@ fn describe(c: &Case) -> String {
 }
 
 /// Nearest-rank percentile of sorted values (0 when empty).
-fn percentile(sorted: &[f64], p: f64) -> f64 {
+pub(crate) fn percentile(sorted: &[f64], p: f64) -> f64 {
     if sorted.is_empty() {
         return 0.0;
     }

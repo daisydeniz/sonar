@@ -1,9 +1,62 @@
 //! Human-readable output of `sonar bench ...`.
 
 use sonar_core::bench::{
-    self, AnalyzeBench, DecodeBench, PipelineRun, ScanBench, ScanPhase, SearchBench, WatchBench,
-    WatchPhase,
+    self, AnalyzeBench, DecodeBench, PipelineRun, ScanBench, ScanPhase, SearchBench, SimilarBench,
+    WatchBench, WatchPhase,
 };
+
+pub(crate) fn print_similar(b: &SimilarBench) {
+    println!(
+        "machine: {}; scan pool {} threads",
+        machine_line(&b.machine),
+        b.threads
+    );
+    println!(
+        "corpus: {} files, {} vector rows ({:.1} MB on disk), seed {:#x}; setup {:.1} s (untimed)",
+        b.docs,
+        b.vector_rows,
+        b.vector_bytes as f64 / 1e6,
+        b.seed,
+        b.setup_secs
+    );
+    println!(
+        "top {} per query; budget p95 < {} ms end to end; filter / scoring timed separately",
+        b.limit, b.budget_ms
+    );
+    println!(
+        "{:<11} {:>4} {:>8} {:>8} {:>8} {:>10} {:>10} {:>10} {:>10} {:>11}",
+        "class",
+        "n",
+        "p50 ms",
+        "p95 ms",
+        "max ms",
+        "filt p50",
+        "filt p95",
+        "score p50",
+        "score p95",
+        "candidates"
+    );
+    for c in &b.classes {
+        println!(
+            "{:<11} {:>4} {:>8.2} {:>8.2} {:>8.2} {:>10.2} {:>10.2} {:>10.2} {:>10.2} {:>11.0}{}",
+            c.class,
+            c.n,
+            c.total.p50_ms,
+            c.total.p95_ms,
+            c.total.max_ms,
+            c.filter.p50_ms,
+            c.filter.p95_ms,
+            c.scoring.p50_ms,
+            c.scoring.p95_ms,
+            c.mean_candidates,
+            if c.total.p95_ms >= b.budget_ms {
+                "  OVER BUDGET"
+            } else {
+                ""
+            }
+        );
+    }
+}
 
 fn machine_line(m: &bench::Machine) -> String {
     format!("{}, {} cores, {} build", m.cpu, m.cores, m.profile)

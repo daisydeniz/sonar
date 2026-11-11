@@ -23,8 +23,11 @@
 //! **Candidates.** The [`Filters`] of text search (same semantics, hidden
 //! files excluded unless asked) select the allowed file ids through the
 //! text index ([`crate::search::filtered_file_ids`]); only those with a
-//! live vector row are scored, brute force (ANN / SIMD is T4.3). The seed
-//! file itself is never a result. Ties order by file id.
+//! live vector row are scored, exact brute force over the mmap rows,
+//! split into chunks scored in parallel (rayon) and merged (ADR-025: at
+//! 500k files p95 ≈ 15 ms end to end, no ANN index). The seed file itself
+//! is never a result. Ties order by file id; the result does not depend on
+//! the thread count.
 //!
 //! **Seeds.** A library file uses its stored row ([`Error::NoVectors`] if
 //! it has none); an external file is decoded and analyzed on the fly with
@@ -43,6 +46,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
+use rayon::prelude::*;
 use serde::Serialize;
 
 pub use score::AspectDistances;
@@ -54,7 +58,8 @@ use crate::index::TextIndex;
 use crate::search::{filtered_file_ids, Filters, DEFAULT_LIMIT};
 use crate::{Error, Result};
 
-/// Candidates scored between two cancellation checks.
+/// Allowed ids per parallel work item; each item checks the cancel flag
+/// first.
 const CANCEL_CHECK_EVERY: usize = 4096;
 
 /// What to find neighbours of.
@@ -153,6 +158,9 @@ pub fn similar(
 /// `exclude`) against the raw `seed` vectors and returns the best
 /// `opts.limit` (filters in `opts` are not applied again).
 ///
+/// Scoring runs in 4096-id chunks on the caller's rayon pool (ADR-025);
+/// call it off the UI thread.
+///
 /// # Errors
 /// [`Error::InvalidQuery`], [`Error::Dsp`] (seed dimensions),
 /// [`Error::Cancelled`].
@@ -164,28 +172,38 @@ pub fn rank(
     opts: &SimilarOptions,
 ) -> Result<SimilarResults> {
     let scorer = score::Scorer::new(vs, seed, &opts.weights)?;
-    let mut top = score::TopK::new(opts.limit);
-    let mut candidates = 0usize;
-    for (n, &file_id) in allowed.iter().enumerate() {
-        if n % CANCEL_CHECK_EVERY == 0 && is_cancelled(opts.cancel.as_deref()) {
-            return Err(Error::Cancelled);
-        }
-        if Some(file_id) == exclude {
-            continue;
-        }
-        let Some(row) = vs.row_of(file_id).and_then(|r| usize::try_from(r).ok()) else {
-            continue;
-        };
-        let Some(distance) = scorer.distance(row) else {
-            continue;
-        };
-        candidates += 1;
-        top.push(score::Cand {
-            distance,
-            file_id,
-            row,
-        });
-    }
+    let cancel = opts.cancel.as_deref();
+    let empty = || (score::TopK::new(opts.limit), 0usize);
+    // Chunks of the allowed ids are scored in parallel, each worker into
+    // its own top-K; the merge keeps the k smallest under the total
+    // (distance, file id) order, so the result does not depend on the
+    // split.
+    let (top, candidates) = allowed
+        .par_chunks(CANCEL_CHECK_EVERY)
+        .try_fold(empty, |(mut top, mut candidates), chunk| {
+            if is_cancelled(cancel) {
+                return Err(Error::Cancelled);
+            }
+            for &file_id in chunk {
+                if Some(file_id) == exclude {
+                    continue;
+                }
+                let Some(row) = vs.row_of(file_id).and_then(|r| usize::try_from(r).ok()) else {
+                    continue;
+                };
+                let Some(distance) = scorer.distance(row) else {
+                    continue;
+                };
+                candidates += 1;
+                top.push(score::Cand {
+                    distance,
+                    file_id,
+                    row,
+                });
+            }
+            Ok((top, candidates))
+        })
+        .try_reduce(empty, |(a, n), (b, m)| Ok((a.merge(b), n + m)))?;
     let hits = top
         .into_sorted()
         .into_iter()

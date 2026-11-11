@@ -165,8 +165,10 @@ weights} }`.
 3. **Semantic** → CLAP text embedding → kNN over CLAP audio vectors.
 4. **Fusion** → reciprocal-rank fusion (start) → tuned weighted fusion
    (later, driven by eval).
-5. **Similarity mode** → brute-force SIMD over filtered set if < ~200k,
-   else ANN on Overall then aspect-weighted re-rank of top-K.
+5. **Similarity mode** → exact parallel brute force over the filtered set
+   (ADR-025: p95 ≈ 17 ms at 500k); ANN on Overall + aspect-weighted
+   re-rank only for default-weight, unfiltered queries if libraries pass
+   ~1.5M files.
 Latency budget p95 < 50 ms at 500k docs. Queries are cancellable; the UI
 always shows the latest query only.
 
