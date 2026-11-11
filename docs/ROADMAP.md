@@ -54,7 +54,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [ ] T3.7 [HUMAN] Founder points `SONAR_GOLDEN_DIR` at a real sample folder and labels ~300 files (CSV template from `sonar eval --init-golden`). Agents continue with silver/fixtures meanwhile.
 
 ## M4 — Similarity search
-- [ ] T4.1 (search-ranking) Vector store: mmap matrices per aspect, row-id mapping, incremental append, compaction. AC: tests; 1M×(dims) load < 1 s. Note (T3.2): the `jobs` Dsp stage does not compute aspect vectors yet; wire `AspectExtractor` (raw vectors stored) + `LibraryNorm` (rayon fold/merge, persisted) into the pipeline here.
+- [x] T4.1 (search-ranking) Vector store: mmap matrices per aspect, row-id mapping, incremental append, compaction. AC: tests; 1M×(dims) load < 1 s. Note (T3.2): the `jobs` Dsp stage does not compute aspect vectors yet; wire `AspectExtractor` (raw vectors stored) + `LibraryNorm` (rayon fold/merge, persisted) into the pipeline here. (64d2548)
 - [ ] T4.2 (search-ranking) `similar` query: seed = file id or external file (analyzed on the fly), aspect weights, filters respected. AC: CLI `sonar similar`; fixtures sanity (same synth/pitch family ranks first).
 - [ ] T4.3 (search-ranking) Performance: SIMD brute force vs USearch ANN + re-rank; pick by benchmark. AC: p95 < 50 ms at 500k; decision recorded as ADR.
 - [ ] T4.4 (eval) Similarity metrics (P@10) in eval; tune aspect features against silver/golden. AC: numbers in STATUS.md.
