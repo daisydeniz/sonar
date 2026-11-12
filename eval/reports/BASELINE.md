@@ -4,7 +4,7 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
 
 ## fixtures
 
-120 files, generated (sonar fixtures, default seed), revision aac7eac (2026-11-12)
+120 files, generated (sonar fixtures, default seed), revision d240fff (2026-11-12)
 
 | Metric | Value | Target |
 |---|---:|---|
@@ -19,6 +19,8 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
 | Category macro-F1, DSP only (%) | 50.72 | report only |
 | Similarity P@10, k = min(10, relevant) (%) | 81.51 | >= 70 |
 | Similarity MRR (%) | 99.33 | report only |
+| Text search NDCG@10, BM25 (%) | 28.96 | no regression |
+| Text search recall@50, BM25 (%) | 26.82 | no regression |
 | Unexpected decode errors (count) | 0 | 0 |
 
 ```json
@@ -27,7 +29,7 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
   "tiers": {
     "fixtures": {
       "date": "2026-11-12",
-      "git_sha": "aac7eac",
+      "git_sha": "d240fff",
       "files": 120,
       "source": "generated (sonar fixtures, default seed)",
       "metrics": {
@@ -42,7 +44,9 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
         "note.midi_pct": 100.0,
         "note.pitch_class_pct": 100.0,
         "similar.mrr_pct": 99.33333333333333,
-        "similar.p10_pct": 81.5111111111111
+        "similar.p10_pct": 81.5111111111111,
+        "text.bm25_ndcg10_pct": 28.96006015590183,
+        "text.bm25_recall50_pct": 26.824754193175245
       }
     }
   }
