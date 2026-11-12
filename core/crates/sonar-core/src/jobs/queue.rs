@@ -213,6 +213,30 @@ pub(crate) fn commit(
             FileResult::Unstarted => {}
             FileResult::Skipped => counts.skipped += 1,
             _ if !still_current(&tx, claim)? => counts.skipped += 1,
+            // The embedding itself went to the embedding store before this
+            // commit; the stage row marks the file done. `files.status` is
+            // the meta/dsp pipeline's and stays as it is.
+            FileResult::Embedded {
+                partial, problem, ..
+            } => {
+                let outcome = if *partial {
+                    Outcome::Partial
+                } else {
+                    Outcome::Ok
+                };
+                let message = problem
+                    .as_deref()
+                    .or_else(|| partial.then_some("partial decode"));
+                put_stage(&tx, claim.id, stage, outcome, message, now)?;
+                match outcome {
+                    Outcome::Partial => counts.partial += 1,
+                    _ => counts.ok += 1,
+                }
+            }
+            FileResult::Failed(message) if stage == Stage::Embed => {
+                put_stage(&tx, claim.id, stage, Outcome::Error, Some(message), now)?;
+                counts.errors += 1;
+            }
             FileResult::Done { meta, analysis } => {
                 let outcome = if meta.partial {
                     Outcome::Partial

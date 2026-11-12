@@ -11,6 +11,7 @@
 pub mod analyze;
 pub mod corpus;
 pub mod decode;
+pub mod embed;
 pub mod scan;
 pub mod search;
 pub mod search_corpus;
@@ -28,6 +29,7 @@ use serde::Serialize;
 
 pub use analyze::{bench_analyze, AnalyzeBench, AnalyzeBenchOptions};
 pub use decode::{bench_decode, DecodeBench, DecodeBenchOptions, DecodeRun};
+pub use embed::{bench_embed, EmbedBench, EmbedBenchOptions, ModelRun};
 pub use scan::{bench_scan, ScanBench, ScanPhase};
 pub use search::{
     bench_search, ClassLatency, FirstQuery, SearchBench, SearchBenchOptions, SEARCH_BUDGET_MS,

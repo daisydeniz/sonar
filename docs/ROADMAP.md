@@ -162,3 +162,10 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T5.1) Re-compare `laion/larger_clap_general` once golden NL queries exist (same quality on silver, ~2× slower).
 - (from T5.1) `scripts/fetch-models.sh` lacks the exec bit (chmod blocked in the agent sandbox); `git update-index --chmod=+x` it.
 - (from T4.4) Fixture sweep favoured L1 (P@10 87.29 vs 81.51), no-pitch 85.42, amp ×2 86.53; defaults kept (synthetic-fixture overfit risk). Re-run `sonar eval --golden --similar-sweep` once labels + `similar.jsonl` exist and decide then.
+- (from T5.2 review) `run_embed` loads the CLAP pool (~4 s, 10 sessions) before checking for pending Embed work; open/reconcile the store, `count_pending` and return early when 0.
+- (from T5.2 review) `embed/store.rs` rewrites `meta.json` non-atomically on every writer open; write only on New/Reset or via temp + rename.
+- (from T5.2 review) `embed/pool.rs` batch-of-one path clones 256 KB features per clip; `mem::take` instead.
+- (from T5.2 review) Front end has property tests only; add HF-computed reference log-mel values or a model-gated 6-class zero-shot check (ADR-026: 0.984).
+- (from T5.2 review) A changed file that fails to re-embed keeps its old live row in the CLAP store; T5.3/T5.4 should filter by stage outcome or the store should drop the row.
+- (from T5.2) `cargo deny check advisories` flags unmaintained `paste` (via tokenizers) and `basic-toml` (via uniffi); check.sh does not run advisories.
+- (from T5.2) Embed throughput measured on M4 Pro only (154 files/s); base M4 (4P) estimated ≈ 60 files/s — re-measure on base hardware.

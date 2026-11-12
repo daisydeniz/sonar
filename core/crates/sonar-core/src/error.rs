@@ -177,6 +177,23 @@ pub enum Error {
         file_id: i64,
     },
 
+    /// A CLAP model file is missing or unreadable (run
+    /// `scripts/fetch-models.sh`, or set `SONAR_MODELS_DIR`).
+    #[error("CLAP model file not found: {}", path.display())]
+    ModelMissing {
+        /// The expected file.
+        path: PathBuf,
+    },
+
+    /// The CLAP embedding pipeline failed: a model that will not load or run,
+    /// input that cannot be embedded (empty audio, empty text), a build
+    /// without the `embed` feature, or a damaged embedding store.
+    #[error("embedding error: {reason}")]
+    Embed {
+        /// What went wrong.
+        reason: String,
+    },
+
     /// Query parameters that cannot be used (e.g. similarity weights that
     /// are negative, not finite or all zero).
     #[error("invalid query: {reason}")]

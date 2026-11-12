@@ -11,7 +11,7 @@ name = "sonar"
 path = "src/main.rs"
 
 [dependencies]
-sonar-core = { path = "../sonar-core" }
+sonar-core = { path = "../sonar-core", features = ["embed"] }
 anyhow.workspace = true
 clap.workspace = true
 serde.workspace = true

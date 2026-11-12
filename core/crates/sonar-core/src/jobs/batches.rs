@@ -32,8 +32,27 @@ use super::queue::{self, Claim};
 use super::stage::{FileResult, Stage};
 use super::work::{self, WorkOptions};
 use super::JobOptions;
+use crate::embed::EmbedStore;
 use crate::index::vectors::VectorStore;
 use crate::{Error, Result, Store};
+
+/// Where a stage's side output (not in SQLite) goes; appended to before each
+/// batch commit (a crash in between only re-runs the batch).
+pub(super) enum Sink<'a> {
+    /// `dsp`: raw aspect vectors.
+    Aspects(&'a mut VectorStore),
+    /// `embed`: CLAP embeddings.
+    Embeddings(&'a mut EmbedStore),
+}
+
+impl Sink<'_> {
+    fn append(&mut self, results: &[(Claim, FileResult)]) -> Result<()> {
+        match self {
+            Self::Aspects(vs) => super::vectors::append(vs, results),
+            Self::Embeddings(es) => super::embed::append(es, results),
+        }
+    }
+}
 
 /// How long a batch commit keeps retrying while another writer (e.g. a long
 /// scan) holds the database lock, before the job fails.
@@ -84,8 +103,8 @@ fn spawn_batch(
     rx
 }
 
-/// Runs one stage over everything pending, in id order. `vectors` (the
-/// `dsp` stage) receives each batch's aspect vectors before its commit.
+/// Runs one stage over everything pending, in id order. `sink` (the `dsp`
+/// and `embed` stages) receives each batch's vectors before its commit.
 pub(super) fn run_stage(
     store: &mut Store,
     stage: Stage,
@@ -93,7 +112,7 @@ pub(super) fn run_stage(
     pool: &rayon::ThreadPool,
     work: &Arc<WorkOptions>,
     shared: &Arc<Shared>,
-    mut vectors: Option<&mut VectorStore>,
+    mut sink: Option<Sink<'_>>,
 ) -> Result<StageSummary> {
     let started = Instant::now();
     let total = queue::count_pending(store.conn(), stage)?;
@@ -176,8 +195,8 @@ pub(super) fn run_stage(
 
         let t = Instant::now();
         // Vectors first: a crash before the commit only re-runs the batch.
-        if let Some(vs) = vectors.as_deref_mut() {
-            tri!(super::vectors::append(vs, &results));
+        if let Some(sink) = sink.as_mut() {
+            tri!(sink.append(&results));
         }
         let c = tri!(queue::commit_retrying(
             store.conn_mut(),

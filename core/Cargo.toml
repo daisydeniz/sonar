@@ -59,6 +59,14 @@ tantivy = { version = "0.27.0", default-features = false, features = ["mmap", "l
 # MIT OR Apache-2.0. Read-only memory maps of the aspect vector matrices
 # (T4.1, ADR-023); already in the tree through tantivy's `mmap` feature.
 memmap2 = "0.9.12"
+# MIT OR Apache-2.0. ONNX Runtime bindings for the CLAP embeddings (T5.2,
+# ADR-027). Pinned: rc.10 = ONNX Runtime 1.22 as measured in ADR-026. The
+# prebuilt runtime is downloaded at build time; `coreml` only makes the
+# optional CoreML execution provider selectable.
+ort = { version = "=2.0.0-rc.10", features = ["coreml"] }
+# Apache-2.0. RoBERTa BPE for the CLAP text tower (`tokenizer.json`); pure
+# Rust regex backend (no Oniguruma C library), no progress bars/HTTP.
+tokenizers = { version = "0.21", default-features = false, features = ["fancy-regex"] }
 # Test-only (dev-dependencies).
 hound = "3.5.1"      # Apache-2.0; independent WAV reader to verify our writer
 tempfile = "3.27.0"  # MIT OR Apache-2.0

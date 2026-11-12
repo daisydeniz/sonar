@@ -30,6 +30,13 @@ unused-allowed-license = "allow"
 name = "notify"
 allow = ["CC0-1.0"]
 
+# webpki-root-certs (Mozilla root store data) is CDLA-Permissive-2.0, a
+# permissive data license; it is only a build dependency of `ort-sys`
+# (`download-binaries`, ADR-027), never linked into Sonar.
+[[licenses.exceptions]]
+name = "webpki-root-certs"
+allow = ["CDLA-Permissive-2.0"]
+
 [licenses.private]
 # Our own crates are `publish = false` with `LicenseRef-Proprietary`.
 ignore = true

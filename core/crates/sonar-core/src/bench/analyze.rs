@@ -10,6 +10,7 @@ use serde::Serialize;
 
 use super::decode::generate_fixtures;
 use super::{machine, Machine};
+use crate::embed::EmbedOptions;
 use crate::jobs::{self, JobOptions, Stage, StageSummary};
 use crate::scan::scan_library;
 use crate::{Error, Result, Store};
@@ -34,6 +35,8 @@ pub struct AnalyzeBenchOptions {
     /// from disk without `sudo purge`. Clones share extents with the source
     /// fixtures (cold reads of the same blocks).
     pub clone: bool,
+    /// Settings of the `Embed` stage, if requested.
+    pub embed: EmbedOptions,
 }
 
 /// Result of [`bench_analyze`]. By default the numbers are for a **warm
@@ -145,6 +148,7 @@ pub fn bench_analyze(work: &Path, opts: &AnalyzeBenchOptions) -> Result<AnalyzeB
             stages: opts.stages.clone(),
             threads: opts.threads,
             batch_size: opts.batch.max(1),
+            embed: opts.embed.clone(),
             ..JobOptions::default()
         },
     )?
@@ -203,6 +207,7 @@ mod tests {
                 batch: 32,
                 warm: true,
                 clone: false,
+                embed: EmbedOptions::default(),
             },
         )
         .expect("bench");

@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M5 (M0–M4 done, tags m0-done … m4-done; T3.7 human)
-- Next task: T5.2
+- Next task: T5.3
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
@@ -18,12 +18,14 @@ manual tests, labeled data. Keep each item one line with the task id.)_
 - T3.7 Golden set labeling: `sonar eval --init-golden <dir>` writes the labels.csv template; then set `SONAR_GOLDEN_DIR` (optional: `SONAR_SILVER_DIR` for name-labeled real files); optional `similar.jsonl` similarity judgements (format in EVAL.md) enable similarity tuning (T4.4)
 - T8.1 End-to-end test by the founder (after M7)
 - T7.4 Apple Developer ID, notarization, payment provider, pricing
+- T5.2 (permissions) In the T5.2 session, running `scripts/*.sh` and `core/target/*/sonar` directly needed approval (cargo commands did not), so the check.sh gates were run one by one and build-core.sh/xcodebuild were skipped (sonar-ffi unchanged). Allow `scripts/check.sh` in the autopilot's permission settings.
+- T5.2 Model-dependent embed tests pass as no-ops without `models/` (weights not in git); run `scripts/fetch-models.sh` on any machine that runs check.sh, so the embed stage is actually exercised.
 
 ## Metrics baseline
 _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Silver/golden: not run (env vars unset).
 
 ## Log
+- 2026-11-12 — T5.2: `sonar_core::embed` (feature `embed`, CLI only; FFI uses stubs until T5.6). CLAP front end per ADR-026, a pool of N single-thread int8 `ort` audio sessions (CPU default, `--ep coreml` opt-in with CPU fallback), an fp32 text encoder plus tokenizer, a 512-d embedding store, and an `Embed` job stage (lowest priority; skipped if the model is missing). CLI: `embed`, `embed-text`, `bench embed`. ADR-027. **M4 Pro, release, 10 sessions: 154.5 files/s end to end (AC ≥ 100 met); model alone 157 clips/s; load 4 s.** Fixture eval unchanged. Reviewer APPROVE in round 1; I fixed 3 trivial NITs. Later: 7 T5.2 items.
 - 2026-11-12 — T5.1: CLAP model = LAION `clap-htsat-unfused` (Apache-2.0 weights, commercial redistribution OK with notice) via pinned Xenova ONNX export (ADR-026); `scripts/fetch-models.sh` (pinned commit, SHA-256, idempotent) → `models/clap-htsat-unfused/` 538 MB. **int8 audio / fp32 text: zero-shot fixtures 6-class 0.984, silver 7-class 0.631 (fp32 0.638), audio cosine vs fp32 ≥ 0.995; M4 Pro CPU 10×1-thread sessions 158 clips/s, text 4.8 ms/query** → >100 files/s reachable. Front end spec (48 kHz, 64 Slaney mel) in ADR. Reviewer APPROVE round 1 (3 trivial NITs fixed). No eval (no analysis code). Later: 5 T5.1 items.
 - 2026-11-12 — T4.4: `sonar eval` similarity metrics (`eval::similarity`): same-family queries over fixtures, k = min(10, |relevant|); P@10 (tracked, ≥ 70) + MRR (tracked) + pitch-only same-pitch-class P@10 (report only); golden reads `similar.jsonl`; `--similar-sweep` reports weight/L1 variants. **Fixtures 120 files / 75 seeds: P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %.** Sweep: L1 87.29, no-pitch 85.42, amp×2 86.53 → defaults kept (synthetic overfit risk). Silver/golden not run (env unset). Reviewer APPROVE round 1 (1 doc NIT fixed). Later: 2 T4.4 items.
-- 2026-11-11 — T4.3: `similar::rank` scores 4096-id chunks in parallel (rayon, per-chunk top-K merged by (D, id), bit-identical to sequential); new `sonar bench similar` (500k text index + vector store, 240 end-to-end queries). **M4 Pro 14 thr, 500k: p95 89–91 → 13.9–16.9 ms (filtered 6.3; 4 thr worst 25.7); budget < 50 ms met.** USearch prototype (outside repo): recall@10 0.92–0.985 default weights, 0.12–0.22 pitch-only → ADR-025: exact brute force, no ANN, revisit at ~1.5M rows. Reviewer APPROVE round 1 (2 trivial NITs fixed). Eval --check green, metrics unchanged. Later: 3 T4.3 items.

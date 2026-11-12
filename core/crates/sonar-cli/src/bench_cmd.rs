@@ -97,6 +97,11 @@ pub enum BenchCommand {
         json: bool,
     },
 
+    /// CLAP embedding throughput: model-only clips/s of the session pool,
+    /// single-thread decode + front end, and the real `embed` stage over a
+    /// generated library (files/s; budget >= 100 on an M4).
+    Embed(crate::embed_cmd::BenchEmbedArgs),
+
     /// Watcher under a continuous copy into a big library (scan count and
     /// duration, duty cycle, catch-up latency), optionally while the job
     /// pipeline analyzes the same store (SQLite contention).
@@ -236,10 +241,12 @@ pub fn run(cmd: BenchCommand) -> Result<()> {
                 batch: batch as usize,
                 warm: !cold,
                 clone,
+                embed: sonar_core::embed::EmbedOptions::default(),
             };
             let b = bench::bench_analyze(work.path(), &opts).context("analyze benchmark")?;
             emit(json, &b, print_analyze)
         }
+        BenchCommand::Embed(args) => crate::embed_cmd::bench(&args),
         BenchCommand::Watch {
             files,
             copy_files,
@@ -340,13 +347,13 @@ fn emit<T: Serialize>(json: bool, value: &T, text: fn(&T)) -> Result<()> {
 }
 
 /// A working folder that is deleted on drop unless kept.
-struct Work {
+pub(crate) struct Work {
     path: PathBuf,
     _guard: Option<tempfile::TempDir>,
 }
 
 impl Work {
-    fn new(parent: Option<&Path>, keep: bool) -> Result<Self> {
+    pub(crate) fn new(parent: Option<&Path>, keep: bool) -> Result<Self> {
         let mut b = tempfile::Builder::new();
         b.prefix("sonar-bench-");
         let tmp = match parent {
@@ -370,7 +377,7 @@ impl Work {
         }
     }
 
-    fn path(&self) -> &Path {
+    pub(crate) fn path(&self) -> &Path {
         &self.path
     }
 }

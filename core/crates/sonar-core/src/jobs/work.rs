@@ -15,6 +15,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::Duration;
 
+use super::embed;
 use super::progress::Shared;
 use super::queue::Claim;
 use super::stage::{DspAnalysis, FileResult, Stage};
@@ -23,6 +24,7 @@ use crate::classify::{classify_kind, kind_hint};
 use crate::decode::{DecodeOptions, Decoded, Decoder};
 use crate::dsp::aspects::{AspectExtractor, AspectVectors};
 use crate::dsp::Analyzer;
+use crate::embed::EmbedPool;
 use crate::key::{key_and_note, NoteTracker};
 use crate::meta::MetaOptions;
 use crate::store::analysis::KindTempo;
@@ -36,6 +38,8 @@ use crate::{quiet_panic, Error};
 pub(crate) struct WorkOptions {
     pub delay: Duration,
     pub before_file: Option<BeforeFileHook>,
+    /// Session pool of the `Embed` stage (`None` for the other stages).
+    pub embedder: Option<Arc<EmbedPool>>,
 }
 
 thread_local! {
@@ -69,7 +73,11 @@ pub(crate) fn process(
             std::thread::sleep(opts.delay);
         }
         let cancel = shared.cancel_flag();
-        with_workers(|w| run_stage(w, stage, &claim.path, cancel))
+        match (stage, &opts.embedder) {
+            (Stage::Embed, Some(pool)) => embed::embed_file(pool, &claim.path, cancel),
+            (Stage::Embed, None) => FileResult::Failed("embed stage has no model pool".into()),
+            _ => with_workers(|w| run_stage(w, stage, &claim.path, cancel)),
+        }
     });
     run.unwrap_or_else(|msg| {
         reset_workers();
@@ -144,8 +152,8 @@ fn run_stage(
             },
             MetaOptions::default(),
         ),
-        // The runner never schedules it; fail loudly rather than skip silently.
-        Stage::Embed => return FileResult::Failed("embed stage is not implemented".into()),
+        // Handled in `process` (needs the session pool).
+        Stage::Embed => return FileResult::Failed("embed stage runs through `process`".into()),
     };
     match w.decoder.decode_with_meta(path, &decode, &meta) {
         Ok((decoded, meta)) => {

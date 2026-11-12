@@ -6,8 +6,19 @@ license.workspace = true
 publish.workspace = true
 description = "Sonar core: scan, analysis, index and search for local sample libraries."
 
+[features]
+default = []
+# CLAP embeddings through ONNX Runtime (T5.2, ADR-027): the session pool and
+# the text tower. The front end, the embedding store and the `Embed` stage
+# plumbing are always built; without this feature the stage is unavailable
+# (skipped). `sonar-cli` enables it; `sonar-ffi` does not (ONNX Runtime is a
+# static library the app link step would have to know about; T5.6).
+embed = ["dep:ort", "dep:tokenizers"]
+
 [dependencies]
 memmap2.workspace = true
+ort = { workspace = true, optional = true }
+tokenizers = { workspace = true, optional = true }
 notify.workspace = true
 rayon.workspace = true
 realfft.workspace = true

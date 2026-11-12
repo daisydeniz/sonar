@@ -36,6 +36,15 @@ pub enum JobEvent {
         /// Files left pending (I/O error, changed meanwhile) so far.
         skipped: u64,
     },
+    /// A requested stage cannot run in this build or on this machine (the
+    /// `Embed` stage without model files) and was skipped; no file was
+    /// marked.
+    StageSkipped {
+        /// The stage.
+        stage: Stage,
+        /// Why, for the user.
+        reason: String,
+    },
     /// Workers stop taking new files.
     Paused,
     /// Workers continue.
@@ -129,11 +138,22 @@ impl StageSummary {
     }
 }
 
+/// A requested stage that did not run, and why.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SkippedStage {
+    /// The stage.
+    pub stage: Stage,
+    /// Why (missing model files, build without the feature, ...).
+    pub reason: String,
+}
+
 /// Result of a whole job run.
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct JobSummary {
     /// One entry per stage that started, in run order.
     pub stages: Vec<StageSummary>,
+    /// Requested stages that could not run.
+    pub skipped: Vec<SkippedStage>,
     /// The job was cancelled before finishing every stage.
     pub cancelled: bool,
     /// Wall-clock seconds.

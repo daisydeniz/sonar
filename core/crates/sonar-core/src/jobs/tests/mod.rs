@@ -9,6 +9,7 @@ use std::time::Duration;
 use rusqlite::Connection;
 
 mod control;
+mod embed;
 mod vectors;
 mod versions;
 use tempfile::TempDir;
@@ -161,16 +162,43 @@ fn meta_stage_leaves_levels_empty_and_dsp_fills_them() {
 }
 
 #[test]
-fn embed_is_declared_but_skipped() {
+fn embed_without_model_files_is_skipped_cleanly() {
     let env = Env::new(2, 0);
+    let empty = tempfile::tempdir().expect("tmp");
+    let events = Arc::new(Mutex::new(Vec::new()));
+    let ev = Arc::clone(&events);
     let s = env.run(JobOptions {
         stages: vec![Stage::Embed, Stage::Meta],
+        embed: EmbedOptions {
+            models_dir: Some(empty.path().to_path_buf()),
+            ..EmbedOptions::default()
+        },
+        on_event: Some(Arc::new(move |e| {
+            if let Ok(mut v) = ev.lock() {
+                v.push(e.clone());
+            }
+        })),
         ..opts(1, 8)
     });
     assert_eq!(s.stages.len(), 1);
     assert_eq!(s.stages[0].stage, Stage::Meta);
+    assert_eq!(s.skipped.len(), 1);
+    assert_eq!(s.skipped[0].stage, Stage::Embed);
+    assert!(!s.skipped[0].reason.is_empty(), "{:?}", s.skipped);
+    assert!(events.lock().expect("lock").iter().any(|e| matches!(
+        e,
+        JobEvent::StageSkipped {
+            stage: Stage::Embed,
+            ..
+        }
+    )));
+    // Nothing recorded per file, no store created.
     assert_eq!(
         env.count("SELECT count(*) FROM file_stages WHERE stage='embed'"),
+        0
+    );
+    assert_eq!(
+        env.count("SELECT count(*) FROM files WHERE status = 'error'"),
         0
     );
 }

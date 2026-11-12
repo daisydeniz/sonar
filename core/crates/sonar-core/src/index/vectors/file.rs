@@ -236,7 +236,7 @@ fn map_file(path: &Path, file: &File) -> Result<Mmap> {
 }
 
 /// `bytes` as `f32` values (`None` if misaligned or not a whole number).
-pub(super) fn as_f32(bytes: &[u8]) -> Option<&[f32]> {
+pub(crate) fn as_f32(bytes: &[u8]) -> Option<&[f32]> {
     let ok = bytes.as_ptr().align_offset(align_of::<f32>()) == 0 && bytes.len().is_multiple_of(4);
     // SAFETY: alignment and length checked above; every bit pattern is a
     // valid `f32`; the result borrows `bytes`.
@@ -244,7 +244,7 @@ pub(super) fn as_f32(bytes: &[u8]) -> Option<&[f32]> {
 }
 
 /// `bytes` as `i64` values (`None` if misaligned or not a whole number).
-pub(super) fn as_i64(bytes: &[u8]) -> Option<&[i64]> {
+pub(crate) fn as_i64(bytes: &[u8]) -> Option<&[i64]> {
     let ok = bytes.as_ptr().align_offset(align_of::<i64>()) == 0 && bytes.len().is_multiple_of(8);
     // SAFETY: alignment and length checked above; every bit pattern is a
     // valid `i64`; the result borrows `bytes`.

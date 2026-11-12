@@ -9,6 +9,7 @@ mod classify_cmd;
 mod cli;
 mod decode_cmd;
 mod dsp_cmd;
+mod embed_cmd;
 mod eval_cmd;
 mod key_cmd;
 mod meta_cmd;
@@ -72,14 +73,18 @@ fn main() -> Result<()> {
         } => bpm_cmd::run(&files, json, !no_names)?,
         Command::Key(args) => key_cmd::run(&args)?,
         Command::Eval(args) => eval_cmd::run(&args)?,
+        Command::Embed(args) => embed_cmd::run(&args)?,
+        Command::EmbedText(args) => embed_cmd::run_text(&args)?,
         Command::Analyze {
             stages,
+            embed,
             threads,
             batch,
             json,
             debug_delay_ms,
         } => analyze_cmd::run(analyze_cmd::Args {
             stages,
+            embed: embed.to_options(),
             threads,
             batch: batch as usize,
             json,

@@ -6,6 +6,7 @@ use std::str::FromStr;
 use serde::Serialize;
 
 use crate::dsp::aspects::AspectVectors;
+use crate::embed::Embedding;
 use crate::meta::BasicMeta;
 use crate::store::analysis::KindTempo;
 use crate::store::key_pitch::KeyPitch;
@@ -30,8 +31,11 @@ pub const META_VERSION: u32 = 2;
 /// the vector store (ADR-023); bump it also when
 /// [`crate::dsp::aspects::ASPECTS_VERSION`] changes.
 pub const DSP_VERSION: u32 = 5;
-/// Version of the `embed` stage (T5.2). Declared so the stage name and
-/// version slot exist in the schema; there is no implementation yet.
+/// Version of the `embed` stage (T5.2, ADR-027): CLAP audio embedding of
+/// the first 10 s at the native rate resampled to 48 kHz, int8 audio tower,
+/// stored L2-normalised in the embedding store (`index/clap`). Bump it to
+/// re-embed every file, e.g. when the model or the front end
+/// ([`crate::embed::front`]) changes.
 pub const EMBED_VERSION: u32 = 1;
 
 /// A pipeline stage, in priority order (`Meta < Dsp < Embed`).
@@ -48,8 +52,10 @@ pub enum Stage {
     /// Analysis decode (30 s window) plus peak and loudness, loop/one-shot
     /// kind and (loops only) tempo.
     Dsp,
-    /// CLAP embedding. **Not implemented yet** (T5.2): it has a name and a
-    /// version but [`Stage::is_runnable`] is false, so the runner skips it.
+    /// CLAP audio embedding (T5.2, ADR-027), always last. Skipped (not
+    /// failed) when the model files are missing or the build has no CLAP
+    /// support. A failing file gets an `error` stage row but keeps its
+    /// `files.status`.
     Embed,
 }
 
@@ -74,12 +80,6 @@ impl Stage {
             Self::Dsp => DSP_VERSION,
             Self::Embed => EMBED_VERSION,
         }
-    }
-
-    /// Whether the runner can execute this stage in this build. `Embed` is
-    /// declared but not implemented, so it is always skipped.
-    pub fn is_runnable(self) -> bool {
-        !matches!(self, Self::Embed)
     }
 }
 
@@ -146,6 +146,16 @@ pub(crate) enum FileResult {
         /// boxed, the vectors make it large).
         analysis: Option<Box<DspAnalysis>>,
     },
+    /// `Embed` stage completed: the file's CLAP embedding.
+    Embedded {
+        /// The file is damaged or truncated; the embedding covers what was
+        /// readable (recorded as `partial`).
+        partial: bool,
+        /// First problem seen when `partial`.
+        problem: Option<String>,
+        /// L2-normalised embedding, appended to the embedding store.
+        embedding: Box<Embedding>,
+    },
     /// Decode or format failure: recorded as an error row.
     Failed(String),
     /// Not recorded, file stays pending: an I/O error (offline drive,
@@ -166,7 +176,5 @@ mod tests {
         }
         assert!(Stage::Meta < Stage::Dsp && Stage::Dsp < Stage::Embed);
         assert!("bogus".parse::<Stage>().is_err());
-        assert!(!Stage::Embed.is_runnable());
-        assert!(Stage::Meta.is_runnable() && Stage::Dsp.is_runnable());
     }
 }

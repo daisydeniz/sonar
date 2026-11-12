@@ -5,6 +5,7 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
+use sonar_core::embed::EmbedOptions;
 use sonar_core::jobs::{self, JobEvent, JobOptions, JobSummary, Stage};
 use sonar_core::paths;
 
@@ -14,6 +15,7 @@ const PROGRESS_INTERVAL: Duration = Duration::from_millis(250);
 /// Parsed arguments.
 pub struct Args {
     pub stages: Vec<Stage>,
+    pub embed: EmbedOptions,
     pub threads: usize,
     pub batch: usize,
     pub json: bool,
@@ -29,6 +31,7 @@ pub fn run(args: Args) -> Result<()> {
     let on_event = Arc::new(move |e: &JobEvent| report(e, &last, tty));
     let opts = JobOptions {
         stages: args.stages,
+        embed: args.embed,
         threads: args.threads,
         batch_size: args.batch,
         on_event: Some(on_event),
@@ -65,14 +68,18 @@ fn report(event: &JobEvent, last: &Mutex<Instant>, tty: bool) {
             let end = if tty { '\r' } else { '\n' };
             eprint!("{stage}: {done}/{total} (errors {errors}, skipped {skipped}){end}");
         }
+        JobEvent::StageSkipped { stage, reason } => eprintln!("{stage}: skipped, {reason}"),
         JobEvent::StageFinished(_) if tty => eprintln!(),
         _ => {}
     }
 }
 
 fn print_summary(s: &JobSummary) {
-    if s.stages.is_empty() {
+    if s.stages.is_empty() && s.skipped.is_empty() {
         println!("nothing to do");
+    }
+    for sk in &s.skipped {
+        println!("{}: skipped ({})", sk.stage, sk.reason);
     }
     for st in &s.stages {
         println!(

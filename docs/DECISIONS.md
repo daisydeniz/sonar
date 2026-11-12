@@ -792,3 +792,41 @@ Accepted. Measured with a throwaway Rust crate outside git (`ort`
   MS-PL (not on the ADR-004 list), no ONNX. Own export (optimum/torch):
   needs a Python toolchain; the pinned, checksummed hosted export is the
   same weights.
+
+## ADR-027 — Embed module: ort session pool, CLAP store, Embed stage (T5.2)
+Accepted. Implements ADR-026 in `sonar_core::embed` (cargo feature `embed`,
+on for the CLI; the FFI build gets a stub until T5.6).
+- **Runtime**: `ort` =2.0.0-rc.10 (MIT OR Apache-2.0, ONNX Runtime 1.22) with
+  default `download-binaries`: `ort-sys`' build script downloads the
+  prebuilt onnxruntime at build time (needs network on first build; its
+  build-only deps `ureq`/`native-tls`/`tar`/`webpki-root-certs` are not
+  linked into Sonar). The runtime itself is MIT. `webpki-root-certs` is
+  CDLA-Permissive-2.0 (a permissive data license): scoped exception in
+  `core/deny.toml`. `cargo deny check advisories` flags `paste` (via
+  `tokenizers`) and `basic-toml` (via uniffi) as unmaintained; advisories are
+  not part of check.sh, left open (ROADMAP Later).
+- **Audio**: a pool of N single-thread int8 sessions (default one per
+  performance core), each on its own thread, fed through a bounded channel;
+  inputs `[B,1,1001,64]` from the ADR-026 front end (`embed::front`,
+  decode at the native rate, resample to 48 kHz); outputs L2-normalised.
+  CPU EP by default; CoreML selectable (`--ep coreml`, `SONAR_EMBED_EP`),
+  falls back to CPU if it cannot load. **CoreML is not the default**:
+  ADR-026 measured it at 26-79 clips/s vs 150+ on CPU, with 33 s compile
+  per session load.
+- **Text**: one fp32 session, RoBERTa tokenizer, 77 tokens, no padding.
+- **Store**: `index/clap/{ids.i64,emb.f32,meta.json,LOCK}` beside the aspect
+  vectors; 512 x f32 rows, append-only, rows written before ids so a torn
+  append is cut on open; re-embedding supersedes (new row wins); mmap
+  readers, single locked writer. SQLite stage rows are the source of truth
+  for "done"; the store is appended before the batch commit.
+- **Stage**: `Embed` is the last and lowest-priority stage; it is skipped
+  cleanly (not failed) when the model directory is missing or the build has
+  no `embed` feature. CLI: `sonar embed`, `sonar embed-text`,
+  `sonar analyze --stages ... embed`, `sonar bench embed`.
+- **Throughput** (Apple M4 Pro 10P+4E, release, CPU EP, 10 sessions,
+  batch 1): model only 157 clips/s; decode + front end 2.1 ms/file on one
+  thread; **end to end 154 files/s** over a 1000-file generated library
+  (budget >= 100 files/s: met). Model load 4 s. Scaling is per
+  performance core (~15.5 clips/s each): a base M4 (4P) defaults to 4
+  sessions, ≈ 60 files/s estimated (not measured) — the documented best
+  there; the M4 Pro figure is the measured one.

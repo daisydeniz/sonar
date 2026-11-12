@@ -45,7 +45,7 @@ use crate::{paths, Error, Result};
 pub use file::FORMAT_VERSION;
 pub use write::CompactReport;
 
-use file::{as_f32, as_i64};
+pub(crate) use file::{as_f32, as_i64};
 use generation::Generation;
 
 /// Vector store directory relative to the data directory.

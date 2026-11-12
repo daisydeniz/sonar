@@ -181,14 +181,18 @@ pub enum Command {
 
     /// Run the analysis pipeline over every library in the store: `meta`
     /// (format, duration) for all files first, then `dsp` (analysis decode,
-    /// peak, loudness). Resumable: only pending files are processed, so it can
-    /// be interrupted and restarted. Progress goes to stderr, the summary
-    /// to stdout. File-level errors are recorded as data (exit code 0).
+    /// peak, loudness), then optionally `embed` (CLAP). Resumable: only
+    /// pending files are processed, so it can be interrupted and restarted.
+    /// Progress goes to stderr, the summary to stdout. File-level errors are
+    /// recorded as data (exit code 0).
     Analyze {
-        /// Stages to run, comma separated (`meta`, `dsp`; `embed` is not
-        /// implemented yet and is skipped).
+        /// Stages to run, comma separated (`meta`, `dsp`, `embed`; `embed`
+        /// is skipped with a note when the CLAP model is not installed).
         #[arg(long, value_delimiter = ',', default_values = ["meta", "dsp"])]
         stages: Vec<Stage>,
+        /// CLAP model settings for the `embed` stage.
+        #[command(flatten)]
+        embed: crate::embed_cmd::EmbedOpts,
         /// Worker threads (0 = all cores).
         #[arg(long, default_value_t = 0)]
         threads: usize,
@@ -299,6 +303,13 @@ pub enum Command {
     /// (`--file`), nearest first, with per-aspect weights and the filters
     /// of `sonar search`. Needs `sonar analyze` (aspect vectors).
     Similar(crate::similar_cmd::SimilarArgs),
+
+    /// CLAP audio embeddings (512-d, normalised) of audio files: dims,
+    /// norm and timing. Needs the model (`scripts/fetch-models.sh`).
+    Embed(crate::embed_cmd::EmbedArgs),
+
+    /// CLAP text embedding of a query: tokens, dims, norm and timing.
+    EmbedText(crate::embed_cmd::EmbedTextArgs),
 
     /// Performance benchmarks in a temporary folder with its own store
     /// (never yours). Use a release build for meaningful numbers.

@@ -3,8 +3,10 @@
 //!
 //! # Model
 //! - Stages ([`Stage`]): `Meta` (format + duration, fast), `Dsp` (analysis
-//!   decode, peak, loudness), `Embed` (declared, not implemented yet, so
-//!   always skipped). Each has a version; per-file progress lives in
+//!   decode, peak, loudness), `Embed` (CLAP audio embedding, T5.2: lowest
+//!   priority, runs on the session pool of [`crate::embed`], skipped with a
+//!   [`JobEvent::StageSkipped`] when the model files are missing). Each has
+//!   a version; per-file progress lives in
 //!   `file_stages`, and a file is *pending* for a stage when it has no row or
 //!   an older version. A scan that sees changed content deletes the rows.
 //! - **Priorities**: strictly staged across the whole store: every pending
@@ -23,7 +25,9 @@
 //! - **Vectors**: the `Dsp` stage also extracts the raw aspect vectors and
 //!   appends them to the vector store next to the database
 //!   (`<db dir>/index/vectors`) right before each batch commit; see
-//!   `vectors.rs` for reconciliation and compaction (ADR-023).
+//!   `vectors.rs` for reconciliation and compaction (ADR-023). The `Embed`
+//!   stage does the same with the embedding store (`<db dir>/index/clap`,
+//!   `embed.rs`, ADR-027).
 //! - **Control**: [`JobHandle::pause`] stops workers starting new files
 //!   (files in flight finish and are committed; the rest of the batch is
 //!   re-dispatched after [`JobHandle::resume`], no busy loop),
@@ -32,6 +36,7 @@
 //!   ([`JobHandle::progress`]) or pushed ([`JobOptions::on_event`]).
 
 mod batches;
+mod embed;
 mod progress;
 pub(crate) mod queue;
 mod runner;
@@ -49,9 +54,10 @@ use std::sync::Arc;
 use std::thread::JoinHandle;
 use std::time::Duration;
 
+use crate::embed::EmbedOptions;
 use crate::{Error, Result, Store};
 
-pub use progress::{JobEvent, JobSummary, ProgressSnapshot, StageSummary};
+pub use progress::{JobEvent, JobSummary, ProgressSnapshot, SkippedStage, StageSummary};
 pub use stage::{Outcome, Stage, DSP_VERSION, EMBED_VERSION, META_VERSION};
 
 use progress::Shared;
@@ -66,13 +72,16 @@ pub type BeforeFileHook = Arc<dyn Fn(Stage, &Path) + Send + Sync>;
 /// Options for [`start`].
 #[derive(Clone)]
 pub struct JobOptions {
-    /// Stages to run (any order; they always run in priority order, and
-    /// `Embed` is skipped until it is implemented). Default: `Meta`, `Dsp`.
+    /// Stages to run (any order; they always run in priority order).
+    /// `Embed` is skipped when the model is not available. Default: `Meta`,
+    /// `Dsp` (add `Embed` for CLAP embeddings; see [`JobOptions::embed`]).
     pub stages: Vec<Stage>,
     /// Worker threads for decoding; 0 = available cores.
     pub threads: usize,
     /// Files claimed and committed together (one transaction). Default 128.
     pub batch_size: usize,
+    /// Models, session count and execution provider of the `Embed` stage.
+    pub embed: EmbedOptions,
     /// Receives progress events; runs on the job thread.
     pub on_event: Option<EventCallback>,
     /// Test only: sleep this long before each file (so a kill test can
@@ -90,6 +99,7 @@ impl Default for JobOptions {
             stages: vec![Stage::Meta, Stage::Dsp],
             threads: 0,
             batch_size: 128,
+            embed: EmbedOptions::default(),
             on_event: None,
             debug_file_delay: Duration::ZERO,
             debug_before_file: None,
