@@ -133,11 +133,12 @@ pub enum Command {
         json: bool,
     },
 
-    /// Classify audio files as loop or one-shot from their analysis window
-    /// (onset periodicity, true duration, decay tail) plus a lower-weight
-    /// hint from the file and folder names, and print the decision,
-    /// confidence and heuristic scores. Unreadable files are reported and
-    /// skipped; exits non-zero if any failed.
+    /// Classify audio files: loop or one-shot (onset periodicity, true
+    /// duration, decay tail) and category (`docs/categories.md`: CLAP
+    /// zero-shot when the model is available, DSP cues, name hint), each
+    /// with confidence and source, plus the scores behind them. Names are a
+    /// lower-weight hint. Unreadable files are reported and skipped; exits
+    /// non-zero if any failed.
     Classify {
         /// Audio files (wav, aif/aiff, flac, mp3, ogg, m4a).
         #[arg(required = true)]
@@ -148,6 +149,10 @@ pub enum Command {
         /// Ignore file and folder names (audio evidence only, as the eval).
         #[arg(long)]
         no_names: bool,
+        /// Category from DSP cues (and names) only, even when the CLAP
+        /// model is available.
+        #[arg(long)]
+        no_clap: bool,
     },
 
     /// Estimate the tempo of audio files: loop/one-shot decision first

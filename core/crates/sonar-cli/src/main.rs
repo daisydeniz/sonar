@@ -65,7 +65,8 @@ fn main() -> Result<()> {
             files,
             json,
             no_names,
-        } => classify_cmd::run(&files, json, !no_names)?,
+            no_clap,
+        } => classify_cmd::run(&files, json, !no_names, !no_clap)?,
         Command::Bpm {
             files,
             json,

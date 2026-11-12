@@ -114,6 +114,45 @@ fn a_lost_embedding_store_requeues_the_files() {
     assert_eq!(live_ids(&env).len(), 4);
 }
 
+/// The `embed` stage re-decides the category (CLAP + stored DSP cues) and a
+/// later `dsp`-only re-run never replaces that refined value (ADR-028).
+#[test]
+fn embed_refines_the_category_and_dsp_reruns_keep_it() {
+    let Some(embed) = embed_opts() else { return };
+    let env = Env::new(4, 0);
+    env.run(JobOptions {
+        stages: vec![Stage::Meta, Stage::Dsp, Stage::Embed],
+        embed,
+        ..opts(2, 4)
+    });
+    assert_eq!(
+        env.count(
+            "SELECT count(*) FROM analysis WHERE category IS NOT NULL \
+             AND category_source = 'detected' AND category_conf BETWEEN 0 AND 1"
+        ),
+        4
+    );
+    // Mark the refined values, then re-run only the DSP stage.
+    env.conn()
+        .execute_batch(
+            "UPDATE analysis SET category = 'pad', category_conf = 0.5;
+             DELETE FROM file_stages WHERE stage = 'dsp';",
+        )
+        .expect("mark");
+    env.run(JobOptions {
+        stages: vec![Stage::Dsp],
+        ..opts(2, 4)
+    });
+    assert_eq!(
+        env.count("SELECT count(*) FROM file_stages WHERE stage = 'dsp'"),
+        4
+    );
+    assert_eq!(
+        env.count("SELECT count(*) FROM analysis WHERE category = 'pad'"),
+        4
+    );
+}
+
 #[test]
 fn embed_has_the_lowest_priority() {
     let Some(embed) = embed_opts() else { return };

@@ -6,6 +6,8 @@ use std::process::Command as Proc;
 
 use anyhow::{bail, Context, Result};
 use clap::Args;
+use sonar_core::classify::category::clap::ClapScorer;
+use sonar_core::embed::EmbedOptions;
 use sonar_core::eval::golden::TEMPLATE_SIZE;
 use sonar_core::eval::{self, Baseline, Dataset, EvalReport};
 
@@ -41,6 +43,15 @@ pub struct EvalArgs {
     /// similarity (report only, never recorded in the baseline).
     #[arg(long, conflicts_with_all = ["check", "write_baseline"])]
     pub similar_sweep: bool,
+    /// Score categories without CLAP even when the model is available
+    /// (DSP only, as on a machine without `models/`).
+    #[arg(long)]
+    pub no_clap: bool,
+    /// Write per-file category evidence (JSON lines) to FILE: DSP cues,
+    /// decisions and, with CLAP, the cosine to every prompt (for tuning the
+    /// classifier, ADR-028).
+    #[arg(long, value_name = "FILE", hide = true)]
+    pub category_dump: Option<PathBuf>,
     /// Exit non-zero when a tracked metric regressed against the baseline
     /// (a percentage dropped by more than 1 point, or a must-be-zero count
     /// rose). Only tiers present in the baseline are compared.
@@ -81,6 +92,8 @@ pub fn run(args: &EvalArgs) -> Result<()> {
 
     let opts = eval::EvalOptions {
         similar_sweep: args.similar_sweep,
+        clap: if args.no_clap { None } else { load_clap() },
+        category_dump: args.category_dump.clone(),
     };
     let mut tiers = Vec::new();
     // Keeps the generated fixtures alive until the end of the run.
@@ -90,7 +103,7 @@ pub fn run(args: &EvalArgs) -> Result<()> {
         eprintln!("generating fixtures...");
         let ds = eval::fixtures_dataset(tmp.path(), !args.skip_long)
             .context("generating the fixtures")?;
-        tiers.push(analyse(&ds, opts));
+        tiers.push(analyse(&ds, opts.clone()));
         _fixture_dir = Some(tmp);
     }
     if let Some(dir) = &args.silver {
@@ -103,7 +116,7 @@ pub fn run(args: &EvalArgs) -> Result<()> {
                 ds.unlabeled
             );
         }
-        tiers.push(analyse(&ds, opts));
+        tiers.push(analyse(&ds, opts.clone()));
     }
     if args.golden {
         let dir = golden_dir(args.golden_dir.as_deref())?;
@@ -150,6 +163,26 @@ pub fn run(args: &EvalArgs) -> Result<()> {
         check(&report, old, &baseline_path)?;
     }
     Ok(())
+}
+
+/// CLAP for the category scores when the model is available (a note on
+/// stderr either way); the tracked fixture metrics never depend on it.
+pub(crate) fn load_clap() -> Option<std::sync::Arc<ClapScorer>> {
+    let opts = EmbedOptions::default();
+    if let Some(reason) = opts.unavailable_reason() {
+        eprintln!("categories: DSP only ({reason})");
+        return None;
+    }
+    match ClapScorer::load(&opts) {
+        Ok(c) => {
+            eprintln!("categories: CLAP + DSP");
+            Some(std::sync::Arc::new(c))
+        }
+        Err(e) => {
+            eprintln!("categories: DSP only (CLAP failed to load: {e})");
+            None
+        }
+    }
 }
 
 /// Evaluates one dataset with a progress line on stderr.

@@ -9,6 +9,7 @@ use crate::dsp::aspects::AspectVectors;
 use crate::embed::Embedding;
 use crate::meta::BasicMeta;
 use crate::store::analysis::KindTempo;
+use crate::store::category::CategoryRow;
 use crate::store::key_pitch::KeyPitch;
 
 /// Current version of the `meta` stage (format, duration). Bump it to
@@ -29,14 +30,20 @@ pub const META_VERSION: u32 = 2;
 /// stores `key` / `key_conf` / `key_source` and, for pitched one-shots,
 /// `pitch_midi` / `pitch_conf`. 5 (T4.1) appends the raw aspect vectors to
 /// the vector store (ADR-023); bump it also when
-/// [`crate::dsp::aspects::ASPECTS_VERSION`] changes.
-pub const DSP_VERSION: u32 = 5;
+/// [`crate::dsp::aspects::ASPECTS_VERSION`] changes. 6 (T5.3) stores the
+/// DSP + name `category` / `category_conf` / `category_source` (ADR-028);
+/// bump it also when [`crate::classify::CATEGORY_VERSION`] changes.
+pub const DSP_VERSION: u32 = 6;
 /// Version of the `embed` stage (T5.2, ADR-027): CLAP audio embedding of
 /// the first 10 s at the native rate resampled to 48 kHz, int8 audio tower,
 /// stored L2-normalised in the embedding store (`index/clap`). Bump it to
 /// re-embed every file, e.g. when the model or the front end
 /// ([`crate::embed::front`]) changes.
-pub const EMBED_VERSION: u32 = 1;
+///
+/// History: 2 (T5.3) also refines the category with CLAP zero-shot scores
+/// (ADR-028); bump it also when [`crate::classify::CATEGORY_VERSION`]
+/// changes.
+pub const EMBED_VERSION: u32 = 2;
 
 /// A pipeline stage, in priority order (`Meta < Dsp < Embed`).
 ///
@@ -130,6 +137,8 @@ pub(crate) struct DspAnalysis {
     pub kind_tempo: KindTempo,
     /// `key`, `key_conf`, `key_source`, `pitch_midi`, `pitch_conf`.
     pub key_pitch: KeyPitch,
+    /// `category`, `category_conf`, `category_source` (DSP + name).
+    pub category: CategoryRow,
     /// Raw aspect vectors, appended to the vector store.
     pub aspects: AspectVectors,
 }
@@ -155,6 +164,9 @@ pub(crate) enum FileResult {
         problem: Option<String>,
         /// L2-normalised embedding, appended to the embedding store.
         embedding: Box<Embedding>,
+        /// CLAP-refined category, filled in by the coordinator before the
+        /// commit (`None` = leave the stored category alone).
+        category: Option<CategoryRow>,
     },
     /// Decode or format failure: recorded as an error row.
     Failed(String),

@@ -830,3 +830,38 @@ on for the CLI; the FFI build gets a stub until T5.6).
   performance core (~15.5 clips/s each): a base M4 (4P) defaults to 4
   sessions, ≈ 60 files/s estimated (not measured) — the documented best
   there; the M4 Pro figure is the measured one.
+
+## ADR-028 — Category classifier: CLAP zero-shot + DSP naive Bayes + name hint (T5.3)
+Accepted. `sonar_core::classify::category`; taxonomy of 17 sound-source
+categories in `docs/categories.md` (mirrored by a unit test; loop/one-shot
+stays a separate field).
+- **Evidence, late fusion**: CLAP zero-shot (Wu et al. 2023) = best-prompt
+  cosine per category (several sub-type prompts per class; max beat the
+  CLIP prompt-embedding average by 2-3 points on silver); DSP = Gaussian
+  naive Bayes (Duda/Hart/Stork §2.6) over 11 named aspect-vector cues
+  (spectral always, envelope only for one-shots, f0 gated by tonality) plus
+  a loop/one-shot prior. Profiles fitted on 22 of the 47 silver genre
+  folders (hand rows for classes silver lacks: lead, pad, pluck, vocal,
+  texture). `z = 10·clap + 0.2·dsp` (or `dsp` alone), `p = softmax(z/T)`.
+- **Calibration**: temperature scaling (Guo et al. 2017) fitted on silver:
+  `T = 0.96` fused, `2.69` DSP-only. `sonar eval` refits T on a hash-split
+  half and reports held-out ECE.
+- **Name hint**: a category word in the stem or the two nearest folders adds
+  +3 to that calibrated logit (odds ≈ 20:1): decides ambiguous audio, cannot
+  outvote clear audio. Source `filename` iff it changed the decision. The
+  eval hides names, so measured numbers are audio-only.
+- **Pipeline**: the `dsp` stage stores the DSP + name category
+  (`DSP_VERSION` 6); the `embed` stage re-decides with CLAP from the stored
+  aspect vectors + kind + duration and overwrites it (`EMBED_VERSION` 2). A
+  DSP-only rerun never replaces a CLAP-refined row. CLI: `sonar classify`
+  (`--no-clap`, `--no-names`), `sonar eval` (`--no-clap`).
+- **Eval**: tracked fixture metric is the **DSP-only** top-1 / macro-F1 (no
+  dependency on `models/`); the shipped (CLAP + DSP) and CLAP-only numbers
+  are report-only. Measured (audio only): fixtures DSP 33.9 % / CLAP + DSP
+  53.6 % (synthetic, 56 labelled); silver (7818 files, folder labels) DSP
+  65.8 % / CLAP-only 71.3 % / CLAP + DSP 76.0 %, ECE 1.8 %; the two
+  alphabetical halves of the genre folders agree within 2.4 points.
+- **Consequences**: the golden ≥ 90 % target is open until the founder's
+  golden set exists; silver is one vendor library with noisy folder labels
+  (perc folders hold snares/claps). Re-fit weights/profiles when golden
+  arrives (bump `CATEGORY_VERSION` + both stage versions).

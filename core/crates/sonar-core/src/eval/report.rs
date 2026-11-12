@@ -16,10 +16,8 @@ use super::run::TierReport;
 pub const REPORT_SCHEMA_VERSION: u32 = 1;
 
 /// Metric families the docs define that have no implementation yet.
-pub const NOT_AVAILABLE: &[&str] = &[
-    "category (top-1, macro-F1, confusion): needs the category classifier (T5.3)",
-    "text / NL search (NDCG@10, recall@50): needs NL search (T5.4)",
-];
+pub const NOT_AVAILABLE: &[&str] =
+    &["text / NL search (NDCG@10, recall@50): needs NL search (T5.4)"];
 
 /// A whole eval run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -171,6 +169,17 @@ fn tier_markdown(s: &mut String, t: &TierReport, baseline: Option<&Baseline>) {
     if let Some(n) = &m.note {
         parts.push(format!("note {}", n.total));
     }
+    if let Some(c) = &m.category {
+        parts.push(format!(
+            "category {} ({})",
+            c.total,
+            if c.used_clap {
+                "CLAP + DSP"
+            } else {
+                "DSP only"
+            }
+        ));
+    }
     if let Some(x) = &m.similar {
         let pitch = x.pitch.as_ref().map_or(String::new(), |p| {
             format!(", pitch-only {} seeds", p.queries)
@@ -196,6 +205,9 @@ fn tier_markdown(s: &mut String, t: &TierReport, baseline: Option<&Baseline>) {
         for r in &x.sweep {
             let _ = writeln!(s, "| {} | {:.2} | {:.2} |", r.name, r.p10_pct, r.mrr_pct);
         }
+    }
+    if let Some(c) = &m.category {
+        super::category::markdown(s, c);
     }
     if !t.notes.is_empty() {
         s.push_str("\nNotes:\n\n");
@@ -273,7 +285,7 @@ mod tests {
         assert!(!ok.contains("REGRESSION"));
         let none = report(100.0).to_markdown(None);
         assert!(none.contains("| 100.00 | - | - |"), "{none}");
-        assert!(none.contains("Not available yet") && none.contains("T5.3"));
+        assert!(none.contains("Not available yet") && none.contains("T5.4"));
         assert!(none.contains("- a note"));
     }
 

@@ -9,6 +9,7 @@
 
 pub mod analysis;
 pub mod audio_meta;
+pub mod category;
 mod files;
 pub mod key_pitch;
 mod libraries;

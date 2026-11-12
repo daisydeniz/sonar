@@ -14,7 +14,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 use super::stage::{FileResult, Outcome, Stage};
-use crate::store::{analysis as store_analysis, audio_meta, is_busy, key_pitch};
+use crate::store::{
+    analysis as store_analysis, audio_meta, category as store_category, is_busy, key_pitch,
+};
 use crate::Result;
 
 /// A file taken from the queue, with the identity it had at claim time.
@@ -217,8 +219,14 @@ pub(crate) fn commit(
             // commit; the stage row marks the file done. `files.status` is
             // the meta/dsp pipeline's and stays as it is.
             FileResult::Embedded {
-                partial, problem, ..
+                partial,
+                problem,
+                category,
+                ..
             } => {
+                if let Some(c) = category {
+                    store_category::upsert_category(&tx, claim.id, c, false)?;
+                }
                 let outcome = if *partial {
                     Outcome::Partial
                 } else {
@@ -257,6 +265,7 @@ pub(crate) fn commit(
                         if let Some(a) = analysis {
                             store_analysis::upsert_kind_tempo(&tx, claim.id, &a.kind_tempo)?;
                             key_pitch::upsert_key_pitch(&tx, claim.id, &a.key_pitch)?;
+                            store_category::upsert_category(&tx, claim.id, &a.category, true)?;
                         }
                         "analyzed"
                     }

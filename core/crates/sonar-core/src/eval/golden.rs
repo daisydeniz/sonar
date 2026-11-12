@@ -5,13 +5,15 @@
 //! Paths are relative to the golden directory, or absolute. `kind` accepts
 //! `loop` and `oneshot` / `one_shot` / `one-shot` / `one shot`; `key` accepts
 //! `F minor`, `Fm`, `C#m`, `Ebmaj`, `A` (tonic only) and flats or sharps;
-//! `note` is scientific pitch (`A4` = 69, `C4` = 60). A cell that does not
-//! parse is ignored and reported as a warning.
+//! `note` is scientific pitch (`A4` = 69, `C4` = 60); `category` is a
+//! taxonomy id of `docs/categories.md` (`kick`, `hat`, ...; plurals and the
+//! taxonomy's name words such as `hihat`, `percussion` also parse). A cell
+//! that does not parse is ignored and reported as a warning.
 
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 
-use crate::classify::Kind;
+use crate::classify::{Category, Kind};
 use crate::text::music::{parse_key_piece, KeyPiece};
 use crate::text::Key;
 use crate::{Error, Result};
@@ -135,10 +137,13 @@ pub fn golden_dataset(dir: &Path) -> Result<Dataset> {
         };
         let mut warn =
             |what: &str, v: &str| ds.warnings.push(format!("row {}: bad {what} {v:?}", i + 1));
-        let mut labels = Labels {
-            category: cell(c_cat).map(str::to_string),
-            ..Labels::default()
-        };
+        let mut labels = Labels::default();
+        if let Some(v) = cell(c_cat) {
+            labels.category = Category::parse(v);
+            if labels.category.is_none() {
+                warn("category", v);
+            }
+        }
         if let Some(v) = cell(c_kind) {
             labels.kind = parse_kind(v);
             if labels.kind.is_none() {
@@ -351,17 +356,21 @@ mod tests {
             k.wav,kick,one_shot,,,A4,\n\
             u.wav,,,,,,\n\
             gone.wav,,loop,100,,,\n\
-            k.wav,,oneshot,fast,H,x,\n";
+            k.wav,,oneshot,fast,H,x,\n\
+            u.wav,Hi-Hats,,,,,\n\
+            u.wav,banjo,,,,,\n";
         std::fs::write(d.join(LABELS_FILE), csv).unwrap();
         let ds = golden_dataset(d).unwrap();
-        assert_eq!(ds.items.len(), 3, "{ds:?}");
-        assert_eq!(ds.unlabeled, 1);
+        assert_eq!(ds.items.len(), 4, "{ds:?}");
+        assert_eq!(ds.unlabeled, 2);
         assert_eq!(ds.missing, ["gone.wav"]);
-        assert_eq!(ds.warnings.len(), 3, "{:?}", ds.warnings);
+        assert_eq!(ds.warnings.len(), 4, "{:?}", ds.warnings);
         let a = &ds.items[0].labels;
         assert_eq!((a.kind, a.bpm), (Some(Kind::Loop), Some(122.0)));
-        assert_eq!(a.category.as_deref(), Some("pad"));
+        assert_eq!(a.category, Some(Category::Pad));
+        assert_eq!(ds.items[1].labels.category, Some(Category::Kick));
         assert_eq!(ds.items[1].labels.note_midi, Some(69));
+        assert_eq!(ds.items[3].labels.category, Some(Category::Hat));
         assert!(golden_dataset(&d.join("nope")).is_err());
     }
 

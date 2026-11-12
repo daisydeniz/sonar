@@ -11,9 +11,11 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::classify::category::{T_DSP, T_FUSED};
 use crate::classify::Kind;
 use crate::text::{Key, Mode};
 
+use super::category::{CategoryAccumulator, CategoryMetrics, CategoryObs};
 use super::dataset::Labels;
 use super::similarity::SimilarMetrics;
 
@@ -34,6 +36,8 @@ pub struct Observation {
     pub key: Option<Key>,
     /// MIDI number of the detected one-shot note.
     pub note_midi: Option<u8>,
+    /// Category decisions.
+    pub category: Option<CategoryObs>,
 }
 
 /// How an estimated BPM relates to the truth.
@@ -182,6 +186,10 @@ pub struct Metrics {
     /// not by the [`Accumulator`].
     #[serde(default)]
     pub similar: Option<SimilarMetrics>,
+    /// Category (top-1, macro-F1, confusion, calibration), see
+    /// [`super::category`].
+    #[serde(default)]
+    pub category: Option<CategoryMetrics>,
 }
 
 /// Scores observations one by one.
@@ -192,11 +200,15 @@ pub struct Accumulator {
     key: KeyMetrics,
     mirex_sum: f64,
     note: NoteMetrics,
+    category: CategoryAccumulator,
 }
 
 impl Accumulator {
-    /// Adds one analysed file with its labels.
-    pub fn add(&mut self, labels: &Labels, got: &Observation) {
+    /// Adds one analysed file (`id`: its dataset id) with its labels.
+    pub fn add(&mut self, id: &str, labels: &Labels, got: &Observation) {
+        if let (Some(want), Some(c)) = (labels.category, got.category) {
+            self.category.add(id, want, c);
+        }
         if let Some(want) = labels.kind {
             self.kind.total += 1;
             if want == got.kind {
@@ -245,8 +257,12 @@ impl Accumulator {
             mut key,
             mirex_sum,
             mut note,
+            category,
         } = self;
-        let mut m = Metrics::default();
+        let mut m = Metrics {
+            category: category.finish(T_FUSED, T_DSP),
+            ..Metrics::default()
+        };
         if let Some(p) = pct(kind.correct, kind.total) {
             kind.accuracy_pct = p;
             m.kind = Some(kind);
@@ -347,6 +363,7 @@ mod tests {
             bpm,
             key,
             note_midi: note,
+            category: None,
         }
     }
 
@@ -362,28 +379,36 @@ mod tests {
             ..Labels::default()
         };
         a.add(
+            "f",
             &loop_label(100.0),
             &obs(Kind::Loop, Some(100.4), None, None),
         );
         a.add(
+            "f",
             &loop_label(100.0),
             &obs(Kind::Loop, Some(200.0), None, None),
         );
-        a.add(&loop_label(100.0), &obs(Kind::OneShot, None, None, None));
+        a.add(
+            "f",
+            &loop_label(100.0),
+            &obs(Kind::OneShot, None, None, None),
+        );
         let shot = Labels {
             kind: Some(Kind::OneShot),
             ..Labels::default()
         };
-        a.add(&shot, &obs(Kind::Loop, Some(90.0), None, None));
+        a.add("f", &shot, &obs(Kind::Loop, Some(90.0), None, None));
         let keyed = |key| Labels {
             key: Some(key),
             ..Labels::default()
         };
         a.add(
+            "f",
             &keyed(k(0, MAJ)),
             &obs(Kind::Loop, None, Some(k(0, MAJ)), None),
         );
         a.add(
+            "f",
             &keyed(k(0, MAJ)),
             &obs(Kind::Loop, None, Some(k(9, MIN)), None),
         );
@@ -391,8 +416,8 @@ mod tests {
             note_midi: Some(m),
             ..Labels::default()
         };
-        a.add(&noted(60), &obs(Kind::OneShot, None, None, Some(60)));
-        a.add(&noted(60), &obs(Kind::OneShot, None, None, Some(72)));
+        a.add("f", &noted(60), &obs(Kind::OneShot, None, None, Some(60)));
+        a.add("f", &noted(60), &obs(Kind::OneShot, None, None, Some(72)));
         let m = a.finish();
         let kind = m.kind.unwrap();
         assert_eq!((kind.total, kind.correct), (4, 2));

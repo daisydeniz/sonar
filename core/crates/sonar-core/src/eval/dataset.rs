@@ -17,8 +17,10 @@ use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
 
-use crate::classify::{kind_hint, Kind};
-use crate::fixtures::manifest::{Kind as TruthKind, Manifest, Mode as TruthMode};
+use crate::classify::{category_hint, kind_hint, Category, Kind};
+use crate::fixtures::manifest::{
+    Category as TruthCategory, Kind as TruthKind, Manifest, Mode as TruthMode,
+};
 use crate::scan::is_audio_name;
 use crate::text::{filename_prior, Key, Mode};
 use crate::{Error, Result};
@@ -60,8 +62,8 @@ pub struct Labels {
     pub key: Option<Key>,
     /// MIDI number of a tonal one-shot's note.
     pub note_midi: Option<u8>,
-    /// Category (kept for the classifier metrics, not scored yet).
-    pub category: Option<String>,
+    /// Category (`docs/categories.md`).
+    pub category: Option<Category>,
     /// Decoding is expected to fail (corrupt fixture).
     pub expect_error: bool,
     /// Fixture sound family: relevance class of the similarity metric
@@ -76,6 +78,7 @@ impl Labels {
             || self.bpm.is_some()
             || self.key.is_some()
             || self.note_midi.is_some()
+            || self.category.is_some()
             || self.expect_error
     }
 }
@@ -131,6 +134,24 @@ pub fn fixture_kind(truth: TruthKind) -> Option<Kind> {
     }
 }
 
+/// Fixture truth → category label (`docs/categories.md`): drum hits and
+/// loops map one to one (both hats to `hat`); the `synth` truth is split by
+/// its kind (one-shot pluck → `pluck`, sustained tone → `pad`, chord loop
+/// → `synth`). Test material with no instrument category (`sine`, `click`,
+/// `noise`) has no label.
+pub fn fixture_category(truth: TruthCategory, kind: Option<TruthKind>) -> Option<Category> {
+    match (truth, kind) {
+        (TruthCategory::Kick, _) => Some(Category::Kick),
+        (TruthCategory::Snare, _) => Some(Category::Snare),
+        (TruthCategory::HatClosed | TruthCategory::HatOpen, _) => Some(Category::Hat),
+        (TruthCategory::Drums, _) => Some(Category::Drums),
+        (TruthCategory::Synth, Some(TruthKind::OneShot)) => Some(Category::Pluck),
+        (TruthCategory::Synth, Some(TruthKind::Tone)) => Some(Category::Pad),
+        (TruthCategory::Synth, Some(TruthKind::Loop)) => Some(Category::Synth),
+        _ => None,
+    }
+}
+
 /// Dataset of a generated fixture directory (`dir` holds the files named in
 /// `manifest`).
 pub fn fixtures_dataset(manifest: &Manifest, dir: &Path) -> Dataset {
@@ -150,7 +171,10 @@ pub fn fixtures_dataset(manifest: &Manifest, dir: &Path) -> Dataset {
                 }),
             }),
             note_midi: t.note_midi.filter(|_| tonal),
-            category: None,
+            category: t
+                .category
+                .filter(|_| t.corrupt.is_none())
+                .and_then(|c| fixture_category(c, t.kind)),
             expect_error: t.corrupt.is_some(),
             family: fixture_family(f).map(str::to_string),
         };
@@ -178,13 +202,16 @@ pub fn fixtures_dataset(manifest: &Manifest, dir: &Path) -> Dataset {
 
 /// Labels read from a relative path, as the product reads names: BPM and
 /// key from [`filename_prior`], loop/one-shot from [`kind_hint`] (a BPM
-/// marker or loop word means loop; `oneshot`, `hit` mean one-shot).
+/// marker or loop word means loop; `oneshot`, `hit` mean one-shot),
+/// category from [`category_hint`] (the taxonomy words of the file name or
+/// its two nearest folders).
 pub fn silver_labels(rel: &Path) -> Labels {
     let prior = filename_prior(rel);
     Labels {
         kind: kind_hint(rel),
         bpm: prior.bpm.map(|b| f64::from(b.bpm)),
         key: prior.key.map(|k| k.key),
+        category: category_hint(rel),
         ..Labels::default()
     }
 }

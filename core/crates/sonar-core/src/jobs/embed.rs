@@ -10,18 +10,25 @@
 //! - **Per batch** ([`append`]): the rows are appended *before* the batch's
 //!   SQLite commit. A crash in between leaves the files pending; the re-run
 //!   appends again and the newer row wins, so there are no duplicates.
+//! - **Category** ([`CategoryRefiner`], T5.3, ADR-028): on the coordinator,
+//!   before the commit, each embedded file's category is re-decided from its
+//!   CLAP zero-shot scores plus the DSP cues the `dsp` stage stored, and
+//!   written in the same transaction as the stage row.
 
 use std::cell::RefCell;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
-use rusqlite::{params, Connection, TransactionBehavior};
+use rusqlite::{params, Connection, OptionalExtension, TransactionBehavior};
 
 use super::queue::Claim;
 use super::stage::{FileResult, Outcome, Stage, EMBED_VERSION};
+use crate::classify::{category_hint, classify_category, DspCues, Kind, PromptBank};
 use crate::embed::store::{self, EmbedStore, OpenState};
-use crate::embed::{AudioPrep, EmbedPool, Embedding};
+use crate::embed::{AudioPrep, EmbedOptions, EmbedPool, Embedding, TextEncoder};
+use crate::index::vectors::VectorStore;
+use crate::store::category::CategoryRow;
 use crate::{quiet_panic, Error, Result, Store};
 
 thread_local! {
@@ -85,6 +92,82 @@ pub(super) fn reconcile(conn: &mut Connection, es: &EmbedStore) -> Result<u64> {
     Ok(lost.len() as u64)
 }
 
+/// CLAP category refinement of the `embed` stage (ADR-028): the prompt
+/// bank (text embeddings, built once per run) and a read-only view of the
+/// aspect vectors the `dsp` stage stored.
+pub(super) struct CategoryRefiner {
+    bank: PromptBank,
+    vectors: Option<VectorStore>,
+}
+
+impl CategoryRefiner {
+    /// Loads the text tower, embeds the taxonomy prompts and opens the
+    /// vector store of `store`. `None` (with a warning) if the text model
+    /// cannot be used: embeddings are still stored, categories stay as the
+    /// `dsp` stage wrote them.
+    pub(super) fn new(store: &Store, opts: &EmbedOptions) -> Option<Self> {
+        let bank = TextEncoder::new(opts).and_then(|mut enc| PromptBank::from_encoder(&mut enc));
+        let bank = match bank {
+            Ok(b) => b,
+            Err(e) => {
+                tracing::warn!(error = %e, "category prompts unavailable, categories not refined");
+                return None;
+            }
+        };
+        let vectors = store
+            .path()
+            .map(crate::index::vectors::dir_for_db)
+            .and_then(|dir| VectorStore::open_read(dir).ok());
+        Some(Self { bank, vectors })
+    }
+
+    /// Fills in the refined category of every embedded file in `results`
+    /// from its CLAP scores, the stored DSP cues (aspect vectors, kind,
+    /// duration) and its name.
+    pub(super) fn refine(
+        &self,
+        conn: &Connection,
+        results: &mut [(Claim, FileResult)],
+    ) -> Result<()> {
+        let mut stmt = conn.prepare_cached(
+            "SELECT a.kind, a.kind_conf, m.duration_ms FROM files f \
+             LEFT JOIN analysis a ON a.file_id = f.id \
+             LEFT JOIN audio_meta m ON m.file_id = f.id WHERE f.id = ?1",
+        )?;
+        for (claim, result) in results.iter_mut() {
+            let FileResult::Embedded {
+                embedding,
+                category,
+                ..
+            } = result
+            else {
+                continue;
+            };
+            type Row = (Option<String>, Option<f64>, Option<i64>);
+            let (kind, kind_conf, ms): Row = stmt
+                .query_row([claim.id], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+                .optional()?
+                .unwrap_or((None, None, None));
+            let kind = match kind.as_deref() {
+                Some("loop") => Some(Kind::Loop),
+                Some("one_shot") => Some(Kind::OneShot),
+                _ => None,
+            };
+            let aspects = self
+                .vectors
+                .as_ref()
+                .and_then(|v| v.vectors(claim.id))
+                .unwrap_or_default();
+            let duration = ms.map_or(0.0, |ms| ms as f64 / 1000.0);
+            let cues = DspCues::new(&aspects, kind, kind_conf.map(|c| c as f32), duration);
+            let clap = self.bank.scores(embedding);
+            let r = classify_category(&cues, Some(&clap), category_hint(&claim.path));
+            *category = Some(CategoryRow::new(&r));
+        }
+        Ok(())
+    }
+}
+
 /// Appends the embeddings of every completed file in `results`.
 pub(super) fn append(es: &mut EmbedStore, results: &[(Claim, FileResult)]) -> Result<()> {
     let batch: Vec<(i64, &Embedding)> = results
@@ -127,6 +210,7 @@ pub(super) fn embed_file(pool: &EmbedPool, path: &Path, cancel: Arc<AtomicBool>)
             partial: prepared.partial,
             problem: prepared.problem,
             embedding: Box::new(e),
+            category: None,
         },
         Err(e) => {
             tracing::warn!(path = %path.display(), error = %e, "embedding failed, file left pending");

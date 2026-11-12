@@ -20,7 +20,9 @@ use super::progress::Shared;
 use super::queue::Claim;
 use super::stage::{DspAnalysis, FileResult, Stage};
 use super::BeforeFileHook;
-use crate::classify::{classify_kind, kind_hint};
+use crate::classify::{
+    category_hint, classify_category, classify_kind, kind_hint, Category, CategoryResult, DspCues,
+};
 use crate::decode::{DecodeOptions, Decoded, Decoder};
 use crate::dsp::aspects::{AspectExtractor, AspectVectors};
 use crate::dsp::Analyzer;
@@ -28,6 +30,7 @@ use crate::embed::EmbedPool;
 use crate::key::{key_and_note, NoteTracker};
 use crate::meta::MetaOptions;
 use crate::store::analysis::KindTempo;
+use crate::store::category::CategoryRow;
 use crate::store::key_pitch::KeyPitch;
 use crate::tempo::loop_tempo;
 use crate::text::filename_prior;
@@ -182,14 +185,29 @@ fn run_stage(
 /// names as lower-weight priors (ADR-020, ADR-021, ADR-022), plus the raw
 /// aspect vectors (ADR-019, ADR-023).
 fn dsp_analysis(w: &mut Workers<'_>, decoded: &Decoded, path: &Path) -> crate::Result<DspAnalysis> {
-    let a = analyze_window(w, decoded, kind_hint(path), filename_prior(path), true)?;
+    let names = NameHints {
+        kind: kind_hint(path),
+        prior: filename_prior(path),
+        category: category_hint(path),
+    };
+    let a = analyze_window(w, decoded, names, true)?;
     Ok(DspAnalysis {
         kind_tempo: KindTempo::new(&a.kind, a.tempo.as_ref()),
         key_pitch: KeyPitch::new(&a.key_note),
+        category: CategoryRow::new(&a.category),
         aspects: a.aspects.ok_or_else(|| Error::Internal {
             reason: "aspect vectors missing".into(),
         })?,
     })
+}
+
+/// What a file's name says (all empty = names hidden, as `sonar eval` runs
+/// the analysis).
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct NameHints {
+    pub kind: Option<crate::classify::Kind>,
+    pub prior: crate::text::FilenamePrior,
+    pub category: Option<Category>,
 }
 
 /// Everything the `dsp` stage derives from a decoded window.
@@ -197,18 +215,22 @@ pub(crate) struct WindowAnalysis {
     pub kind: crate::classify::KindResult,
     pub tempo: Option<crate::tempo::Tempo>,
     pub key_note: crate::key::KeyNote,
+    /// Category cues (aspects + kind + duration).
+    pub cues: DspCues,
+    /// Category from DSP cues and the name (no CLAP: that is the `embed`
+    /// stage's refinement).
+    pub category: CategoryResult,
     /// Raw aspect vectors (only when asked for).
     pub aspects: Option<AspectVectors>,
 }
 
-/// Loop/one-shot, tempo, key and note of `decoded` with the given name
-/// hint and priors (`None`/default = names hidden, as `sonar eval` runs it),
-/// and the raw aspect vectors if `with_aspects`.
+/// Loop/one-shot, tempo, key, note and (DSP + name) category of `decoded`
+/// with the given name hints, and the raw aspect vectors if `with_aspects`
+/// (they are always computed: the category reads them).
 pub(crate) fn analyze_window(
     w: &mut Workers<'_>,
     decoded: &Decoded,
-    hint: Option<crate::classify::Kind>,
-    prior: crate::text::FilenamePrior,
+    names: NameHints,
     with_aspects: bool,
 ) -> crate::Result<WindowAnalysis> {
     let sr = decoded.sample_rate;
@@ -220,20 +242,21 @@ pub(crate) fn analyze_window(
     };
     let features = analyzer.analyze(&decoded.samples)?;
     let duration = decoded.source.duration_s;
-    let kind = classify_kind(&features, duration, hint);
-    let tempo = loop_tempo(&kind, &features, duration, prior.bpm);
-    let key_note = key_and_note(&kind, &features, &decoded.samples, tracker, prior.key)?;
-    let aspects = if with_aspects {
-        let extractor = extractor_for(w.aspects, sr)?;
-        Some(extractor.extract(&decoded.samples, &features)?)
-    } else {
-        None
-    };
+    let kind = classify_kind(&features, duration, names.kind);
+    let tempo = loop_tempo(&kind, &features, duration, names.prior.bpm);
+    let key_note = key_and_note(&kind, &features, &decoded.samples, tracker, names.prior.key)?;
+    let aspects = extractor_for(w.aspects, sr)?.extract(&decoded.samples, &features)?;
+    // The same inputs the `embed` stage reads back from the store.
+    let stored = KindTempo::new(&kind, None);
+    let cues = DspCues::new(&aspects, stored.kind, stored.kind_conf, duration);
+    let category = classify_category(&cues, None, names.category);
     Ok(WindowAnalysis {
         kind,
         tempo,
         key_note,
-        aspects,
+        cues,
+        category,
+        aspects: with_aspects.then_some(aspects),
     })
 }
 
@@ -346,7 +369,9 @@ mod tests {
             aspects: &mut aspects,
         };
         let cancel = Arc::new(AtomicBool::new(false));
+        use crate::classify::CategorySource;
         let (mut loops, mut one_shots, mut keys, mut notes) = (0, 0, 0, 0);
+        let mut categories = 0;
         for f in &manifest.fixtures {
             let (Some(truth), None) = (f.truth.kind, &f.truth.corrupt) else {
                 continue;
@@ -364,6 +389,21 @@ mod tests {
                 .map(|(asp, v)| (v.len(), asp.dim()));
             assert!(dims.iter().all(|(n, d)| n == d), "{}: {dims:?}", f.path);
             let (a, kp) = (analysis.kind_tempo, analysis.key_pitch);
+            // Every audible file gets a category (from the audio, or from a
+            // folder word such as `chords/` that outweighs it); digital
+            // silence without a category word gets none.
+            let cat = analysis.category;
+            let hinted = crate::classify::category_hint(&path).is_some();
+            if f.truth.is_silent == Some(true) && !hinted {
+                assert_eq!(cat, CategoryRow::default(), "{}", f.path);
+            } else {
+                assert!(cat.category.is_some(), "{}", f.path);
+                if !hinted {
+                    assert_eq!(cat.source, Some(CategorySource::Detected), "{}", f.path);
+                }
+                assert!(cat.conf.is_some_and(|c| c > 0.0 && c <= 1.0), "{}", f.path);
+                categories += 1;
+            }
             if let Some(want) = &f.truth.key {
                 let got = kp.key.unwrap_or_else(|| panic!("{}: no key", f.path));
                 assert_eq!(got.root, want.tonic_pc, "{}", f.path);
@@ -401,8 +441,8 @@ mod tests {
             }
         }
         assert!(
-            loops >= 8 && one_shots >= 10 && keys >= 16 && notes >= 20,
-            "{loops} loops, {one_shots} one-shots, {keys} keys, {notes} notes"
+            loops >= 8 && one_shots >= 10 && keys >= 16 && notes >= 20 && categories >= 80,
+            "{loops} loops, {one_shots} one-shots, {keys} keys, {notes} notes, {categories} categories"
         );
     }
 }

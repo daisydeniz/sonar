@@ -124,6 +124,8 @@ fn run_embed(
         ..(**work).clone()
     });
     let mut es = embed::open(store)?;
+    // Category prompts: embedded once per run (ADR-028).
+    let refiner = embed::CategoryRefiner::new(store, &opts.embed);
     let s = batches::run_stage(
         store,
         Stage::Embed,
@@ -131,7 +133,7 @@ fn run_embed(
         &rayon,
         &work,
         shared,
-        Some(Sink::Embeddings(&mut es)),
+        Some(Sink::Embeddings(&mut es, refiner.as_ref())),
     )?;
     Ok(Ok(s))
 }

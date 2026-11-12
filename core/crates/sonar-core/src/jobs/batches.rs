@@ -27,6 +27,9 @@ use std::time::{Duration, Instant};
 
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 
+use rusqlite::Connection;
+
+use super::embed::CategoryRefiner;
 use super::progress::{JobEvent, Shared, StageSummary, StageTiming};
 use super::queue::{self, Claim};
 use super::stage::{FileResult, Stage};
@@ -41,15 +44,22 @@ use crate::{Error, Result, Store};
 pub(super) enum Sink<'a> {
     /// `dsp`: raw aspect vectors.
     Aspects(&'a mut VectorStore),
-    /// `embed`: CLAP embeddings.
-    Embeddings(&'a mut EmbedStore),
+    /// `embed`: CLAP embeddings, plus the category refinement (ADR-028)
+    /// when the prompt bank is available.
+    Embeddings(&'a mut EmbedStore, Option<&'a CategoryRefiner>),
 }
 
 impl Sink<'_> {
-    fn append(&mut self, results: &[(Claim, FileResult)]) -> Result<()> {
+    fn append(&mut self, conn: &Connection, results: &mut [(Claim, FileResult)]) -> Result<()> {
         match self {
             Self::Aspects(vs) => super::vectors::append(vs, results),
-            Self::Embeddings(es) => super::embed::append(es, results),
+            Self::Embeddings(es, refiner) => {
+                super::embed::append(es, results)?;
+                match refiner {
+                    Some(r) => r.refine(conn, results),
+                    None => Ok(()),
+                }
+            }
         }
     }
 }
@@ -184,7 +194,7 @@ pub(super) fn run_stage(
         timing.wait_secs += t.elapsed().as_secs_f64();
         timing.busy_secs += out.busy_ns as f64 * 1e-9;
         timing.max_file_secs += out.slowest_ns as f64 * 1e-9;
-        let (unstarted, results): (Vec<_>, Vec<_>) = out
+        let (unstarted, mut results): (Vec<_>, Vec<_>) = out
             .results
             .into_iter()
             .partition(|(_, r)| matches!(r, FileResult::Unstarted));
@@ -196,7 +206,7 @@ pub(super) fn run_stage(
         let t = Instant::now();
         // Vectors first: a crash before the commit only re-runs the batch.
         if let Some(sink) = sink.as_mut() {
-            tri!(sink.append(&results));
+            tri!(sink.append(store.conn(), &mut results));
         }
         let c = tri!(queue::commit_retrying(
             store.conn_mut(),

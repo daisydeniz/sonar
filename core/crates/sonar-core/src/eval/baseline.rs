@@ -85,6 +85,42 @@ pub const METRICS: &[MetricInfo] = &[
         tracked: true,
     },
     MetricInfo {
+        key: "category.accuracy_pct",
+        label: "Category top-1, shipped (CLAP + DSP if the model is present) (%)",
+        target: ">= 90 (golden)",
+        tracked: false,
+    },
+    MetricInfo {
+        key: "category.macro_f1_pct",
+        label: "Category macro-F1, shipped (%)",
+        target: "report only",
+        tracked: false,
+    },
+    MetricInfo {
+        key: "category.dsp_accuracy_pct",
+        label: "Category top-1, DSP only (%)",
+        target: "report only",
+        tracked: true,
+    },
+    MetricInfo {
+        key: "category.dsp_macro_f1_pct",
+        label: "Category macro-F1, DSP only (%)",
+        target: "report only",
+        tracked: true,
+    },
+    MetricInfo {
+        key: "category.clap_accuracy_pct",
+        label: "Category top-1, CLAP zero-shot only (%)",
+        target: "report only",
+        tracked: false,
+    },
+    MetricInfo {
+        key: "category.ece_pct",
+        label: "Category confidence ECE, shipped (%)",
+        target: "report only",
+        tracked: false,
+    },
+    MetricInfo {
         key: "similar.p10_pct",
         label: "Similarity P@10, k = min(10, relevant) (%)",
         target: ">= 70",
@@ -141,6 +177,16 @@ pub fn values(t: &TierReport) -> BTreeMap<String, f64> {
     if let Some(n) = &m.note {
         put("note.pitch_class_pct", n.pitch_class_pct);
         put("note.midi_pct", n.midi_pct);
+    }
+    if let Some(c) = &m.category {
+        put("category.accuracy_pct", c.fused.accuracy_pct);
+        put("category.macro_f1_pct", c.fused.macro_f1_pct);
+        put("category.dsp_accuracy_pct", c.dsp.accuracy_pct);
+        put("category.dsp_macro_f1_pct", c.dsp.macro_f1_pct);
+        if let Some(t) = &c.clap {
+            put("category.clap_accuracy_pct", t.accuracy_pct);
+        }
+        put("category.ece_pct", c.ece_pct);
     }
     if let Some(s) = &m.similar {
         put("similar.p10_pct", s.p10_pct);

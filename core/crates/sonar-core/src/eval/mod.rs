@@ -5,18 +5,21 @@
 //! - [`run`]: analysis with names hidden, the same function the `dsp` job
 //!   stage stores kind / BPM / key / note with;
 //! - [`metrics`]: loop/one-shot, BPM (+ octave errors), key (MIREX), note;
+//! - [`category`]: category top-1, macro-F1, confusion, calibration (T5.3);
 //! - [`similarity`]: P@10 / MRR of the aspect-weighted `similar` ranking
 //!   (fixture families, golden `similar.jsonl`);
 //! - [`report`]: JSON + markdown with deltas;
 //! - [`baseline`]: `eval/reports/BASELINE.md` and the regression rule.
 //!
-//! Category and text-search metrics are listed as "not
-//! available yet" ([`report::NOT_AVAILABLE`]); they become more keys in
-//! [`baseline::METRICS`] when their features exist.
+//! Text-search metrics are listed as "not available yet"
+//! ([`report::NOT_AVAILABLE`]); they become more keys in
+//! [`baseline::METRICS`] when their feature exists.
 
 pub mod baseline;
+pub mod category;
 mod csv;
 pub mod dataset;
+mod dump;
 pub mod golden;
 pub mod metrics;
 pub mod report;

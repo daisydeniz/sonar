@@ -159,6 +159,15 @@ fn meta_stage_leaves_levels_empty_and_dsp_fills_them() {
         env.count("SELECT count(*) FROM files WHERE status='analyzed'"),
         3
     );
+    // The DSP + name category is stored without any model (ADR-028); the
+    // names (`s000.wav`) say nothing, so it is the audio's.
+    assert_eq!(
+        env.count(
+            "SELECT count(*) FROM analysis WHERE category IS NOT NULL \
+             AND category_source = 'detected' AND category_conf > 0 AND category_conf <= 1"
+        ),
+        3
+    );
 }
 
 #[test]
