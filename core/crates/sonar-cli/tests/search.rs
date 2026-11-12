@@ -186,7 +186,7 @@ fn scan_then_search_builds_and_refreshes_the_index() {
     assert!(err.contains("text search only"), "{err}");
     let text = ok(&out);
     assert!(
-        text.contains("Snare_Hard.wav") && text.contains("text"),
+        text.contains("Snare_Hard.wav") && text.contains(" ms, text"),
         "{text}"
     );
 
