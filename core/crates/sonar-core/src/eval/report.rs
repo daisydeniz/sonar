@@ -16,8 +16,7 @@ use super::run::TierReport;
 pub const REPORT_SCHEMA_VERSION: u32 = 1;
 
 /// Metric families the docs define that have no implementation yet.
-pub const NOT_AVAILABLE: &[&str] =
-    &["text / NL search (NDCG@10, recall@50): needs NL search (T5.4)"];
+pub const NOT_AVAILABLE: &[&str] = &[];
 
 /// A whole eval run.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -69,9 +68,11 @@ impl EvalReport {
         for t in &self.tiers {
             tier_markdown(&mut s, t, baseline);
         }
-        s.push_str("\n## Not available yet\n\n");
-        for n in &self.not_available {
-            let _ = writeln!(s, "- {n}");
+        if !self.not_available.is_empty() {
+            s.push_str("\n## Not available yet\n\n");
+            for n in &self.not_available {
+                let _ = writeln!(s, "- {n}");
+            }
         }
         s
     }
@@ -194,6 +195,22 @@ fn tier_markdown(s: &mut String, t: &TierReport, baseline: Option<&Baseline>) {
             x.queries, x.pool
         ));
     }
+    if let Some(x) = &m.text {
+        let skipped = if x.skipped > 0 {
+            format!(", {} judgments not in the pool", x.skipped)
+        } else {
+            String::new()
+        };
+        let legs = if x.semantic.is_some() {
+            "BM25 + CLAP"
+        } else {
+            "BM25 only"
+        };
+        parts.push(format!(
+            "text search {} queries over {} files ({legs}{skipped})",
+            x.queries, x.pool
+        ));
+    }
     if parts.is_empty() {
         parts.push("none".into());
     }
@@ -208,6 +225,23 @@ fn tier_markdown(s: &mut String, t: &TierReport, baseline: Option<&Baseline>) {
     }
     if let Some(c) = &m.category {
         super::category::markdown(s, c);
+    }
+    if let Some(x) = m.text.as_ref().filter(|x| !x.per_query.is_empty()) {
+        s.push_str(
+            "\nText search NDCG@10 per query (%):\n\n| Query | Judged | BM25 | CLAP | Hybrid |\n|---|---:|---:|---:|---:|\n",
+        );
+        let opt = |v: Option<f64>| v.map_or_else(|| "-".to_owned(), |v| format!("{v:.1}"));
+        for r in &x.per_query {
+            let _ = writeln!(
+                s,
+                "| {} | {} | {:.1} | {} | {} |",
+                r.query,
+                r.relevant,
+                r.bm25,
+                opt(r.semantic),
+                opt(r.hybrid)
+            );
+        }
     }
     if !t.notes.is_empty() {
         s.push_str("\nNotes:\n\n");
@@ -285,7 +319,7 @@ mod tests {
         assert!(!ok.contains("REGRESSION"));
         let none = report(100.0).to_markdown(None);
         assert!(none.contains("| 100.00 | - | - |"), "{none}");
-        assert!(none.contains("Not available yet") && none.contains("T5.4"));
+        assert!(!none.contains("Not available yet"));
         assert!(none.contains("- a note"));
     }
 

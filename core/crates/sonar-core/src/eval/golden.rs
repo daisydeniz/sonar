@@ -125,6 +125,7 @@ pub fn golden_dataset(dir: &Path) -> Result<Dataset> {
         warnings: Vec::new(),
         similar_queries: Vec::new(),
         similar_extra: Vec::new(),
+        text_queries: Vec::new(),
     };
     for (i, row) in rows.iter().enumerate().skip(1) {
         let cell = |c: Option<usize>| {
@@ -184,6 +185,7 @@ pub fn golden_dataset(dir: &Path) -> Result<Dataset> {
         }
     }
     load_similar(&mut ds, dir);
+    super::text_queries::load_text_queries(&mut ds, dir);
     Ok(ds)
 }
 

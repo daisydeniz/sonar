@@ -26,6 +26,7 @@ use crate::text::{filename_prior, Key, Mode};
 use crate::{Error, Result};
 
 use super::similarity::{fixture_family, SimilarQuery};
+use super::text_queries::TextQuery;
 
 /// A dataset tier.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
@@ -112,9 +113,13 @@ pub struct Dataset {
     /// Golden similarity queries (`similar.jsonl`); empty = relevance comes
     /// from the items' fixture family.
     pub similar_queries: Vec<SimilarQuery>,
-    /// Files named only by `similar_queries`: analysed for the similarity
-    /// pool, never scored for the other metrics.
+    /// Files named only by golden query files (`similar.jsonl`,
+    /// `text_queries.jsonl`): analysed for the similarity and text-search
+    /// pools, never scored for the other metrics.
     pub similar_extra: Vec<Item>,
+    /// Golden text queries (`text_queries.jsonl`); fixtures judge
+    /// [`super::text_queries::FIXTURE_QUERIES`] from truth instead.
+    pub text_queries: Vec<TextQuery>,
 }
 
 impl Dataset {
@@ -197,6 +202,7 @@ pub fn fixtures_dataset(manifest: &Manifest, dir: &Path) -> Dataset {
         warnings: Vec::new(),
         similar_queries: Vec::new(),
         similar_extra: Vec::new(),
+        text_queries: Vec::new(),
     }
 }
 
@@ -248,6 +254,7 @@ pub fn silver_dataset(root: &Path) -> Result<Dataset> {
         warnings: Vec::new(),
         similar_queries: Vec::new(),
         similar_extra: Vec::new(),
+        text_queries: Vec::new(),
     })
 }
 

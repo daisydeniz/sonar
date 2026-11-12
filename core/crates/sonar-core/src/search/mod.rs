@@ -18,14 +18,20 @@
 //! [`Sort`] orders by relevance or a field (unknown values last). Empty
 //! text + filters browses every matching file (by name). [`Facets`] count
 //! values over the matching set with multi-select semantics.
+//!
+//! [`hybrid`] adds natural-language search: a CLAP text-embedding kNN over
+//! the audio embeddings ([`semantic`]) fused with this text search by
+//! reciprocal-rank fusion (T5.4, ADR-029).
 
 mod allowed;
 mod build;
 mod collect;
 mod facets;
 mod filters;
+pub mod hybrid;
 pub mod keys;
 mod parse;
+pub mod semantic;
 mod sideways;
 mod sort;
 mod stats;
@@ -41,9 +47,14 @@ mod tests;
 use serde::Serialize;
 use tantivy::query::{BooleanQuery, Occur, Query};
 
-pub use allowed::filtered_file_ids;
+pub use allowed::{allowed_file_ids, filtered_file_ids};
 pub use facets::{FacetCount, Facets, LibraryCount};
 pub use filters::{normalize_kind, Filters, ValueRange};
+pub use hybrid::{
+    hybrid_search, HybridHit, HybridOptions, HybridResults, QueryEmbedder, SearchMode,
+    SemanticSearch,
+};
+pub use semantic::{embedded_file_ids, SemanticHit, SemanticIndex};
 pub use sort::{ParseSortError, Sort, SortField};
 pub use synonyms::{Synonyms, BUILTIN_SYNONYMS, SYNONYMS_FILE};
 

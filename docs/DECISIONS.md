@@ -869,3 +869,46 @@ stays a separate field).
   golden set exists; silver is one vendor library with noisy folder labels
   (perc folders hold snares/claps). Re-fit weights/profiles when golden
   arrives (bump `CATEGORY_VERSION` + both stage versions).
+
+## ADR-029 — Hybrid search: BM25 + CLAP kNN, reciprocal-rank fusion (T5.4)
+Accepted. `sonar_core::search::{hybrid, semantic}`; CLI `sonar search
+--mode hybrid|text|semantic`; `sonar bench search --hybrid`.
+- **Legs**: text = the existing `search` (ADR-017/018), top 200 (or the
+  limit if larger). Semantic = the query's positive words (exclusions and
+  quotes dropped) through the CLAP text tower, then **exact** cosine kNN
+  (dot product of unit vectors, 16-lane accumulators) over the allowed set
+  = filters minus the `-word` exclusions (same synonyms as text), rayon
+  scan in 4096-id chunks with mergeable top-K, as ADR-025. The text leg
+  runs in parallel with the query embedding and the allowed-set pass.
+- **Fusion**: Reciprocal Rank Fusion (Cormack, Clarke & Büttcher 2009),
+  `Σ 1/(60 + rank)`; rank-only, so BM25 and cosine never need calibrating.
+  Ties: better best rank, then file id. Weighted fusion only when golden
+  eval shows a gain (ARCHITECTURE §6).
+- **Current rows only**: `SemanticIndex::open` keeps rows of files with an
+  `embed` stage result `ok`/`partial` (`embedded_file_ids`); a changed file
+  whose re-embed failed or is pending is never returned (closes the T5.2
+  review item for search).
+- **Fallback, never an error**: no positive words (browse), a field sort,
+  no model / `embed` feature, no embeddings, or a text-tower error → text
+  mode, with `fallback` saying why. Facets: hybrid returns the text leg's
+  counts; semantic none.
+- **Ownership**: `SemanticSearch` (text encoder behind a mutex + mmap'd
+  index) is loaded once and shared by `&self` queries; the Engine (T5.5)
+  holds it next to the text index. `QueryEmbedder` lets tests/bench inject
+  a stand-in encoder.
+- **Eval**: NDCG@10 / recall@50 on 19 fixture queries judged from truth
+  (EVAL.md "Text / NL search"); BM25 keys tracked, CLAP/hybrid report only
+  (model may be absent). Golden `text_queries.jsonl` supported.
+- **Numbers** (M4 Pro, release, 500k synthetic files, every query with
+  facets, real CLAP text tower; 1 GB of clustered random 512-d rows):
+  text encode p50 / p95 3.9 / 5.2 ms; p50 / p95 ms hybrid NL queries
+  13.4 / 13.9, hybrid every keystroke 13.3 / 34.5, hybrid + filters
+  5.9 / 10.7, semantic only 13.3 / 14.0, all under the 50 ms budget. Text
+  classes unchanged (as-you-type 29.5, text+filters 4.3, browse 27.3 /
+  29.3, ranges 9.6 p95; T2.4: 29.3 / 4.3 / 27.7 / 29.4 / 9.7). Fixtures
+  (19 queries): NDCG@10 / recall@50 BM25 29.0 / 26.8, CLAP 89.2 / 98.9,
+  hybrid 91.3 / 100. BM25 is weak there by construction (names hidden;
+  only detected category/kind words to match).
+- **Later**: per-keystroke hybrid re-embeds the query (≈ 5 ms each); the
+  app may debounce the semantic leg. Effective BPM/key are not text tokens,
+  so "120 bpm" in a query only matches names.

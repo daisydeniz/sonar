@@ -178,8 +178,9 @@ impl<'a> Scorer<'a> {
 }
 
 /// A scored candidate; orders by distance (total order), then file id.
+/// Also used by the semantic leg of hybrid search (`search::semantic`).
 #[derive(Debug, Clone, Copy)]
-pub(super) struct Cand {
+pub(crate) struct Cand {
     pub distance: f32,
     pub file_id: i64,
     pub row: usize,
@@ -208,13 +209,13 @@ impl Ord for Cand {
 }
 
 /// The `k` smallest candidates seen.
-pub(super) struct TopK {
+pub(crate) struct TopK {
     k: usize,
     heap: BinaryHeap<Cand>,
 }
 
 impl TopK {
-    pub(super) fn new(k: usize) -> Self {
+    pub(crate) fn new(k: usize) -> Self {
         Self {
             k,
             heap: BinaryHeap::with_capacity(k.saturating_add(1).min(4096)),
@@ -222,7 +223,7 @@ impl TopK {
     }
 
     /// Offers a candidate.
-    pub(super) fn push(&mut self, c: Cand) {
+    pub(crate) fn push(&mut self, c: Cand) {
         if self.heap.len() < self.k {
             self.heap.push(c);
         } else if self.heap.peek().is_some_and(|worst| c < *worst) {
@@ -233,7 +234,7 @@ impl TopK {
 
     /// Offers every candidate of `other` (same `k`): the result keeps the
     /// `k` smallest of both, whatever the merge order (total order).
-    pub(super) fn merge(self, other: Self) -> Self {
+    pub(crate) fn merge(self, other: Self) -> Self {
         let (mut big, small) = if self.heap.len() >= other.heap.len() {
             (self, other)
         } else {
@@ -246,7 +247,7 @@ impl TopK {
     }
 
     /// Best first.
-    pub(super) fn into_sorted(self) -> Vec<Cand> {
+    pub(crate) fn into_sorted(self) -> Vec<Cand> {
         self.heap.into_sorted_vec()
     }
 }

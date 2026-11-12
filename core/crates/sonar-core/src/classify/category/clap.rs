@@ -66,10 +66,24 @@ impl ClapScorer {
         path: &Path,
         prompts: bool,
     ) -> Result<(ClapScores, Option<Vec<f32>>)> {
+        let e = self.embed_file(path)?;
+        Ok(self.scores_of(&e, prompts))
+    }
+
+    /// The CLAP audio embedding of one file, decoded as the `embed` stage
+    /// does. Callable from many threads.
+    ///
+    /// # Errors
+    /// Decode or model errors.
+    pub fn embed_file(&self, path: &Path) -> Result<Embedding> {
         let prepared = PREP.with(|p| p.borrow_mut().prepare(path, None))?;
-        let e = self.pool.embed(prepared.features)?;
-        let all = prompts.then(|| self.bank.prompt_scores(&e).iter().map(|p| p.2).collect());
-        Ok((self.bank.scores(&e), all))
+        self.pool.embed(prepared.features)
+    }
+
+    /// [`ClapScorer::scores_and_prompts`] of an embedding.
+    pub fn scores_of(&self, e: &Embedding, prompts: bool) -> (ClapScores, Option<Vec<f32>>) {
+        let all = prompts.then(|| self.bank.prompt_scores(e).iter().map(|p| p.2).collect());
+        (self.bank.scores(e), all)
     }
 
     /// Drops this thread's decode state after a caught panic.

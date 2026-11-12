@@ -9,7 +9,7 @@
 //! reused decoder/analyzer per thread.
 
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use rayon::prelude::*;
@@ -20,6 +20,7 @@ use crate::classify::category::clap::ClapScorer;
 use crate::classify::{classify_category, Category, DspCues};
 use crate::decode::DecodeOptions;
 use crate::dsp::aspects::AspectVectors;
+use crate::embed::{Embedding, TextEncoder};
 use crate::jobs::work::{analyze_window, with_workers, NameHints};
 use crate::quiet_panic;
 
@@ -27,6 +28,8 @@ use super::category::CategoryObs;
 use super::dataset::{Dataset, Item, Tier};
 use super::metrics::{Accumulator, Metrics, Observation};
 use super::similarity::{self, Entry};
+use super::text_queries::fixture_queries;
+use super::text_search;
 
 /// Result of one tier.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -65,6 +68,8 @@ pub(crate) struct Analysed {
     pub cues: DspCues,
     /// Cosine to every taxonomy prompt (only for `--category-dump`).
     pub prompts: Option<Vec<f32>>,
+    /// CLAP audio embedding (with [`EvalOptions::clap`]).
+    pub embedding: Option<Embedding>,
 }
 
 /// Analyses one file; `Err` = decode or analysis failure (also a panic).
@@ -82,10 +87,15 @@ fn analyze(item: &Item, with_aspects: bool, opts: &EvalOptions) -> Result<Analys
         let dump = opts.category_dump.is_some();
         // A file CLAP cannot read is scored without it (counted as a
         // CLAP-only miss).
+        let embedding = opts
+            .clap
+            .as_ref()
+            .and_then(|c| c.embed_file(&item.path).ok());
         let clap = opts
             .clap
             .as_ref()
-            .and_then(|c| c.scores_and_prompts(&item.path, dump).ok());
+            .zip(embedding.as_ref())
+            .map(|(c, e)| c.scores_of(e, dump));
         let (dsp_logits, _) = audio_logits(&a.cues, None);
         let (fused, raw_logits) = match &clap {
             Some((s, _)) => (
@@ -117,6 +127,7 @@ fn analyze(item: &Item, with_aspects: bool, opts: &EvalOptions) -> Result<Analys
             aspects: a.aspects,
             cues: a.cues,
             prompts: clap.and_then(|(_, p)| p),
+            embedding,
         })
     });
     run.unwrap_or_else(|panic| {
@@ -136,6 +147,9 @@ pub struct EvalOptions {
     /// Write per-file category evidence (JSON lines) here (diagnostics for
     /// tuning the classifier, ADR-028).
     pub category_dump: Option<PathBuf>,
+    /// CLAP text tower for the semantic / hybrid text-search metrics
+    /// (with [`EvalOptions::clap`]; `None` = BM25 only).
+    pub text_encoder: Option<Arc<Mutex<TextEncoder>>>,
 }
 
 /// Analyses every item of `ds` and scores the results.
@@ -206,6 +220,7 @@ pub fn evaluate_with(ds: &Dataset, opts: EvalOptions) -> TierReport {
     } else if ds.tier == Tier::Golden {
         notes.push("similarity not measured: no similar.jsonl in the golden directory".into());
     }
+    text_search_metrics(ds, &all, &analysed, &opts, &mut metrics, &mut notes);
     if metrics.category.is_some() && opts.clap.is_none() {
         notes.push("category: CLAP model not used, shipped classifier = DSP only".into());
     }
@@ -223,6 +238,54 @@ pub fn evaluate_with(ds: &Dataset, opts: EvalOptions) -> TierReport {
         wall_s,
         metrics,
         notes,
+    }
+}
+
+/// Text / NL search metrics ([`text_search`]): fixture queries judged from
+/// truth, golden queries from `text_queries.jsonl`; silver has none.
+fn text_search_metrics(
+    ds: &Dataset,
+    all: &[&Item],
+    analysed: &[Result<Analysed, String>],
+    opts: &EvalOptions,
+    metrics: &mut Metrics,
+    notes: &mut Vec<String>,
+) {
+    let queries = match ds.tier {
+        Tier::Fixtures => fixture_queries(&ds.items),
+        Tier::Golden | Tier::Silver => ds.text_queries.clone(),
+    };
+    if queries.is_empty() {
+        return;
+    }
+    // Fixture folders name the truth group; golden files keep their path.
+    let names = ds.tier != Tier::Fixtures;
+    let entries: Vec<text_search::Entry> = all
+        .iter()
+        .zip(analysed)
+        .filter(|(item, _)| !item.labels.expect_error)
+        .filter_map(|(item, r)| {
+            let a = r.as_ref().ok()?;
+            Some(text_search::Entry {
+                path: item.path.clone(),
+                rel_path: names.then(|| item.id.clone()),
+                kind: Some(a.obs.kind),
+                bpm: a.obs.bpm,
+                key: a.obs.key,
+                category: a.obs.category.as_ref().and_then(|c| c.dsp),
+                embedding: a.embedding,
+            })
+        })
+        .collect();
+    let encoder = opts.text_encoder.as_deref().filter(|_| opts.clap.is_some());
+    match text_search::compute(&entries, &queries, encoder) {
+        Ok(m) => {
+            if m.as_ref().is_some_and(|m| m.semantic.is_none()) {
+                notes.push("text search: CLAP not used, BM25 only".into());
+            }
+            metrics.text = m;
+        }
+        Err(e) => notes.push(format!("text search not measured: {e}")),
     }
 }
 
@@ -258,6 +321,7 @@ mod tests {
             warnings: vec![],
             similar_queries: vec![],
             similar_extra: vec![],
+            text_queries: vec![],
         };
         let r = evaluate(&ds);
         assert_eq!((r.files, r.expected_errors, r.unexpected_errors), (3, 1, 2));

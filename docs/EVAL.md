@@ -126,7 +126,7 @@ worst 0.046 LU.
 | Note (tonal one-shots) | exact pitch class / exact MIDI | ≥ 90 % |
 | Category | top-1 accuracy, macro-F1, confusion matrix | ≥ 90 % top-1 |
 | Similarity | P@10, MRR (definition below; percent) | P@10 ≥ 70 % |
-| Text / NL search | NDCG@10, recall@50 | track, no regressions |
+| Text / NL search | NDCG@10, recall@50 (definition below) | track, no regressions |
 | Latency | search p50/p95 at 500k docs | p95 < 50 ms |
 | Throughput | scan files/s, analysis files/s | ≥ 2,000 / ≥ 100 |
 
@@ -174,6 +174,43 @@ hidden from the classifier in every tier (audio-only numbers).
   `models/`; `--no-clap` skips them), held-out ECE, confusion matrix.
 - Silver labels come from folder names (`category_hint`); golden from
   `labels.csv`. The ≥ 90 % target applies to golden.
+
+### Text / NL search (NDCG@10, recall@50)
+`sonar eval` turns the evaluated files into an in-RAM library and runs each
+query through the shipped `hybrid_search` (ADR-029) in three modes: text
+(BM25, ADR-017), semantic (CLAP text → audio kNN) and hybrid (RRF k = 60).
+- **Documents**: what analysis gives an unnamed file: DSP-only category
+  (names hidden, as for every metric), kind, BPM, key; CLAP audio embedding
+  when the model is present. Fixture names and folders are **not** indexed
+  (the folders name the truth group); golden files are indexed with their
+  relative path (name + folders), as the product indexes a library.
+- **Fixture queries** (`eval::text_queries::FIXTURE_QUERIES`, 19): category
+  words and synonyms (`kick`, `bd`, `hihat`), descriptive / natural-language
+  phrasings (`punchy kick drum`, `breakbeat with kick and snare`, `soft
+  sustained synth pad`) and kind / tempo / key qualifiers (`drum loop 120
+  bpm`, `chord loop in a minor`, `one shot`). Judged from manifest truth: a
+  file of a named category is grade 2 if it also meets every other
+  constraint, else grade 1; a query without a category judges by its
+  constraints (grade 1).
+- **Golden queries**: optional `$SONAR_GOLDEN_DIR/text_queries.jsonl`, one
+  object per line, `#` comments allowed:
+  `{"query": "dark kick", "relevant": {"Kicks/k1.wav": 2, "Kicks/k2.wav": 1}}`
+  (paths relative to the golden dir or absolute; grade 1–3, higher = more
+  relevant). Files not in `labels.csv` are analysed and join the pool;
+  judged files that are missing or fail to decode are dropped and counted
+  ("judgments not in the pool"). Silver has no text queries.
+- **NDCG@10** (Järvelin & Kekäläinen 2002): gain `2^grade − 1`, discount
+  `log2(rank + 1)`, ideal = all judged files of the pool by grade.
+  **Recall@50**: judged files in the top 50 / `min(|judged|, 50)`. Queries
+  without a judged file in the pool do not count; means over queries, in
+  percent. The report adds a per-query NDCG@10 table.
+- Tracked keys: `text.bm25_ndcg10_pct`, `text.bm25_recall50_pct` (no
+  dependency on `models/`). Report only: `text.semantic_*`, `text.hybrid_*`
+  (need the CLAP model; `--no-clap` skips them).
+- On fixtures BM25 can only match the detected category and kind words, so
+  its numbers are low by construction (DSP category 34 % on fixtures);
+  they guard the analysis → index → query path. Golden measures the
+  product.
 
 ## Running
 ```

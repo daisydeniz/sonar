@@ -105,6 +105,7 @@ fn main() -> Result<()> {
             json,
             no_prefix,
             synonyms,
+            mode,
             filters,
         } => search_cmd::run(&search_cmd::Args {
             query: &query,
@@ -112,6 +113,7 @@ fn main() -> Result<()> {
             json,
             no_prefix,
             synonyms: synonyms.as_deref(),
+            mode,
             filters: &filters,
         })?,
         Command::Similar(args) => similar_cmd::run(&args)?,

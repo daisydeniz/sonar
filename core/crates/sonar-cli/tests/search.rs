@@ -180,6 +180,15 @@ fn scan_then_search_builds_and_refreshes_the_index() {
     let out = sonar(&home, &["search", "snare"]);
     assert!(out.stderr.is_empty(), "{out:?}");
     assert!(ok(&out).contains("Snare_Hard.wav"));
+    // Asking for CLAP without embeddings falls back to text with a note.
+    let out = sonar(&home, &["search", "--mode", "semantic", "snare"]);
+    let err = String::from_utf8_lossy(&out.stderr).into_owned();
+    assert!(err.contains("text search only"), "{err}");
+    let text = ok(&out);
+    assert!(
+        text.contains("Snare_Hard.wav") && text.contains("text"),
+        "{text}"
+    );
 
     let text = ok(&sonar(&home, &["index"]));
     assert!(text.starts_with("indexed 4 files"), "{text}");

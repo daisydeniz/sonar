@@ -19,6 +19,7 @@ use std::time::{Duration, Instant};
 
 use serde::Serialize;
 
+use super::hybrid::{bench_hybrid, HybridBench};
 use super::search_corpus::{generate_store, SearchCorpus};
 use super::search_queries::{cases, Case, QueryClass};
 use super::{machine, Machine};
@@ -41,6 +42,9 @@ pub struct SearchBenchOptions {
     pub rounds: usize,
     /// Corpus seed.
     pub seed: u64,
+    /// Also time hybrid / semantic queries (T5.4): writes one synthetic
+    /// CLAP row per file (2 KB each, 1 GB at 500k) first.
+    pub hybrid: bool,
 }
 
 impl Default for SearchBenchOptions {
@@ -49,6 +53,7 @@ impl Default for SearchBenchOptions {
             docs: 500_000,
             rounds: 10,
             seed: DEFAULT_SEED,
+            hybrid: false,
         }
     }
 }
@@ -118,14 +123,21 @@ pub struct SearchBench {
     pub classes: Vec<ClassLatency>,
     /// p95 budget per class, ms.
     pub budget_ms: f64,
+    /// Hybrid / semantic classes ([`SearchBenchOptions::hybrid`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hybrid: Option<HybridBench>,
 }
 
 impl SearchBench {
-    /// Classes whose p95 is at or over the budget.
-    pub fn over_budget(&self) -> Vec<&ClassLatency> {
+    /// Classes (text and hybrid) whose p95 is at or over the budget, as
+    /// `(class, p95 ms)`.
+    pub fn over_budget(&self) -> Vec<(&'static str, f64)> {
+        let hybrid = self.hybrid.iter().flat_map(|h| &h.classes);
         self.classes
             .iter()
-            .filter(|c| c.p95_ms >= self.budget_ms)
+            .map(|c| (c.class, c.p95_ms))
+            .chain(hybrid.map(|c| (c.class, c.p95_ms)))
+            .filter(|&(_, p95)| p95 >= self.budget_ms)
             .collect()
     }
 }
@@ -192,6 +204,19 @@ pub fn bench_search(work: &Path, opts: &SearchBenchOptions) -> Result<SearchBenc
             latency(class.name(), &of_class)
         })
         .collect();
+    let hybrid = if opts.hybrid {
+        let docs = opts.docs;
+        Some(bench_hybrid(
+            work,
+            &ix,
+            docs,
+            opts.seed,
+            opts.rounds,
+            &libraries,
+        )?)
+    } else {
+        None
+    };
 
     Ok(SearchBench {
         machine: machine(),
@@ -208,6 +233,7 @@ pub fn bench_search(work: &Path, opts: &SearchBenchOptions) -> Result<SearchBenc
         rounds: opts.rounds,
         classes,
         budget_ms: SEARCH_BUDGET_MS,
+        hybrid,
     })
 }
 
@@ -317,8 +343,16 @@ mod tests {
             docs: 2_000,
             rounds: 1,
             seed: DEFAULT_SEED,
+            hybrid: true,
         };
         let b = bench_search(tmp.path(), &opts).expect("bench");
+        let h = b.hybrid.as_ref().expect("hybrid");
+        assert_eq!(h.vector_rows as u64, b.indexed_docs);
+        assert_eq!(h.classes.len(), 4);
+        for c in &h.classes {
+            assert!(c.n > 0 && c.mean_candidates > 0.0, "{}", c.class);
+            assert!(c.p50_ms <= c.p95_ms && c.p95_ms <= c.max_ms);
+        }
         assert!(
             b.indexed_docs > 1_900 && b.indexed_docs <= 2_000,
             "{}",

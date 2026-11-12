@@ -146,6 +146,11 @@ pub enum BenchCommand {
         /// Corpus seed (the default makes runs comparable).
         #[arg(long, default_value_t = bench::search::DEFAULT_SEED)]
         seed: u64,
+        /// Also time hybrid and semantic (CLAP) queries over one synthetic
+        /// 512-d row per file (writes 2 KB per file); uses the real CLAP
+        /// text encoder when the model is installed.
+        #[arg(long)]
+        hybrid: bool,
         /// Create the working folder inside this directory.
         #[arg(long)]
         dir: Option<PathBuf>,
@@ -276,6 +281,7 @@ pub fn run(cmd: BenchCommand) -> Result<()> {
             docs,
             rounds,
             seed,
+            hybrid,
             dir,
             keep,
             json,
@@ -285,13 +291,14 @@ pub fn run(cmd: BenchCommand) -> Result<()> {
                 docs: docs as usize,
                 rounds: rounds as usize,
                 seed,
+                hybrid,
             };
             let b = bench::bench_search(work.path(), &opts).context("search benchmark")?;
             emit(json, &b, print_search)?;
             let over: Vec<String> = b
                 .over_budget()
                 .iter()
-                .map(|c| format!("{} p95 {:.1} ms", c.class, c.p95_ms))
+                .map(|(class, p95)| format!("{class} p95 {p95:.1} ms"))
                 .collect();
             if !over.is_empty() {
                 anyhow::bail!(

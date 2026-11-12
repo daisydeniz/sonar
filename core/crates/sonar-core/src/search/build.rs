@@ -109,19 +109,47 @@ pub(crate) fn build(text: &str, prefix: bool, syn: &Synonyms, fields: &Fields) -
         clauses.push((Occur::Must, Box::new(AllQuery)));
     }
 
-    // Exclusions, each chunk on its own.
-    for c in parsed.chunks.iter().filter(|c| c.negated) {
-        let slots = to_slots(&tokenizer.tokenize(c.text));
-        let parts = b.and_parts(&slots, false)?;
-        if !parts.is_empty() {
-            clauses.push((Occur::MustNot, and(parts)));
-        }
+    for q in exclusion_parts(&parsed, &mut b, &mut tokenizer)? {
+        clauses.push((Occur::MustNot, q));
     }
     Ok(Built {
         query: Box::new(BooleanQuery::new(clauses)),
         blend: b.blend,
         scored,
     })
+}
+
+/// The `-chunk` exclusions of `text` as [`build`] applies them (one query
+/// per chunk, synonyms included), for callers that restrict a candidate
+/// set without the positive text (the semantic leg of hybrid search).
+pub(crate) fn exclusions(
+    text: &str,
+    syn: &Synonyms,
+    fields: &Fields,
+) -> Result<Vec<Box<dyn Query>>> {
+    let mut b = Builder {
+        fields,
+        syn,
+        blend: Vec::new(),
+    };
+    exclusion_parts(&parse(text), &mut b, &mut Tokenizer::for_query())
+}
+
+/// Exclusions, each chunk on its own.
+fn exclusion_parts(
+    parsed: &super::parse::Parsed<'_>,
+    b: &mut Builder<'_>,
+    tokenizer: &mut Tokenizer,
+) -> Result<Vec<Box<dyn Query>>> {
+    let mut out = Vec::new();
+    for c in parsed.chunks.iter().filter(|c| c.negated) {
+        let slots = to_slots(&tokenizer.tokenize(c.text));
+        let parts = b.and_parts(&slots, false)?;
+        if !parts.is_empty() {
+            out.push(and(parts));
+        }
+    }
+    Ok(out)
 }
 
 /// Groups tokens by position, dropping `note:` tokens and duplicates.

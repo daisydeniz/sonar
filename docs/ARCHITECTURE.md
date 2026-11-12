@@ -163,9 +163,13 @@ weights} }`.
    `ff_*` fields; compatible keys via Camelot; hidden excluded; facet
    counts drill-sideways in one collector pass; unknown values sort last).
 2. **Text** → BM25 over tokenized name/path/tags + synonyms; exclusions.
-3. **Semantic** → CLAP text embedding → kNN over CLAP audio vectors.
-4. **Fusion** → reciprocal-rank fusion (start) → tuned weighted fusion
-   (later, driven by eval).
+3. **Semantic** → CLAP text embedding of the positive words → exact cosine
+   kNN over the current CLAP audio vectors of the allowed set (filters
+   minus exclusions), parallel brute force (ADR-029).
+4. **Fusion** → reciprocal-rank fusion, k = 60, top 200 per leg
+   (`search::hybrid`, ADR-029; modes hybrid / text / semantic, text-only
+   fallback without the model) → tuned weighted fusion (later, driven by
+   eval).
 5. **Similarity mode** → exact parallel brute force over the filtered set
    (ADR-025: p95 ≈ 17 ms at 500k); ANN on Overall + aspect-weighted
    re-rank only for default-weight, unfiltered queries if libraries pass

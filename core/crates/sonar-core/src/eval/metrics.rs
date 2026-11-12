@@ -190,6 +190,10 @@ pub struct Metrics {
     /// [`super::category`].
     #[serde(default)]
     pub category: Option<CategoryMetrics>,
+    /// Text / NL search (NDCG@10, recall@50), see [`super::text_search`];
+    /// set by the runner.
+    #[serde(default)]
+    pub text: Option<super::text_search::TextSearchMetrics>,
 }
 
 /// Scores observations one by one.

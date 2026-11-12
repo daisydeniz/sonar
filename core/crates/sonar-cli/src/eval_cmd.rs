@@ -3,11 +3,12 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command as Proc;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{bail, Context, Result};
 use clap::Args;
 use sonar_core::classify::category::clap::ClapScorer;
-use sonar_core::embed::EmbedOptions;
+use sonar_core::embed::{EmbedOptions, TextEncoder};
 use sonar_core::eval::golden::TEMPLATE_SIZE;
 use sonar_core::eval::{self, Baseline, Dataset, EvalReport};
 
@@ -90,10 +91,19 @@ pub fn run(args: &EvalArgs) -> Result<()> {
         .clone()
         .unwrap_or_else(|| root.join("eval/reports/BASELINE.md"));
 
+    let clap = if args.no_clap { None } else { load_clap() };
+    // The text tower for the (report-only) CLAP / hybrid text-search numbers.
+    let text_encoder = clap.as_ref().and_then(|_| {
+        TextEncoder::new(&EmbedOptions::default())
+            .map_err(|e| eprintln!("text search: BM25 only (text encoder: {e})"))
+            .ok()
+            .map(|t| Arc::new(Mutex::new(t)))
+    });
     let opts = eval::EvalOptions {
         similar_sweep: args.similar_sweep,
-        clap: if args.no_clap { None } else { load_clap() },
+        clap,
         category_dump: args.category_dump.clone(),
+        text_encoder,
     };
     let mut tiers = Vec::new();
     // Keeps the generated fixtures alive until the end of the run.

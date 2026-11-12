@@ -139,6 +139,42 @@ pub const METRICS: &[MetricInfo] = &[
         tracked: false,
     },
     MetricInfo {
+        key: "text.bm25_ndcg10_pct",
+        label: "Text search NDCG@10, BM25 (%)",
+        target: "no regression",
+        tracked: true,
+    },
+    MetricInfo {
+        key: "text.bm25_recall50_pct",
+        label: "Text search recall@50, BM25 (%)",
+        target: "no regression",
+        tracked: true,
+    },
+    MetricInfo {
+        key: "text.semantic_ndcg10_pct",
+        label: "Text search NDCG@10, CLAP only (%)",
+        target: "report only",
+        tracked: false,
+    },
+    MetricInfo {
+        key: "text.semantic_recall50_pct",
+        label: "Text search recall@50, CLAP only (%)",
+        target: "report only",
+        tracked: false,
+    },
+    MetricInfo {
+        key: "text.hybrid_ndcg10_pct",
+        label: "Text search NDCG@10, hybrid RRF (%)",
+        target: "report only",
+        tracked: false,
+    },
+    MetricInfo {
+        key: "text.hybrid_recall50_pct",
+        label: "Text search recall@50, hybrid RRF (%)",
+        target: "report only",
+        tracked: false,
+    },
+    MetricInfo {
         key: "decode.unexpected_errors",
         label: "Unexpected decode errors (count)",
         target: "0",
@@ -193,6 +229,16 @@ pub fn values(t: &TierReport) -> BTreeMap<String, f64> {
         put("similar.mrr_pct", s.mrr_pct);
         if let Some(p) = &s.pitch {
             put("similar.pitch_p10_pct", p.p10_pct);
+        }
+    }
+    if let Some(x) = &m.text {
+        put("text.bm25_ndcg10_pct", x.bm25.ndcg10_pct);
+        put("text.bm25_recall50_pct", x.bm25.recall50_pct);
+        for (mode, s) in [("semantic", &x.semantic), ("hybrid", &x.hybrid)] {
+            if let Some(s) = s {
+                put(&format!("text.{mode}_ndcg10_pct"), s.ndcg10_pct);
+                put(&format!("text.{mode}_recall50_pct"), s.recall50_pct);
+            }
         }
     }
     put("decode.unexpected_errors", t.unexpected_errors as f64);

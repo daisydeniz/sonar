@@ -299,6 +299,12 @@ pub enum Command {
         /// Synonyms file to use instead of the default.
         #[arg(long, value_name = "FILE")]
         synonyms: Option<PathBuf>,
+        /// `hybrid` (names + CLAP sound search fused by reciprocal rank),
+        /// `text` (names only) or `semantic` (CLAP only: "dark atmospheric
+        /// pad"). Default: hybrid when the CLAP model and embeddings exist,
+        /// else text. Browsing and field sorts always run as text.
+        #[arg(long, value_name = "MODE")]
+        mode: Option<sonar_core::search::SearchMode>,
         /// Filters, sort and facets.
         #[command(flatten)]
         filters: FilterArgs,
@@ -447,6 +453,15 @@ mod tests {
             }) => assert_eq!(query, ["kick", "-vinyl", "dark"]),
             other => panic!("{other:?}"),
         }
+        let cli = Cli::try_parse_from(["sonar", "search", "--mode", "semantic", "dark pad"]);
+        assert!(matches!(
+            cli.map(|c| c.command),
+            Ok(Command::Search {
+                mode: Some(sonar_core::search::SearchMode::Semantic),
+                ..
+            })
+        ));
+        assert!(Cli::try_parse_from(["sonar", "search", "--mode", "bm25", "x"]).is_err());
         let cli = Cli::try_parse_from(["sonar", "search", "--no-prefix", "-\"one shot\""]);
         assert!(matches!(
             cli.map(|c| c.command),

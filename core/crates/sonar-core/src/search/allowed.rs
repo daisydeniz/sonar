@@ -1,14 +1,16 @@
 //! The set of files a query may return: every indexed document that passes
 //! the [`Filters`] (ADR-018 semantics, hidden files excluded unless
 //! [`Filters::include_hidden`]), without text and without scoring. Used by
-//! similarity search (ADR-024) to restrict the brute-force scan.
+//! similarity search (ADR-024) and the semantic leg of hybrid search
+//! (ADR-029, also minus the query's exclusions) to restrict the
+//! brute-force scans.
 
 use tantivy::collector::{Collector, SegmentCollector};
 use tantivy::columnar::Column;
 use tantivy::query::{AllQuery, BooleanQuery, Occur, Query};
 use tantivy::{DocId, Score, SegmentOrdinal, SegmentReader};
 
-use super::Filters;
+use super::{build, Filters, Synonyms};
 use crate::index::{TextIndex, FILE_ID_FIELD};
 use crate::Result;
 
@@ -18,8 +20,34 @@ use crate::Result;
 /// # Errors
 /// [`crate::Error::Index`].
 pub fn filtered_file_ids(index: &TextIndex, filters: &Filters) -> Result<Vec<i64>> {
+    ids_matching(index, filters, Vec::new())
+}
+
+/// [`filtered_file_ids`] minus the files matched by the `-word` exclusions
+/// of `query` (same semantics as text search, synonyms included); the
+/// positive words of `query` are ignored. The candidate set of the
+/// semantic leg of hybrid search.
+///
+/// # Errors
+/// [`crate::Error::Index`].
+pub fn allowed_file_ids(
+    index: &TextIndex,
+    synonyms: &Synonyms,
+    query: &str,
+    filters: &Filters,
+) -> Result<Vec<i64>> {
+    let excluded = build::exclusions(query, synonyms, index.fields())?;
+    ids_matching(index, filters, excluded)
+}
+
+fn ids_matching(
+    index: &TextIndex,
+    filters: &Filters,
+    excluded: Vec<Box<dyn Query>>,
+) -> Result<Vec<i64>> {
     let mut clauses: Vec<(Occur, Box<dyn Query>)> = vec![(Occur::Must, Box::new(AllQuery))];
     clauses.extend(filters.clauses(index.fields(), true));
+    clauses.extend(excluded.into_iter().map(|q| (Occur::MustNot, q)));
     let query = BooleanQuery::new(clauses);
     let raw = index.searcher().search(&query, &IdCollector)?;
     let mut ids: Vec<i64> = raw

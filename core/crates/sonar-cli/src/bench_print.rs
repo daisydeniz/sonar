@@ -291,4 +291,38 @@ pub(crate) fn print_search(b: &SearchBench) {
             c.class, c.slowest_query_p50_ms, c.slowest_query
         );
     }
+    if let Some(h) = &b.hybrid {
+        print_hybrid(h, b.budget_ms);
+    }
+}
+
+fn print_hybrid(h: &bench::HybridBench, budget_ms: f64) {
+    println!(
+        "hybrid: {} CLAP rows ({:.0} MB, written in {:.1} s, untimed); text encoder: {}",
+        h.vector_rows,
+        h.vector_bytes as f64 / 1e6,
+        h.setup_secs,
+        h.encoder
+    );
+    println!(
+        "{:<14} {:>6} {:>8} {:>8} {:>8} {:>8} {:>12}",
+        "class", "n", "p50 ms", "p95 ms", "p99 ms", "max ms", "mean scored"
+    );
+    for c in h.encode.iter().chain(&h.classes) {
+        println!(
+            "{:<14} {:>6} {:>8.2} {:>8.2} {:>8.2} {:>8.2} {:>12.0}{}",
+            c.class,
+            c.n,
+            c.p50_ms,
+            c.p95_ms,
+            c.p99_ms,
+            c.max_ms,
+            c.mean_candidates,
+            if c.p95_ms >= budget_ms {
+                "  OVER BUDGET"
+            } else {
+                ""
+            }
+        );
+    }
 }

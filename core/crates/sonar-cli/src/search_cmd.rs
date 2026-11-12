@@ -6,8 +6,12 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 use serde::Serialize;
+use sonar_core::embed::{store::dir_for_db, EmbedOptions};
 use sonar_core::index::{OpenState, TextIndex};
-use sonar_core::search::{search, FacetCount, Facets, SearchOptions, Synonyms};
+use sonar_core::search::{
+    embedded_file_ids, hybrid_search, FacetCount, Facets, HybridOptions, SearchMode, SearchOptions,
+    SemanticSearch, Synonyms,
+};
 use sonar_core::Store;
 
 use crate::search_args::FilterArgs;
@@ -26,6 +30,8 @@ pub struct Args<'a> {
     pub no_prefix: bool,
     /// Synonyms file instead of `<SONAR_HOME>/synonyms.tsv` / built-in.
     pub synonyms: Option<&'a Path>,
+    /// Search mode; `None` = hybrid when CLAP is available, else text.
+    pub mode: Option<SearchMode>,
 }
 
 #[derive(Serialize)]
@@ -33,13 +39,21 @@ struct Row {
     rank: usize,
     score: f32,
     file_id: i64,
+    text_rank: Option<u32>,
+    semantic_rank: Option<u32>,
     path: Option<PathBuf>,
 }
 
 #[derive(Serialize)]
 struct Report<'a> {
     query: &'a str,
+    mode: SearchMode,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fallback: Option<String>,
+    /// Files the text leg matched.
     total: usize,
+    /// Filtered files with a CLAP embedding (semantic / hybrid).
+    semantic_candidates: usize,
     took_ms: f64,
     hits: Vec<Row>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -81,15 +95,25 @@ pub fn run(args: &Args<'_>) -> Result<()> {
         None => Synonyms::load_default().context("reading synonyms")?,
     };
     let query = args.query.join(" ");
-    let opts = SearchOptions {
-        limit: args.limit,
-        prefix: !args.no_prefix,
-        filters: args.filters.flags.filters(&store)?,
-        sort: args.filters.sort.unwrap_or_default(),
-        facets: args.filters.facets,
+    let opts = HybridOptions {
+        mode: args.mode.unwrap_or_default(),
+        search: SearchOptions {
+            limit: args.limit,
+            prefix: !args.no_prefix,
+            filters: args.filters.flags.filters(&store)?,
+            sort: args.filters.sort.unwrap_or_default(),
+            facets: args.filters.facets,
+        },
+        cancel: None,
+    };
+    let semantic = if opts.mode == SearchMode::Text || query.trim().is_empty() {
+        None
+    } else {
+        load_semantic(&store, args.mode.is_some())
     };
     let started = Instant::now();
-    let results = search(&ix, &synonyms, &query, &opts).context("searching")?;
+    let results =
+        hybrid_search(&ix, &synonyms, semantic.as_ref(), &query, &opts).context("searching")?;
     let took_ms = started.elapsed().as_secs_f64() * 1e3;
     let hits = results
         .hits
@@ -100,14 +124,23 @@ pub fn run(args: &Args<'_>) -> Result<()> {
                 rank: i + 1,
                 score: h.score,
                 file_id: h.file_id,
+                text_rank: h.text_rank,
+                semantic_rank: h.semantic_rank,
                 path: store.file_path(h.file_id)?,
             })
         })
         .collect::<sonar_core::Result<Vec<_>>>()
         .context("looking up result paths")?;
+    // Without --mode, a missing model is the normal text-only setup.
+    let fallback = results
+        .fallback
+        .filter(|_| args.mode.is_some() || semantic.is_some());
     let report = Report {
         query: &query,
-        total: results.total,
+        mode: results.mode,
+        fallback,
+        total: results.text_total,
+        semantic_candidates: results.semantic_candidates,
         took_ms,
         hits,
         facets: results.facets,
@@ -121,6 +154,36 @@ pub fn run(args: &Args<'_>) -> Result<()> {
         }
     }
     Ok(())
+}
+
+/// The CLAP text tower plus the current embeddings of the store's files,
+/// or `None`, with a note on stderr when the user asked for a CLAP mode
+/// (without `--mode`, no model or no embeddings is the normal text-only
+/// setup). The text tower is not loaded when no file has an embedding.
+fn load_semantic(store: &Store, explicit: bool) -> Option<SemanticSearch> {
+    let opts = EmbedOptions::default();
+    let loaded = (|| -> Result<SemanticSearch> {
+        if let Some(reason) = opts.unavailable_reason() {
+            anyhow::bail!(reason);
+        }
+        let db = store
+            .path()
+            .context("the store is in memory (no embeddings)")?;
+        let current = embedded_file_ids(store).context("reading embed results")?;
+        if current.is_empty() {
+            anyhow::bail!("no CLAP embeddings yet (run `sonar analyze --stages meta,dsp,embed`)");
+        }
+        SemanticSearch::load(&opts, &dir_for_db(db), Some(&current)).context("loading CLAP search")
+    })();
+    match loaded {
+        Ok(s) => Some(s),
+        Err(e) => {
+            if explicit {
+                eprintln!("note: text search only: {e:#}");
+            }
+            None
+        }
+    }
 }
 
 /// Opens the default text index, building it from `store` first if it is
@@ -173,12 +236,26 @@ fn print_text(r: &Report<'_>) {
             .map_or_else(|| "(not in store)".into(), |p| p.display().to_string());
         println!("{:>4}  {:>7.3}  #{:<7} {path}", h.rank, h.score, h.file_id);
     }
-    println!(
-        "{} of {} results ({:.1} ms)",
-        r.hits.len(),
-        r.total,
-        r.took_ms
-    );
+    let fallback = r
+        .fallback
+        .as_deref()
+        .map_or_else(String::new, |f| format!(", {f}"));
+    match r.mode {
+        SearchMode::Text => println!(
+            "{} of {} results ({:.1} ms, text{fallback})",
+            r.hits.len(),
+            r.total,
+            r.took_ms
+        ),
+        mode => println!(
+            "{} results ({:.1} ms, {}: {} name matches, {} files with CLAP embeddings)",
+            r.hits.len(),
+            r.took_ms,
+            mode.as_str(),
+            r.total,
+            r.semantic_candidates
+        ),
+    }
 }
 
 /// After `sonar scan`: rebuild the search index if one exists, so the next

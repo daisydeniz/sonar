@@ -8,12 +8,11 @@
 //! - [`category`]: category top-1, macro-F1, confusion, calibration (T5.3);
 //! - [`similarity`]: P@10 / MRR of the aspect-weighted `similar` ranking
 //!   (fixture families, golden `similar.jsonl`);
+//! - [`text_search`] / [`text_queries`]: NDCG@10 / recall@50 of text,
+//!   semantic and hybrid search (T5.4; fixture queries judged from truth,
+//!   golden `text_queries.jsonl`);
 //! - [`report`]: JSON + markdown with deltas;
 //! - [`baseline`]: `eval/reports/BASELINE.md` and the regression rule.
-//!
-//! Text-search metrics are listed as "not available yet"
-//! ([`report::NOT_AVAILABLE`]); they become more keys in
-//! [`baseline::METRICS`] when their feature exists.
 
 pub mod baseline;
 pub mod category;
@@ -25,6 +24,8 @@ pub mod metrics;
 pub mod report;
 pub mod run;
 pub mod similarity;
+pub mod text_queries;
+pub mod text_search;
 
 use std::path::Path;
 

@@ -50,6 +50,7 @@ use rayon::prelude::*;
 use serde::Serialize;
 
 pub use score::AspectDistances;
+pub(crate) use score::{Cand, TopK};
 pub use weights::AspectWeights;
 
 use crate::dsp::aspects::AspectVectors;
