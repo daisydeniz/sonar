@@ -163,6 +163,18 @@ aspect vectors, in memory.
 - Fixture numbers measure the aspect features on synthetic sounds; the
   target (P@10 ≥ 70 %) is only meaningful on golden.
 
+### Category (top-1, macro-F1)
+Taxonomy in `docs/categories.md`, classifier in ADR-028. File names are
+hidden from the classifier in every tier (audio-only numbers).
+- Tracked keys: `category.dsp_accuracy_pct`, `category.dsp_macro_f1_pct`
+  (DSP-only, no dependency on `models/`; a drop > 1 point is a regression).
+  Only 56 fixture files carry a category, so one flipped file = 1.8 points
+  (deterministic, not flaky).
+- Report only: the shipped CLAP + DSP and CLAP-only numbers (need
+  `models/`; `--no-clap` skips them), held-out ECE, confusion matrix.
+- Silver labels come from folder names (`category_hint`); golden from
+  `labels.csv`. The ≥ 90 % target applies to golden.
+
 ## Running
 ```
 sonar eval --fixtures            # always; part of check.sh

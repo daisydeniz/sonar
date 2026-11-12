@@ -860,7 +860,11 @@ stays a separate field).
   are report-only. Measured (audio only): fixtures DSP 33.9 % / CLAP + DSP
   53.6 % (synthetic, 56 labelled); silver (7818 files, folder labels) DSP
   65.8 % / CLAP-only 71.3 % / CLAP + DSP 76.0 %, ECE 1.8 %; the two
-  alphabetical halves of the genre folders agree within 2.4 points.
+  alphabetical halves of the genre folders agree within 2.4 points. The
+  silver numbers are **partly in-sample** (profiles, fusion weights and T
+  were fitted on silver). Shipped accuracy *with* the name hint is not
+  measured (silver labels come from the same words); golden is the real
+  check.
 - **Consequences**: the golden ≥ 90 % target is open until the founder's
   golden set exists; silver is one vendor library with noisy folder labels
   (perc folders hold snares/claps). Re-fit weights/profiles when golden

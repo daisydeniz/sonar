@@ -3,8 +3,8 @@
 //!
 //! Evidence, fused as logits (late fusion of independent scores, then one
 //! softmax):
-//! - **CLAP zero-shot** ([`clap`]): mean cosine of the file's audio
-//!   embedding to each category's text prompts (Wu et al. 2023). Only when
+//! - **CLAP zero-shot** ([`clap`]): best-prompt (max) cosine of the file's
+//!   audio embedding to each category's text prompts (Wu et al. 2023). Only when
 //!   an embedding exists (the `embed` stage, ADR-027).
 //! - **DSP** ([`dsp`]): a naive-Bayes score over named cues from the aspect
 //!   vectors, the loop/one-shot decision and the duration ([`cues`]).

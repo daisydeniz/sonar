@@ -4,7 +4,7 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
 
 ## fixtures
 
-120 files, generated (sonar fixtures, default seed), revision 68d3011 (2026-11-11)
+120 files, generated (sonar fixtures, default seed), revision aac7eac (2026-11-12)
 
 | Metric | Value | Target |
 |---|---:|---|
@@ -15,6 +15,8 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
 | Key MIREX weighted (%) | 100.00 | >= 80 |
 | Note exact pitch class (%) | 100.00 | >= 90 |
 | Note exact MIDI (%) | 100.00 | >= 90 |
+| Category top-1, DSP only (%) | 33.93 | report only |
+| Category macro-F1, DSP only (%) | 50.72 | report only |
 | Similarity P@10, k = min(10, relevant) (%) | 81.51 | >= 70 |
 | Similarity MRR (%) | 99.33 | report only |
 | Unexpected decode errors (count) | 0 | 0 |
@@ -24,13 +26,15 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
   "schema_version": 1,
   "tiers": {
     "fixtures": {
-      "date": "2026-11-11",
-      "git_sha": "68d3011",
+      "date": "2026-11-12",
+      "git_sha": "aac7eac",
       "files": 120,
       "source": "generated (sonar fixtures, default seed)",
       "metrics": {
         "bpm.accuracy_pct": 97.05882352941177,
         "bpm.one_shots_with_bpm": 0.0,
+        "category.dsp_accuracy_pct": 33.92857142857143,
+        "category.dsp_macro_f1_pct": 50.722943722943725,
         "decode.unexpected_errors": 0.0,
         "key.exact_pct": 100.0,
         "key.mirex_pct": 100.0,

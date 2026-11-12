@@ -169,3 +169,8 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T5.2 review) A changed file that fails to re-embed keeps its old live row in the CLAP store; T5.3/T5.4 should filter by stage outcome or the store should drop the row.
 - (from T5.2) `cargo deny check advisories` flags unmaintained `paste` (via tokenizers) and `basic-toml` (via uniffi); check.sh does not run advisories.
 - (from T5.2) Embed throughput measured on M4 Pro only (154 files/s); base M4 (4P) estimated ≈ 60 files/s — re-measure on base hardware.
+- (from T5.3) Re-fit category profiles / fusion weights / T on golden to reach ≥ 90 % top-1 (silver CLAP+DSP 76.0 %, partly in-sample); also report silver on the 25 held-out folders.
+- (from T5.3 review) If the CLAP text tower fails but audio works, files get `embed` v2 ok without category refinement and `keep_refined` then pins the DSP-only category; skip the stage when `CategoryRefiner::new` is None or key `keep_refined` on `category_source`.
+- (from T5.3) The embed-stage category refiner opens the vector store once per run; share the handle with the Engine (T5.5).
+- (from T5.3) Fixture drum loops are often classified `texture`/`lead` by DSP-only cues; improve loop cues or fixture timbres.
+- (from T5.3 review) `classify/category/taxonomy.rs` (411) and `jobs/work.rs` (448) exceed ~400 lines; move `work.rs` tests to `jobs/tests/`.
