@@ -77,7 +77,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T6.5 (swift-ui) Waveform: peaks from core, CALayer/Metal rendering, zoom, playhead. (3db495a)
 - [x] T6.6 (swift-ui) Similarity UI: "Find similar", aspect sliders, drop external file to search. (269bfd6)
 - [x] T6.7 (swift-ui) Drag & drop out to DAW/Finder (file URLs), multi-select. (2c00c44)
-- [ ] T6.8 (swift-ui) Organize: favorites, collections, tags, overrides for BPM/key/category, hide.
+- [x] T6.8 (swift-ui) Organize: favorites, collections, tags, overrides for BPM/key/category, hide. (8191ddb)
 - [ ] T6.9 (swift-ui) Duplicates view (exact + near via aspect vectors).
 
 ## M7 — Polish & release
@@ -236,3 +236,5 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T6.7) `fileExists` per dragged row runs on the main thread at drag start; can stall on slow network volumes with large selections.
 - (from T6.7 review) After a reset that drops the focused file but keeps other selected rows, highlight and inspector focus disagree (Return reveals the gone file).
 - (from T6.7) Edit > Copy menu validation while the table is focused is untested.
+- (from T6.8 review) Deleting a collection has no confirmation dialog.
+- (from T6.8) Inspector can't show which fields are overridden (FileRow has no override flag); "Revert" is always offered (no-op without override).
