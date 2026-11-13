@@ -16,7 +16,6 @@ _(Agents list anything that requires the founder: decisions, credentials,
 manual tests, labeled data. Keep each item one line with the task id.)_
 - T0.1 (optional) For `cargo` in a normal terminal / hand-started `claude`, add to ~/.zprofile: `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"` (scripts and autopilot already handle it). Optional: `brew install gh`.
 - T3.7 Golden set labeling: `sonar eval --init-golden <dir>` writes the labels.csv template; then set `SONAR_GOLDEN_DIR` (optional: `SONAR_SILVER_DIR` for name-labeled real files); optional `similar.jsonl` similarity judgements (format in EVAL.md) enable similarity tuning (T4.4)
-- T5.4 Merge needs permission this session lacked: allow `git checkout`, `git merge --ff-only`, `git push origin main`, `git branch -d` for the autopilot (or merge `task/t5-4-hybrid-ranking` by hand; steps in `logs/handoff.md`).
 - T8.1 End-to-end test by the founder (after M7)
 - T7.4 Apple Developer ID, notarization, payment provider, pricing
 - T5.2 (permissions) In the T5.2 session, running `scripts/*.sh` and `core/target/*/sonar` directly needed approval (cargo commands did not), so the check.sh gates were run one by one and build-core.sh/xcodebuild were skipped (sonar-ffi unchanged). Allow `scripts/check.sh` in the autopilot's permission settings.
