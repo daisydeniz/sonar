@@ -46,7 +46,7 @@ struct ContentView: View {
                 "Could not open Sonar's library", systemImage: "exclamationmark.triangle",
                 description: Text(message))
         case .ready:
-            if model.rows.isEmpty {
+            if model.resultCount == 0 {
                 ContentUnavailableView(
                     model.libraries.isEmpty ? "No libraries yet" : "No results",
                     systemImage: model.libraries.isEmpty ? "folder.badge.plus" : "magnifyingglass",
@@ -54,7 +54,11 @@ struct ContentView: View {
                         ? "Add a folder of samples with File > Add Library…"
                         : "Try a different search."))
             } else {
-                ResultsTableView(rows: model.rows, selection: $model.selectedFileId)
+                ResultsTableView(
+                    pager: model.pager,
+                    libraryNames: Dictionary(uniqueKeysWithValues: model.libraries.map { ($0.id, URL(fileURLWithPath: $0.rootPath).lastPathComponent) }),
+                    onSelect: { model.select($0) },
+                    onSort: { key, descending in Task { await model.setSort(key, descending: descending) } })
             }
         }
     }

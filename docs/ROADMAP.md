@@ -206,3 +206,8 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T6.1 review) `AppModelTests` checks `paused` only if the fixture job is still running, so on a fast machine the pause path may not be exercised; pause before any await or use a larger library.
 - (from T6.1 review) The `.failed` engine state is not tested through `AppModel`; inject an opener closure and assert it.
 - (from T6.1 review) Each watcher `EngineEvent.error` becomes a modal alert; repeated retry errors (SQLITE_BUSY) could spam it. Use a non-modal status message.
+- (from T6.2 review) `ResultsPager.reset` returns false and leaves `resetting = true` if page 0 is `Cancelled` `maxRetries` times in the current generation (not reachable today; similarity search will share the cancel flag): clear the flag and throw so `AppModel` reports it.
+- (from T6.2 review) Header sort arrow is not synced from `AppModel.sortKey` when the table is recreated, and collections show an arrow though `collectionRows` has no core sort (add sort to `collectionRows` or disable sorting there).
+- (from T6.2 review) After a reset that drops the selected file from page 0, the inspector keeps the old snapshot and `selectedID` stays set; decide: clear the selection or re-highlight when scrolled to.
+- (from T6.2 review) The Library column shows the folder name but the core sorts by library id; sort by display name in the core.
+- (from T6.2 review) The perf test's big jumps time mostly placeholder rows (page landing reload is untimed); also time the reload after a page arrives.

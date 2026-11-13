@@ -1,24 +1,28 @@
+import AppKit
 import SwiftUI
 
-/// Simple SwiftUI table of the first results page. Isolated here because
-/// T6.2 replaces it with a paged NSTableView.
+/// SwiftUI host of the AppKit results table (`ResultsTableController`).
 @MainActor
-struct ResultsTableView: View {
-    let rows: [FileRow]
-    @Binding var selection: Int64?
+struct ResultsTableView: NSViewRepresentable {
+    let pager: ResultsPager
+    let libraryNames: [Int64: String]
+    let onSelect: (FileRow?) -> Void
+    let onSort: (SortKey, Bool) -> Void
 
-    var body: some View {
-        Table(rows, selection: $selection) {
-            TableColumn("Name", value: \.name)
-            TableColumn("Category") { Text(Format.text($0.category)) }
-            TableColumn("Kind") { Text(Format.text($0.kind)) }
-            TableColumn("BPM") { Text(Format.bpm($0.bpm)).monospacedDigit() }
-                .width(60)
-            TableColumn("Key") { Text(Format.text($0.key)) }
-                .width(60)
-            TableColumn("Duration") { Text(Format.duration(ms: $0.durationMs)).monospacedDigit() }
-                .width(80)
-        }
-        .accessibilityLabel("Search results")
+    func makeCoordinator() -> ResultsTableController { ResultsTableController(pager: pager) }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let controller = context.coordinator
+        controller.onSelect = onSelect
+        controller.onSort = onSort
+        controller.libraryNames = libraryNames
+        return controller.scrollView
+    }
+
+    func updateNSView(_ view: NSScrollView, context: Context) {
+        let controller = context.coordinator
+        controller.onSelect = onSelect
+        controller.onSort = onSort
+        controller.libraryNames = libraryNames
     }
 }

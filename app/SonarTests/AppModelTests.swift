@@ -17,6 +17,11 @@ final class AppModelTests: XCTestCase {
         return url
     }
 
+    /// Rows of the first (cached) page of the model's results.
+    private func loadedRows(_ model: AppModel) -> [FileRow] {
+        (0..<model.resultCount).compactMap { model.pager.peek($0) }
+    }
+
     private func fixturesDir() throws -> String {
         let env = ProcessInfo.processInfo.environment
         guard let dir = env["SONAR_FIXTURES_DIR"], !dir.isEmpty else {
@@ -45,13 +50,13 @@ final class AppModelTests: XCTestCase {
         await model.start()
         XCTAssertEqual(model.engineState, .ready)
         XCTAssertTrue(model.libraries.isEmpty)
-        XCTAssertTrue(model.rows.isEmpty)
+        XCTAssertEqual(model.resultCount, 0)
 
         // add library: listed, scanned, indexing started
         await model.addLibrary(path: fixtures)
         XCTAssertNil(model.errorMessage)
         XCTAssertEqual(model.libraries.count, 1)
-        XCTAssertFalse(model.rows.isEmpty, "files are searchable right after the scan")
+        XCTAssertFalse(loadedRows(model).isEmpty, "files are searchable right after the scan")
 
         // pause then resume while indexing (a fast job may already be done)
         model.pauseIndexing()
@@ -68,19 +73,26 @@ final class AppModelTests: XCTestCase {
         // search text updates results
         model.searchText = "hit"
         await model.refreshResults()
-        XCTAssertGreaterThanOrEqual(model.rows.count, 12)
-        XCTAssertLessThan(model.rows.count, Int(AppModel.pageLimit))
-        let hit = try XCTUnwrap(model.rows.first)
-        model.selectedFileId = hit.fileId
+        XCTAssertGreaterThanOrEqual(model.resultCount, 12)
+        XCTAssertLessThan(model.resultCount, ResultsPager.defaultPageSize)
+        let hit = try XCTUnwrap(loadedRows(model).first)
+        model.select(hit)
         XCTAssertEqual(model.selectedRow?.fileId, hit.fileId)
+
+        // header sort is done by the core: descending is the reverse of ascending
+        await model.setSort(.name, descending: false)
+        let ascending = loadedRows(model).map { $0.name.lowercased() }
+        await model.setSort(.name, descending: true)
+        XCTAssertEqual(loadedRows(model).map { $0.name.lowercased() }, ascending.reversed())
+        await model.setSort(.relevance, descending: false)
 
         // favourites sidebar shows only the favourited row
         model.searchText = ""
         await model.setFavorite(fileIds: [hit.fileId], on: true)
         model.sidebarSelection = .favorites
         await model.refreshResults()
-        XCTAssertEqual(model.rows.map(\.fileId), [hit.fileId])
-        XCTAssertEqual(model.rows.first?.favorite, true)
+        XCTAssertEqual(loadedRows(model).map(\.fileId), [hit.fileId])
+        XCTAssertEqual(loadedRows(model).first?.favorite, true)
 
         // a collection selection shows its rows
         let cid = try engine.createCollection(name: "Picks")
@@ -89,7 +101,7 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.collections.map(\.name), ["Picks"])
         model.sidebarSelection = .collection(cid)
         await model.refreshResults()
-        XCTAssertEqual(model.rows.map(\.fileId), [hit.fileId])
+        XCTAssertEqual(loadedRows(model).map(\.fileId), [hit.fileId])
 
         // latest wins: overlapping refreshes leave the newest state
         model.sidebarSelection = .allSamples
@@ -99,7 +111,7 @@ final class AppModelTests: XCTestCase {
         model.searchText = "zzzznomatch"
         await model.refreshResults()
         await first.value
-        XCTAssertTrue(model.rows.isEmpty, "the older 'hit' result must not win")
+        XCTAssertEqual(model.resultCount, 0, "the older 'hit' result must not win")
         XCTAssertNil(model.errorMessage, "a superseded search must not surface an error")
 
         // remove library empties everything
@@ -109,7 +121,7 @@ final class AppModelTests: XCTestCase {
         await model.removeLibrary(id: libraryId)
         XCTAssertTrue(model.libraries.isEmpty)
         XCTAssertEqual(model.sidebarSelection, .allSamples)
-        XCTAssertTrue(model.rows.isEmpty)
+        XCTAssertEqual(model.resultCount, 0)
     }
 
     func testOpenFailureIsAnErrorNotACrash() async throws {

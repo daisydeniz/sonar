@@ -30,9 +30,8 @@ final class AppModel {
     private(set) var engineState: EngineState = .opening
     private(set) var libraries: [LibraryInfo] = []
     private(set) var collections: [CollectionInfo] = []
-    private(set) var rows: [FileRow] = []
-    /// Text matches of the last search (row count for collection views).
-    private(set) var total: UInt64 = 0
+    /// Lazily paged results behind the table (latest-wins via its generations).
+    let pager = ResultsPager()
     private(set) var progress = IndexingProgress(
         enabled: false, running: false, paused: false, stage: nil, total: 0, done: 0, errors: 0)
     /// Last user-visible error (add/remove/search failures); nil when none.
@@ -40,23 +39,36 @@ final class AppModel {
 
     var sidebarSelection: SidebarItem = .allSamples
     var searchText = ""
-    var selectedFileId: Int64?
-
-    /// Page size of the simple results table (T6.2 replaces it with paging).
-    static let pageLimit: UInt32 = 500
+    /// Selected row (a snapshot, so it survives page eviction and resets).
+    private(set) var selectedRow: FileRow?
+    /// Core sort key of the table; `.relevance` = the core's default order.
+    private(set) var sortKey: SortKey = .relevance
+    private(set) var sortDescending = false
 
     @ObservationIgnored private var bridge: CoreBridge?
     @ObservationIgnored private var generation = 0
+    @ObservationIgnored private var lastAppliedSort: SortKey = .relevance
+    @ObservationIgnored private var lastAppliedDescending = false
     @ObservationIgnored private var pollTask: Task<Void, Never>?
     @ObservationIgnored private var wasRunning = false
     @ObservationIgnored private var isStarted = false
     @ObservationIgnored private let activePollNs: UInt64
     @ObservationIgnored private let idlePollNs: UInt64
 
-    /// The row selected in the table, if it is in the current page.
-    var selectedRow: FileRow? {
-        guard let id = selectedFileId else { return nil }
-        return rows.first { $0.fileId == id }
+    var selectedFileId: Int64? { selectedRow?.fileId }
+
+    /// Rows in the current result list.
+    var resultCount: Int { pager.count }
+
+    /// Table selection changed (nil = nothing selected).
+    func select(_ row: FileRow?) { selectedRow = row }
+
+    /// A header click: the core re-sorts, the table restarts at the top.
+    func setSort(_ key: SortKey, descending: Bool) async {
+        guard key != sortKey || descending != sortDescending else { return }
+        sortKey = key
+        sortDescending = descending
+        await refreshResults(keepScroll: false)
     }
 
     /// `engine` is injectable (tests pass one opened on a temp home); `nil`
@@ -65,6 +77,7 @@ final class AppModel {
         bridge = engine.map(CoreBridge.init(engine:))
         activePollNs = activePollMs * 1_000_000
         idlePollNs = idlePollMs * 1_000_000
+        pager.onError = { [weak self] in self?.errorMessage = Self.describe($0) }
     }
 
     // MARK: Lifecycle
@@ -150,6 +163,10 @@ final class AppModel {
         guard let bridge else { return }
         do {
             try await bridge.setFavorite(fileIds: fileIds, on: on)
+            if var row = selectedRow, fileIds.contains(row.fileId) {
+                row.favorite = on
+                selectedRow = row
+            }
         } catch {
             errorMessage = Self.describe(error)
         }
@@ -160,38 +177,46 @@ final class AppModel {
 
     /// Fire-and-forget refresh for view callbacks (typing, selection).
     func scheduleRefresh() {
-        Task { await refreshResults() }
+        Task { await refreshResults(keepScroll: false) }
     }
 
     /// Runs the current sidebar selection + search text off the main actor
     /// and applies the result unless a newer request superseded it.
-    func refreshResults() async {
+    func refreshResults(keepScroll: Bool = true) async {
         guard let bridge else { return }
         generation += 1
         let mine = generation
         let selection = sidebarSelection
         let text = searchText
+        let key = sortKey
+        let descending = sortDescending
+        let sortChanged = key != lastAppliedSort || descending != lastAppliedDescending
         do {
-            let newRows: [FileRow]
-            let newTotal: UInt64
+            let loader: ResultPageLoader
             switch selection {
             case .collection(let id):
-                newRows = try await bridge.collectionRows(id: id)
-                newTotal = UInt64(newRows.count)
+                let rows = try await bridge.collectionRows(id: id)
+                guard mine == generation else { return }  // a newer request exists
+                loader = ArrayResultLoader(rows: rows)
             case .allSamples, .favorites, .library:
                 var filters = SearchFilters()
                 if selection == .favorites { filters.favoritesOnly = true }
                 if case .library(let id) = selection { filters.libraryIds = [id] }
-                let page = try await bridge.search(
-                    SearchQuery(text: text, filters: filters, limit: Self.pageLimit))
-                newRows = page.rows
-                newTotal = page.total
+                loader = EngineResultLoader(
+                    bridge: bridge,
+                    query: SearchQuery(
+                        text: text, filters: filters, sort: key == .relevance ? nil : key,
+                        descending: descending))
             }
-            guard mine == generation else { return }  // a newer request exists
-            rows = newRows
-            total = newTotal
-            if let id = selectedFileId, !newRows.contains(where: { $0.fileId == id }) {
-                selectedFileId = nil
+            let applied = try await pager.reset(
+                loader: loader, preservePosition: keepScroll && !sortChanged)
+            guard applied, mine == generation else { return }
+            lastAppliedSort = key
+            lastAppliedDescending = descending
+            if pager.count == 0 {
+                selectedRow = nil
+            } else if let id = selectedFileId, let fresh = pager.cachedRow(fileId: id) {
+                selectedRow = fresh
             }
         } catch FfiError.Cancelled {
             return  // superseded in the core; drop
