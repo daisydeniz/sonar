@@ -20,14 +20,20 @@ mod convert;
 mod engine;
 mod error;
 mod facet_types;
+mod similar_types;
 mod types;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_similar;
 
 pub use engine::SonarEngine;
 pub use error::FfiError;
 pub use facet_types::{FacetCount, LibraryFacet, SearchFacets};
+pub use similar_types::{
+    aspect_weights_from_sliders, AspectWeights, SimilarHit, SimilarPage, SimilarQuery, SimilarSeed,
+};
 pub use types::*;
 
 uniffi::setup_scaffolding!();

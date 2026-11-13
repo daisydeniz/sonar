@@ -70,6 +70,35 @@ impl AspectWeights {
         }
     }
 
+    /// Weights of the UI's five sliders (T6.6, ADR-035): aspect `a` weighs
+    /// `overall + sliders[a]`, i.e. the Overall slider is a flat floor under
+    /// all four aspects and each aspect slider adds emphasis on top (the
+    /// same additive rule as `overall=1,pitch=1` in [`FromStr`]).
+    /// `(1, [0;4])` is the default Overall; `(0, pitch=1)` is pitch only.
+    /// `sliders` are in [`RAW_ASPECTS`] order (spectrum, timbre, pitch,
+    /// amplitude). The result is [validated](AspectWeights::validate).
+    ///
+    /// # Errors
+    /// [`Error::InvalidQuery`] for a negative or non-finite slider or all
+    /// weights zero.
+    pub fn from_sliders(overall: f32, sliders: [f32; 4]) -> Result<Self> {
+        let [spectrum, timbre, pitch, amplitude] = sliders;
+        let w = Self {
+            spectrum: overall + spectrum,
+            timbre: overall + timbre,
+            pitch: overall + pitch,
+            amplitude: overall + amplitude,
+        };
+        let raw = [overall, spectrum, timbre, pitch, amplitude];
+        if raw.iter().any(|x| !x.is_finite() || *x < 0.0) {
+            return Err(invalid(format!(
+                "sliders must be finite and ≥ 0: overall={overall}, {sliders:?}"
+            )));
+        }
+        w.validate()?;
+        Ok(w)
+    }
+
     /// Checks that every weight is finite and ≥ 0 and at least one is > 0.
     ///
     /// # Errors
@@ -152,6 +181,19 @@ mod tests {
         );
         assert_eq!(AspectWeights::only(Aspect::Timbre).timbre, 1.0);
         assert_eq!(w.to_string(), "spectrum=1,timbre=1,pitch=3,amplitude=1");
+    }
+
+    #[test]
+    fn sliders_add_to_overall() {
+        let d = AspectWeights::from_sliders(1.0, [0.0; 4]).unwrap();
+        assert_eq!(d, AspectWeights::default());
+        let p = AspectWeights::from_sliders(0.0, [0.0, 0.0, 1.0, 0.0]).unwrap();
+        assert_eq!(p, AspectWeights::only(Aspect::Pitch));
+        let m = AspectWeights::from_sliders(1.0, [0.0, 0.0, 1.0, 0.0]).unwrap();
+        assert_eq!(m.as_array(), [1.0, 1.0, 2.0, 1.0]);
+        assert!(AspectWeights::from_sliders(0.0, [0.0; 4]).is_err());
+        assert!(AspectWeights::from_sliders(1.0, [-1.0, 0.0, 0.0, 0.0]).is_err());
+        assert!(AspectWeights::from_sliders(f32::NAN, [0.0; 4]).is_err());
     }
 
     #[test]

@@ -184,7 +184,7 @@ hits; ADR-030).
 ## 7. FFI surface (v1, ADR-032)
 One UniFFI object, `SonarEngine` (`sonar-ffi`), over `sonar_core::engine::Engine`:
 libraries, indexing control + polled progress/events, paged `search` (display
-rows), `similar`, `row(s)`, user-data setters, `waveform_peaks`, `preview_pcm`.
+rows), `similar`, `similar_to` (weights, filters, external seed; ADR-035), `row(s)`, user-data setters, `waveform_peaks`, `preview_pcm`.
 Every fallible export `throws FfiError`; the exact list, blocking rules,
 cancellation and PCM format are in ADR-032. `duplicates()` is not in v1.
 

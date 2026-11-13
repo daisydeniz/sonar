@@ -19,6 +19,7 @@ use sonar_core::watch::WatchOptions;
 use crate::convert::{self, count};
 use crate::error::{guard, guard_ffi, FfiError};
 use crate::facet_types::SearchFacets;
+use crate::similar_types::{self, SimilarHit, SimilarPage, SimilarQuery};
 use crate::types::{
     AddedLibrary, CollectionInfo, EngineEvent, FileRow, IndexingProgress, LibraryInfo,
     OverrideField, PreviewPcm, ScanInfo, SearchPage, SearchQuery, TagInfo, WaveformPeak,
@@ -180,6 +181,36 @@ impl SonarEngine {
         let found = guard(|| self.engine.similar(&Seed::File(file_id), &opts))?;
         let ids: Vec<i64> = found.hits.iter().map(|h| h.file_id).collect();
         guard(|| self.engine.rows(&ids)).map(|r| r.into_iter().map(FileRow::from).collect())
+    }
+
+    /// Files that sound like the seed (a library file or any audio file on
+    /// disk), nearest first, with aspect weights and filters. **Blocking**
+    /// (milliseconds for a library seed; an external seed is decoded and
+    /// analyzed first). Shares the search cancel flag, latest wins: a newer
+    /// `search`/`similarTo` or `cancelSearch` makes a running call throw
+    /// `FfiError.Cancelled` (also during decoding); never show its result.
+    /// A `file` seed is never in its own result. Errors: `NotFound` (seed
+    /// not analyzed), `InvalidInput` (weights, filters), `Audio`/`Io`
+    /// (external file), `Internal` (no analysis has run yet: "no vector
+    /// store yet").
+    pub fn similar_to(&self, query: SimilarQuery) -> Result<SimilarPage, FfiError> {
+        let (seed, opts) = similar_types::query(query)?;
+        let found = guard(|| self.engine.similar_latest(&seed, &opts))?;
+        let ids: Vec<i64> = found.hits.iter().map(|h| h.file_id).collect();
+        let rows = guard(|| self.engine.rows(&ids))?;
+        // Keep rows and hits aligned even if a file vanished meanwhile.
+        let mut page = SimilarPage {
+            rows: Vec::with_capacity(rows.len()),
+            hits: Vec::with_capacity(rows.len()),
+            candidates: count(found.candidates),
+        };
+        for row in rows {
+            if let Some(hit) = found.hits.iter().find(|h| h.file_id == row.file_id) {
+                page.hits.push(SimilarHit::from(hit));
+                page.rows.push(FileRow::from(row));
+            }
+        }
+        Ok(page)
     }
 
     /// The row of one file, `nil` if unknown. `row`/`rows` wait on the

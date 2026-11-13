@@ -166,6 +166,26 @@ impl Engine {
         similar(&vs, &self.inner.index, seed, opts)
     }
 
+    /// [`Engine::similar`] sharing the search cancel token (latest wins):
+    /// a newer `search`/`similar_latest` or [`Engine::cancel_search`]
+    /// makes this return [`Error::Cancelled`], also while an external seed
+    /// is being decoded. `opts.cancel` is replaced by that token.
+    ///
+    /// # Errors
+    /// As [`Engine::similar`], plus [`Error::Cancelled`].
+    pub fn similar_latest(&self, seed: &Seed, opts: &SimilarOptions) -> Result<SimilarResults> {
+        let token = self.begin_search();
+        let opts = SimilarOptions {
+            cancel: Some(Arc::clone(&token)),
+            ..opts.clone()
+        };
+        let results = self.similar(seed, &opts)?;
+        if token.load(Ordering::SeqCst) {
+            return Err(Error::Cancelled);
+        }
+        Ok(results)
+    }
+
     /// Cancels the newest search, if it is still running.
     pub fn cancel_search(&self) {
         lock(&self.inner.search_cancel).store(true, Ordering::SeqCst);

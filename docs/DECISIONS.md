@@ -1056,3 +1056,21 @@ comfortable. The gain is computed in core (`sonar_core::preview`), exposed as
   (tempo kept); loop = buffer scheduled with `.loops`; decoded-buffer LRU
   (8 entries / 256 MB) filled for the selection ±2; AVAudioFile decode with
   `previewPcm` fallback, capped at 600 s; latest selection wins.
+
+## ADR-035 — FFI similarity query (T6.6)
+Additive to ADR-032/033; the old `similar(fileId:limit:)` stays.
+- `similarTo(query: SimilarQuery) -> SimilarPage`, **blocking**. `SimilarQuery
+  { seed: SimilarSeed (.file(fileId:) | .external(path:)), weights:
+  AspectWeights? = nil (Overall), filters: SearchFilters? = nil, limit = 100
+  (cut to 1000) }`. `SimilarPage { rows, hits: [SimilarHit], candidates }`:
+  `rows[i]` pairs with `hits[i]` (`distance` + per-aspect distances), nearest
+  first; a file seed is never in its results; filters/hidden as in search.
+- Sliders: `aspectWeightsFromSliders(overall, spectrum, timbre, pitch,
+  amplitude)` (core `AspectWeights::from_sliders`): aspect weight =
+  `overall + slider`. (1,0,0,0,0) = Overall; (0,0,0,1,0) = pitch only.
+  Negative/non-finite/all-zero weights -> `InvalidInput`.
+- Cancel: shares the search flag (`Engine::similar_latest`): a newer `search`
+  or `similarTo`, or `cancelSearch`, throws `Cancelled` in the older call,
+  also while an external seed is decoded (`DecodeOptions.cancel`).
+- Errors: unanalyzed seed `NotFound`; bad external file `Audio`/`Io`;
+  nothing analyzed yet `Internal` ("no vector store yet").
