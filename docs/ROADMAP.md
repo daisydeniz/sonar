@@ -74,7 +74,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T6.2 (swift-ui) Results table: NSTableView, lazy paging from core, sortable columns (name, category, kind, BPM, key, duration, library), 1M rows smooth. AC: XCTest perf test + manual-free scroll benchmark. (dd5c882)
 - [x] T6.3 (swift-ui) Instant search + filter chips/facets, keyboard-first (⌘F, arrows, space, return). (f824df8)
 - [x] T6.4 (swift-ui) Preview: AVAudioEngine, auto-play on select, pre-buffer neighbors, pitch control, loop toggle, loudness-normalized preview. (2f10fe4)
-- [ ] T6.5 (swift-ui) Waveform: peaks from core, CALayer/Metal rendering, zoom, playhead.
+- [x] T6.5 (swift-ui) Waveform: peaks from core, CALayer/Metal rendering, zoom, playhead. (3db495a)
 - [ ] T6.6 (swift-ui) Similarity UI: "Find similar", aspect sliders, drop external file to search.
 - [ ] T6.7 (swift-ui) Drag & drop out to DAW/Finder (file URLs), multi-select.
 - [ ] T6.8 (swift-ui) Organize: favorites, collections, tags, overrides for BPM/key/category, hide.
@@ -218,3 +218,8 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T6.4 review) Preview decode is capped in seconds (600 s), not bytes; hi-rate multichannel clips can exceed the 256 MB cache. Also cap frames by bytes (`AVAudioFrameCount(clamping:)`).
 - (from T6.4 review) `AppModel.start()` calls `preview.warmUp()`, so `AppModelTests`/`FilterSearchTests` start the real audio engine; inject a fake player there.
 - (from T6.4) Toggling loop while playing restarts the sound from the start; keep the position.
+- (from T6.5 review) Each selection starts an uncancellable core `waveformPeaks` decode on the cooperative pool; holding ↓ over long files piles them up. Keep one in flight + one pending latest id (or FFI decode cancel).
+- (from T6.5 review) Seek copies the clip tail on the main thread (up to ~230 MB for a 10-min 48 kHz stereo clip); toggling loop after a seek restarts from 0.
+- (from T6.5 review) `WaveformTests.testLatestSelectionWins` relies on a 200 ms sleep; gate the fake provider on a continuation so the stale path is always exercised.
+- (from T6.5 review) Waveform colour doesn't follow a system accent-colour change until the next relayout; no playhead latency compensation.
+- (from T6.5) If the engine is dropped while a detached `waveformPeaks`/`previewPcm` task still holds it, `Engine::drop` runs on a pool thread (aborted `testShellFlow` once at teardown); the app never drops it before quit, but verify a quit during a decode is clean.
