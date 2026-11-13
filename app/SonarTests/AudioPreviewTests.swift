@@ -223,7 +223,8 @@ final class AudioPreviewTests: XCTestCase {
             throw XCTSkip("no audio output available: \(error)")
         }
         print("real engine first play call took \(start.duration(to: .now))")
-        _ = await waitFor(timeout: 3) { finished }
+        let done = await waitFor(timeout: 3) { finished }
         player.stop()
+        XCTAssertTrue(done, "playback never reported completion")
     }
 }

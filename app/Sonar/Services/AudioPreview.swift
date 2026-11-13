@@ -95,11 +95,13 @@ final class AudioPreview {
         }
     }
 
+    /// Stops playback and drops any pending play of an in-flight decode.
     func stop() {
         generation += 1
         endPlayback()
     }
 
+    /// Sets the pitch shift (clamped to `pitchRange`), applied immediately.
     func setPitch(semitones: Int) {
         pitchSemitones = min(max(semitones, Self.pitchRange.lowerBound), Self.pitchRange.upperBound)
         player.setPitch(cents: Float(pitchSemitones * 100))

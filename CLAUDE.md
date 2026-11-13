@@ -116,6 +116,15 @@ re-review finished phases. After the merge in step 8: `rm -f logs/handoff.md`.
   continue with the next task.
 - Never force-push, never rewrite `main`, never `reset --hard`.
 
+## Running commands (permission rules match the literal command text)
+- Run everything from the repo root with relative paths: `scripts/check.sh`,
+  not `/Users/.../scripts/check.sh` and not `bash /abs/path/...`.
+- Never use `git -C <path>`; plain `git ...` from the repo root.
+- Push with exactly `git push origin main` (or `git push origin main
+  --follow-tags`).
+- Write logs and scratch files under `logs/`, never `/tmp`
+  (e.g. `scripts/check.sh > logs/check.log 2>&1`).
+
 ## Commands
 - `scripts/bootstrap.sh` — toolchain setup/check (macOS).
 - `scripts/check.sh` — all quality gates (fmt, clippy, tests, deny,

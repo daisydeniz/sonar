@@ -76,7 +76,7 @@ final class EnginePlayer: PreviewPlayer {
         player.stop()
         playId += 1
         let id = playId
-        timePitch.pitch = pitchCents
+        setPitch(cents: pitchCents)
         gain.globalGain = Float(min(max(gainDb ?? 0, -24), 24))
         player.scheduleBuffer(
             clip.buffer, at: nil, options: loop ? .loops : [], completionCallbackType: .dataPlayedBack
@@ -96,7 +96,11 @@ final class EnginePlayer: PreviewPlayer {
         player.stop()
     }
 
-    func setPitch(cents: Float) { timePitch.pitch = cents }
+    /// Sets the pitch shift; at 0 the time-pitch unit is bypassed (no added latency).
+    func setPitch(cents: Float) {
+        timePitch.pitch = cents
+        timePitch.bypass = cents == 0
+    }
 
     /// Builds the graph and starts the output once (cold start costs ~150 ms),
     /// so the first preview after launch is as fast as the rest. Best effort.

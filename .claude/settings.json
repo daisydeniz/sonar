@@ -82,7 +82,16 @@
       "Bash(git push -u origin task/:*)",
       "Bash(git push origin task/:*)",
       "Bash(git push origin --delete task/:*)",
-      "Bash(git remote:*)"
+      "Bash(git remote:*)",
+      "Bash(cd:*)",
+      "Bash(sed:*)",
+      "Bash(chmod +x scripts/*)",
+      "Bash(core/target/*)",
+      "Bash(./target/*)",
+      "Bash(target/*)",
+      "Bash(git push -q origin main)",
+      "Bash(git push origin main --follow-tags)",
+      "Bash(git push -q origin main --follow-tags)"
     ],
     "deny": [
       "Bash(sudo:*)",

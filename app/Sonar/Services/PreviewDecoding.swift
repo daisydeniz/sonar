@@ -56,6 +56,10 @@ enum PreviewDecoder {
     static func readWithAVFoundation(_ url: URL) throws -> PreviewClip {
         let file = try AVAudioFile(forReading: url)
         let format = file.processingFormat
+        // More than stereo: use the core's mono downmix instead (the
+        // TimePitch/EQ chain is not guaranteed to accept surround formats,
+        // and an AVFoundation exception cannot be caught in Swift).
+        guard format.channelCount <= 2 else { throw PreviewDecodeError.empty }
         let frames = AVAudioFrameCount(min(file.length, Int64(format.sampleRate * maxSeconds)))
         guard frames > 0,
             let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)
