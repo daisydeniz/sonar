@@ -76,7 +76,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T6.4 (swift-ui) Preview: AVAudioEngine, auto-play on select, pre-buffer neighbors, pitch control, loop toggle, loudness-normalized preview. (2f10fe4)
 - [x] T6.5 (swift-ui) Waveform: peaks from core, CALayer/Metal rendering, zoom, playhead. (3db495a)
 - [x] T6.6 (swift-ui) Similarity UI: "Find similar", aspect sliders, drop external file to search. (269bfd6)
-- [ ] T6.7 (swift-ui) Drag & drop out to DAW/Finder (file URLs), multi-select.
+- [x] T6.7 (swift-ui) Drag & drop out to DAW/Finder (file URLs), multi-select. (2c00c44)
 - [ ] T6.8 (swift-ui) Organize: favorites, collections, tags, overrides for BPM/key/category, hide.
 - [ ] T6.9 (swift-ui) Duplicates view (exact + near via aspect vectors).
 
@@ -230,3 +230,9 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T6.6) A non-audio drop is silently rejected; add a hint. Drop extensions leave out `aifc`/`caf` (match the core decoder list).
 - (from T6.6 review) No core test that a newer `search` supersedes a running `similar_latest` (external seed in a thread → `Cancelled` or completion, never a stale success).
 - (from T6.6) Nothing analyzed yet gives `FfiError.Internal` ("no vector store yet"); the app maps it to an inline message, but a typed `NotFound`/dedicated case would be cleaner.
+- (from T6.7) ⌘A on a huge result list selects (and drags) only loaded rows' ids as they load; "select all N results" needs a core ids query.
+- (from T6.7) Offline/missing files are silently skipped when dragging; show them dimmed in the table.
+- (from T6.7) If some DAW rejects a plain `NSURL` drag, add a file promise / extra audio UTI types.
+- (from T6.7) `fileExists` per dragged row runs on the main thread at drag start; can stall on slow network volumes with large selections.
+- (from T6.7 review) After a reset that drops the focused file but keeps other selected rows, highlight and inspector focus disagree (Return reveals the gone file).
+- (from T6.7) Edit > Copy menu validation while the table is focused is untested.
