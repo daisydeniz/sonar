@@ -29,8 +29,9 @@ final class KeyboardActions {
     private(set) var previewToggleRequests = 0
     /// Return in the table: reveal files in Finder.
     var reveal: ([URL]) -> Void = { NSWorkspace.shared.activateFileViewerSelecting($0) }
-    /// Registered by the table: focus it (selecting row 0 if nothing is selected).
-    var focusResults: (() -> Void)?
+    /// Registered by the table: focus it (selecting row 0 if nothing is
+    /// selected). Returns false when there is nothing to focus (no rows).
+    var focusResults: (() -> Bool)?
     /// Focus the toolbar search field (⌘F, Esc in the table).
     var focusSearch: () -> Void = { SearchFieldFocus.focus() }
 
@@ -96,8 +97,8 @@ final class SearchKeyMonitor {
                 event.modifierFlags.intersection([.command, .control, .option, .shift]).isEmpty,
                 SearchFieldFocus.isSearchField(event.window?.firstResponder)
             {
-                MainActor.assumeIsolated { actions.focusResults?() }
-                return nil
+                let took = MainActor.assumeIsolated { actions.focusResults?() ?? false }
+                return took ? nil : event
             }
             return event
         }

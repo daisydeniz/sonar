@@ -17,7 +17,7 @@ struct SonarApp: App {
                 .task { if !Self.isTesting { await model.start() } }
         }
         .commands {
-            CommandGroup(after: .textEditing) {
+            CommandGroup(replacing: .textEditing) {
                 Button("Find Samples") { model.keyboard.focusSearch() }
                     .keyboardShortcut("f", modifiers: .command)
             }

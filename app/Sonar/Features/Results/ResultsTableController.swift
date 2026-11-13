@@ -89,11 +89,14 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
 
     /// Moves keyboard focus into the table and selects the first row if
     /// nothing is selected (selection goes through `onSelect`).
-    func focusTable() {
+    @discardableResult
+    func focusTable() -> Bool {
+        guard pager.count > 0 else { return false }
         tableView.window?.makeFirstResponder(tableView)
-        if tableView.selectedRow < 0, pager.count > 0 {
+        if tableView.selectedRow < 0 {
             tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         }
+        return true
     }
 
     // MARK: Pager changes

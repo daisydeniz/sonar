@@ -46,11 +46,18 @@ struct FilterState: Equatable, Sendable {
         f.tags = tags.sorted()
         if base.libraryIds.isEmpty { f.libraryIds = libraryIds.sorted() }
         f.favoritesOnly = base.favoritesOnly || favoritesOnly
-        f.bpmMin = bpmMin
-        f.bpmMax = bpmMax
-        f.durationMinMs = durationMinSec.map { UInt64(max(0, $0) * 1000) }
-        f.durationMaxMs = durationMaxSec.map { UInt64(max(0, $0) * 1000) }
+        f.bpmMin = bpmMin.flatMap { $0.isFinite ? $0 : nil }
+        f.bpmMax = bpmMax.flatMap { $0.isFinite ? $0 : nil }
+        f.durationMinMs = durationMinSec.flatMap(Self.milliseconds)
+        f.durationMaxMs = durationMaxSec.flatMap(Self.milliseconds)
         return f
+    }
+
+    /// Seconds to milliseconds: non-finite input is dropped (no bound),
+    /// negatives become 0 and huge values are clamped (no trap).
+    static func milliseconds(_ seconds: Double) -> UInt64? {
+        guard seconds.isFinite else { return nil }
+        return UInt64(min(max(0, seconds), 1e12) * 1000)
     }
 }
 

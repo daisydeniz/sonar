@@ -162,6 +162,22 @@ final class FilterSearchTests: XCTestCase {
         XCTAssertFalse(FilterState().isActive)
     }
 
+    func testDurationAndBpmBoundsNeverTrap() {
+        var state = FilterState()
+        state.durationMaxSec = 1e20
+        state.durationMinSec = -5
+        state.bpmMax = .infinity
+        var f = state.apply(to: SearchFilters())
+        XCTAssertEqual(f.durationMaxMs, UInt64(1e12 * 1000))
+        XCTAssertEqual(f.durationMinMs, 0)
+        XCTAssertNil(f.bpmMax)
+        state.durationMaxSec = .infinity
+        state.durationMinSec = .nan
+        f = state.apply(to: SearchFilters())
+        XCTAssertNil(f.durationMaxMs)
+        XCTAssertNil(f.durationMinMs)
+    }
+
     func testSelectedChipsStayVisibleAtZeroCount() {
         let chips = FacetChip.chips(
             facets: [FacetCount(value: "Kick", count: 3)], selected: ["Kick", "Pad"])

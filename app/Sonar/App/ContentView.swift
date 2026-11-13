@@ -24,7 +24,7 @@ struct ContentView: View {
         .onChange(of: model.searchText) { model.scheduleRefresh() }
         .onChange(of: model.sidebarSelection) { model.scheduleRefresh() }
         .onChange(of: model.filters) { model.scheduleRefresh() }
-        .onSubmit(of: .search) { model.keyboard.focusResults?() }
+        .onSubmit(of: .search) { _ = model.keyboard.focusResults?() }
         .onAppear { searchMonitor.install(actions: model.keyboard) }
         .onDisappear { searchMonitor.remove() }
         .toolbar {
@@ -77,7 +77,7 @@ struct ContentView: View {
                 onSort: { key, descending in Task { await model.setSort(key, descending: descending) } },
                 onKey: { key in model.keyboard.handle(key, selected: model.selectedRow) },
                 register: { controller in
-                    model.keyboard.focusResults = { [weak controller] in controller?.focusTable() }
+                    model.keyboard.focusResults = { [weak controller] in controller?.focusTable() ?? false }
                 })
         }
     }

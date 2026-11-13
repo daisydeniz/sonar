@@ -202,21 +202,27 @@ final class AppModel {
 
     /// Fire-and-forget refresh for view callbacks (typing, selection).
     func scheduleRefresh() {
-        track(Task { await refreshResults(keepScroll: false) })
+        track { await self.refreshResults(keepScroll: false) }
     }
 
     /// Fire-and-forget refreshes started by `scheduleRefresh` / `pollOnce`,
     /// kept so `settle()` can await them (tests; latest-wins is unchanged).
-    @ObservationIgnored private var scheduled: [Task<Void, Never>] = []
+    @ObservationIgnored private var scheduled: [UUID: Task<Void, Never>] = [:]
 
-    private func track(_ task: Task<Void, Never>) { scheduled.append(task) }
+    /// Runs `body` as a tracked Task that removes itself when done.
+    private func track(_ body: @escaping @MainActor () async -> Void) {
+        let id = UUID()
+        // The Task starts after this synchronous code, so the insert comes first.
+        scheduled[id] = Task {
+            await body()
+            self.scheduled[id] = nil
+        }
+    }
 
     /// Awaits every refresh scheduled so far (including ones they schedule).
     func settle() async {
         while !scheduled.isEmpty {
-            let tasks = scheduled
-            scheduled = []
-            for t in tasks { await t.value }
+            for t in Array(scheduled.values) { await t.value }
         }
     }
 
@@ -306,10 +312,10 @@ final class AppModel {
         }
         wasRunning = progress.running
         if refresh {
-            track(Task {
-                await reloadSidebar()
-                await refreshResults()
-            })
+            track {
+                await self.reloadSidebar()
+                await self.refreshResults()
+            }
         }
     }
 
