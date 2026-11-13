@@ -1,4 +1,4 @@
-//! `sonar bench scan|decode|analyze|watch|search`: performance benchmarks
+//! `sonar bench scan|decode|analyze|watch|search|similar|dupes`: performance benchmarks
 //! (use a release build: `cargo run --release -p sonar-cli -- bench ...`).
 //!
 //! Benchmarks run in a temporary working folder with their own store, never
@@ -189,6 +189,11 @@ pub enum BenchCommand {
         #[arg(long)]
         json: bool,
     },
+
+    /// Duplicate finder on a synthetic library (store rows + vectors, no
+    /// audio on disk): times file loading, the exact candidate pass and the
+    /// near pass. Fails if the near pass takes > 10 s at >= 500k files.
+    Dupes(crate::bench_dupes_cmd::DupesBenchArgs),
 }
 
 /// Runs a benchmark and prints its result to stdout.
@@ -341,6 +346,7 @@ pub fn run(cmd: BenchCommand) -> Result<()> {
             }
             Ok(())
         }
+        BenchCommand::Dupes(args) => crate::bench_dupes_cmd::run(&args),
     }
 }
 

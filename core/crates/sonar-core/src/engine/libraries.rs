@@ -65,8 +65,8 @@ impl Engine {
     /// Scans one library (incremental) on the calling thread and refreshes
     /// the text index for exactly the files the scan touched before it
     /// returns. Runs on its own connection, so other calls stay responsive;
-    /// do not scan a library that the watcher is scanning at the same time
-    /// (the second scan may fail with a busy database, see `watch`).
+    /// a concurrent scan of the same library (e.g. by the watcher) waits for
+    /// the other one to finish (`scan::lock`).
     ///
     /// # Errors
     /// [`Error::LibraryNotFound`], [`Error::Sqlite`], [`Error::Index`].

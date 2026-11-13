@@ -17,6 +17,7 @@ use sonar_core::similar::{Seed, SimilarOptions};
 use sonar_core::watch::WatchOptions;
 
 use crate::convert::{self, count};
+use crate::dupes_types::{self, DuplicatesQuery, DuplicatesResult};
 use crate::error::{guard, guard_ffi, FfiError};
 use crate::facet_types::SearchFacets;
 use crate::similar_types::{self, SimilarHit, SimilarPage, SimilarQuery};
@@ -211,6 +212,24 @@ impl SonarEngine {
             }
         }
         Ok(page)
+    }
+
+    /// Duplicate groups over all libraries: byte-identical files and the
+    /// same sound in other files (ADR-036). **Blocking**: the first run
+    /// reads every file that shares size and head/tail bytes with another
+    /// (hashes are cached), the near pass takes about a second per 500k
+    /// files. Latest wins on its own flag (search does not cancel it): a
+    /// newer `duplicates` or `cancelDuplicates` makes a running call throw
+    /// `FfiError.Cancelled`. Unreadable/offline files are left out, not
+    /// errors. `InvalidInput` for a threshold outside 0...0.5.
+    pub fn duplicates(&self, query: DuplicatesQuery) -> Result<DuplicatesResult, FfiError> {
+        let opts = dupes_types::options(query);
+        guard(|| self.engine.duplicates_latest(&opts)).map(Into::into)
+    }
+
+    /// Cancels the running `duplicates` call (it throws `Cancelled`).
+    pub fn cancel_duplicates(&self) {
+        self.engine.cancel_duplicates();
     }
 
     /// The row of one file, `nil` if unknown. `row`/`rows` wait on the

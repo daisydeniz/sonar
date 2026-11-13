@@ -315,6 +315,11 @@ pub enum Command {
     /// of `sonar search`. Needs `sonar analyze` (aspect vectors).
     Similar(crate::similar_cmd::SimilarArgs),
 
+    /// Duplicate groups: byte-identical files (exact) and the same sound in
+    /// other files (near: re-encodes, other rate/depth/channels, gain).
+    /// Exact needs only a scan; near needs `sonar analyze`.
+    Dupes(crate::dupes_cmd::DupesArgs),
+
     /// CLAP audio embeddings (512-d, normalised) of audio files: dims,
     /// norm and timing. Needs the model (`scripts/fetch-models.sh`).
     Embed(crate::embed_cmd::EmbedArgs),

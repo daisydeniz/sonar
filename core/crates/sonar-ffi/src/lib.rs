@@ -17,6 +17,7 @@
 //! only flip flags or read counters.
 
 mod convert;
+mod dupes_types;
 mod engine;
 mod error;
 mod facet_types;
@@ -26,8 +27,11 @@ mod types;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_dupes;
+#[cfg(test)]
 mod tests_similar;
 
+pub use dupes_types::{DuplicateGroup, DuplicateKind, DuplicatesQuery, DuplicatesResult};
 pub use engine::SonarEngine;
 pub use error::FfiError;
 pub use facet_types::{FacetCount, LibraryFacet, SearchFacets};

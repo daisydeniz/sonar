@@ -8,6 +8,7 @@ pub mod bench;
 pub mod classify;
 pub mod decode;
 pub mod dsp;
+pub mod dupes;
 pub mod embed;
 pub mod engine;
 pub mod error;

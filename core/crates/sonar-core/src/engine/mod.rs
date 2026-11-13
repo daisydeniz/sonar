@@ -44,9 +44,10 @@
 //!
 //! # Search
 //! [`Engine::search`] is cancellable with latest-query-wins semantics; see
-//! `search.rs`.
+//! `search.rs`. [`Engine::duplicates`] has its own flag (`dupes.rs`).
 
 mod audio;
+mod dupes;
 mod events;
 mod indexing;
 mod libraries;
@@ -144,6 +145,8 @@ pub(crate) struct Inner {
     semantic: search::SemanticCache,
     /// Cancel flag of the newest search.
     search_cancel: Mutex<Arc<AtomicBool>>,
+    /// Cancel flag of the newest duplicate run.
+    dupes_cancel: Mutex<Arc<AtomicBool>>,
 }
 
 /// A refresh of at least this many files, or of more than a quarter of the
@@ -253,6 +256,7 @@ impl Engine {
             watcher: Mutex::new(None),
             semantic: search::SemanticCache::default(),
             search_cancel: Mutex::new(Arc::new(AtomicBool::new(false))),
+            dupes_cancel: Mutex::new(Arc::new(AtomicBool::new(false))),
             options,
         });
         let for_thread = Arc::clone(&inner);

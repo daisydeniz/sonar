@@ -61,7 +61,8 @@
 //! scans per library).
 
 mod apply;
-mod identity;
+pub(crate) mod identity;
+mod lock;
 mod reconcile;
 mod walk;
 
@@ -69,7 +70,7 @@ mod walk;
 mod tests;
 
 use std::fmt;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -173,13 +174,19 @@ pub fn scan_library_with(
     library_id: i64,
     options: &ScanOptions,
 ) -> Result<ScanReport> {
+    let never = AtomicBool::new(false);
+    let cancel = options.cancel.as_deref().unwrap_or(&never);
+    // Serialize scans of this library (watcher vs. manual scan).
+    let Some(_slot) =
+        lock::ScanSlot::acquire(store.path().map(Path::to_path_buf), library_id, cancel)
+    else {
+        return Err(Error::Cancelled);
+    };
     let start = Instant::now();
     let library = store
         .library(library_id)?
         .ok_or(Error::LibraryNotFound { id: library_id })?;
     let root = library.root_path;
-    let never = AtomicBool::new(false);
-    let cancel = options.cancel.as_deref().unwrap_or(&never);
 
     let mut report = ScanReport {
         library_id,

@@ -81,6 +81,15 @@ pub fn default_dir() -> Result<PathBuf> {
     Ok(dir)
 }
 
+/// Whether a vector store has been created in `dir` (something was
+/// analyzed); [`VectorStore::open_read`] fails while it has not.
+///
+/// # Errors
+/// [`Error::Io`] reading the `CURRENT` pointer.
+pub fn exists(dir: impl AsRef<Path>) -> Result<bool> {
+    Ok(generation::read_current(dir.as_ref())?.is_some())
+}
+
 /// What a writable [`VectorStore::open`] found.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum OpenState {

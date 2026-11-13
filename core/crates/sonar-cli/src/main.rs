@@ -3,12 +3,14 @@
 mod analyze_cmd;
 mod aspects_cmd;
 mod bench_cmd;
+mod bench_dupes_cmd;
 mod bench_print;
 mod bpm_cmd;
 mod classify_cmd;
 mod cli;
 mod decode_cmd;
 mod dsp_cmd;
+mod dupes_cmd;
 mod embed_cmd;
 mod eval_cmd;
 mod key_cmd;
@@ -121,6 +123,7 @@ fn main() -> Result<()> {
             filters: &filters,
         })?,
         Command::Similar(args) => similar_cmd::run(&args)?,
+        Command::Dupes(args) => dupes_cmd::run(&args)?,
         Command::Bench { command } => bench_cmd::run(command)?,
         Command::Watch { json, debounce_ms } => watch_cmd::run(json, debounce_ms)?,
         Command::Wave {

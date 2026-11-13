@@ -1074,3 +1074,51 @@ Additive to ADR-032/033; the old `similar(fileId:limit:)` stays.
   also while an external seed is decoded (`DecodeOptions.cancel`).
 - Errors: unanalyzed seed `NotFound`; bad external file `Audio`/`Io`;
   nothing analyzed yet `Internal` ("no vector store yet").
+
+## ADR-036 — Duplicate finder (T6.9a)
+Accepted. `sonar_core::dupes::find_duplicates`, `Engine::duplicates(_latest)`,
+`sonar dupes [--exact-only|--near-only] [--threshold X] [--json]`, FFI
+`duplicates(query: DuplicatesQuery) -> DuplicatesResult` + `cancelDuplicates()`.
+- **Files**: online libraries, status ≠ `missing`; hidden files included (UI
+  reads `FileRow.hidden`). Zero-byte files and digital silence never group.
+- **Exact**: candidates share `(size, quick_hash)` (lossless blocking), then
+  full **XXH3-128** (twox-hash, already a dep; non-cryptographic is enough
+  for accidental copies, 128 bits make collisions negligible) cached in
+  `files.content_hash` (16-byte BLOB; the scanner already NULLs it on change;
+  written only while size+mtime still match). A file whose size/mtime differ
+  from its row, or that cannot be read, is skipped and counted, never fatal.
+- **Near metric**: library-z-scored aspects (ADR-024), per-aspect RMS
+  z-difference; pair distance = **max over aspects** (a duplicate must match
+  everywhere). Amplitude drops LOUDNESS (gain) plus ATTACK and the first
+  envelope bin: the envelope smoothing is truncated at sample 0, so a hit
+  starting on the first sample vs. after 12 ms of decoder delay differed by
+  z ≈ 1.8 in ATTACK (amp distance 0.36–0.40 → 0.04 without them).
+- **Calibration** (`dupes::calibrate_tests`, fixture set + test-time variants
+  of a kick, a pluck, a chord loop and a drum loop: byte copy, 48 kHz/24-bit
+  mono, 96 kHz float, −8 dB, FLAC, 11 kHz low-pass, +12/+25 ms padding; 483
+  same-sound pairs incl. the 23 fixture A4-sine variants and the −60 dBFS
+  one): same-sound max ≤ **0.124** (kick −8 dB vs 96 kHz, pitch aspect);
+  nearest different sounds: 0.128 (click loops 95 vs 133 BPM, Δ 361 ms),
+  0.157 (Δ 483 ms), 0.180 (FourOnFloor 120 vs 122.5 BPM, Δ 163 ms), and
+  inside the window **0.194** (breakbeat 174 vs 175 BPM, Δ 31 ms). Mean over
+  aspects separates worse (negatives from 0.080). **Threshold 0.15**
+  (CLI/FFI may pass 0–0.5).
+- **Blocking**: sort by `duration_ms`; compare while Δ ≤ max(**80 ms**,
+  **1 %** of the longer) (largest same-sound Δ measured: 37 ms). A 16-dim
+  prefilter (4 broad z-dims per aspect, a lower bound of each aspect's sum,
+  so results are exact) then the full metric with per-aspect early exit.
+- **Groups**: union-find components (order-independent). Exact first: each
+  exact group is represented in the near pass by its lowest id with vectors,
+  so a near group never holds two copies of the same bytes and a file is in
+  ≤ 1 exact and ≤ 1 near group. Group: ids ascending, sizes, wasted bytes
+  (all but the largest), max/mean pair distance (all pairs up to 64 members,
+  else linking pairs). Order: wasted bytes desc, exact before near, ids.
+- **Cancel**: own engine flag, latest wins (search does not cancel it);
+  checked per 1 MiB hashed and per 2048-file chunk of the near scan.
+- **Timing** (`sonar bench dupes`, 500k synthetic files, M4 Pro 14 threads,
+  release; no audio on disk, so hash I/O is not measured): load 70 ms, exact
+  candidate pass 80 ms, **near 0.54 s** (3.0 G pairs in the window, 2474/2474
+  planted pairs found, no other groups); 4 threads: near 1.26 s.
+- **Limit**: thresholds assume library stats over a varied library; in a
+  tiny homogeneous library (a few near-identical files) z-scores degenerate
+  and near groups can be missed (Later).

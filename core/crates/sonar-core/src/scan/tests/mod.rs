@@ -2,6 +2,7 @@
 
 mod basic;
 mod changes;
+mod concurrent;
 mod errors;
 mod moves;
 

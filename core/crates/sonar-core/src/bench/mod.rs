@@ -11,6 +11,7 @@
 pub mod analyze;
 pub mod corpus;
 pub mod decode;
+pub mod dupes;
 pub mod embed;
 pub mod hybrid;
 pub mod scan;
@@ -30,6 +31,7 @@ use serde::Serialize;
 
 pub use analyze::{bench_analyze, AnalyzeBench, AnalyzeBenchOptions};
 pub use decode::{bench_decode, DecodeBench, DecodeBenchOptions, DecodeRun};
+pub use dupes::{bench_dupes, DupesBench, DupesBenchOptions};
 pub use embed::{bench_embed, EmbedBench, EmbedBenchOptions, ModelRun};
 pub use hybrid::{HybridBench, HybridClassLatency};
 pub use scan::{bench_scan, ScanBench, ScanPhase};

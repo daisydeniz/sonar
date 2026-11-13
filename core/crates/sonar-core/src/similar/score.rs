@@ -33,14 +33,14 @@ pub struct AspectDistances {
 
 /// z-score of one aspect with `f32` constants, matching
 /// [`NormStats::normalize`] (std floored at [`STD_FLOOR`], clamped to
-/// ±[`Z_CLAMP`], non-finite → 0).
-struct Scaler {
+/// ±[`Z_CLAMP`], non-finite → 0). Also used by the duplicate finder.
+pub(crate) struct Scaler {
     mean: Vec<f32>,
     inv_sd: Vec<f32>,
 }
 
 impl Scaler {
-    fn new(stats: &NormStats) -> Self {
+    pub(crate) fn new(stats: &NormStats) -> Self {
         let std = if stats.count() == 0 {
             Vec::new()
         } else {
@@ -56,8 +56,9 @@ impl Scaler {
         Self { mean, inv_sd }
     }
 
+    /// z-score of value `x` of dimension `i` (`i` < the stats' dim).
     #[inline]
-    fn z(&self, i: usize, x: f32) -> f32 {
+    pub(crate) fn z(&self, i: usize, x: f32) -> f32 {
         let z = (x - self.mean[i]) * self.inv_sd[i];
         if z.is_finite() {
             z.clamp(-Z_CLAMP, Z_CLAMP)

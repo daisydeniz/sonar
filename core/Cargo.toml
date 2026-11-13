@@ -30,9 +30,10 @@ uniffi = { version = "0.32.2", default-features = false }
 rusqlite = { version = "0.41.1", features = ["bundled"] }
 # MIT OR Apache-2.0. Work-stealing pool for CPU/IO-parallel stages (scan hashing).
 rayon = "1.12.0"
-# MIT. XXH3-64 for `files.quick_hash` (scan identity). Not `xxhash-rust`
+# MIT. XXH3-64 for `files.quick_hash` (scan identity), XXH3-128 for
+# `files.content_hash` (duplicate finder, ADR-036). Not `xxhash-rust`
 # (BSL-1.0, not on the ADR-004 allow list). No `random` (pulls `rand`).
-twox-hash = { version = "2.1.5", default-features = false, features = ["std", "xxhash3_64"] }
+twox-hash = { version = "2.1.5", default-features = false, features = ["std", "xxhash3_64", "xxhash3_128"] }
 # MPL-2.0. Pure-Rust demux/decode. Only the containers/codecs behind the
 # scanner's extension list (wav aif aiff flac mp3 ogg m4a) plus ADPCM WAVs
 # and ID3v2 tag skipping; no mkv/caf, no mp1/mp2.

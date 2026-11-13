@@ -186,7 +186,8 @@ One UniFFI object, `SonarEngine` (`sonar-ffi`), over `sonar_core::engine::Engine
 libraries, indexing control + polled progress/events, paged `search` (display
 rows), `similar`, `similar_to` (weights, filters, external seed; ADR-035), `row(s)`, user-data setters, `waveform_peaks`, `preview_pcm`.
 Every fallible export `throws FfiError`; the exact list, blocking rules,
-cancellation and PCM format are in ADR-032. `duplicates()` is not in v1.
+cancellation and PCM format are in ADR-032. `duplicates(query)` /
+`cancelDuplicates()` (exact + near groups, own cancel flag) are in ADR-036.
 
 ## 8. macOS app (`app/`)
 - Project generated with **XcodeGen** (`app/project.yml`) — never hand-edit
