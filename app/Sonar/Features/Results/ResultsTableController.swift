@@ -10,6 +10,19 @@ final class KeyTableView: NSTableView {
 
     @objc func copy(_ sender: Any?) { onCopy?() }
 
+    /// True while ⌘A runs: the selection grows but focus must not move.
+    private(set) var isSelectingAll = false
+
+    /// AppKit makes the LAST row `selectedRow` after select-all; put the
+    /// focus back on the row that had it.
+    override func selectAll(_ sender: Any?) {
+        let old = selectedRow
+        isSelectingAll = true
+        super.selectAll(sender)
+        if old >= 0 { selectRowIndexes([old], byExtendingSelection: true) }
+        isSelectingAll = false
+    }
+
     override func keyDown(with event: NSEvent) {
         if let key = TableKey.from(event), onKey?(key) == true { return }
         super.keyDown(with: event)
@@ -144,6 +157,11 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
                     columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
             }
             let selected = tableView.selectedRow
+            let ids = tableView.selectedRowIndexes.compactMap { pager.peek($0)?.fileId }
+            if ids != selectedIDs {
+                selectedIDs = ids
+                onSelectionChange?(ids)
+            }
             if selectedID == nil, range.contains(selected), let row = pager.peek(selected) {
                 selectedID = row.fileId
                 onSelect?(row)
@@ -164,11 +182,11 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
     private func restoreSelection() {
         suppressSelection = true
         defer { suppressSelection = false }
-        let present = selectedIDs.compactMap { pager.index(ofFileId: $0) }
+        let focus = selectedID.flatMap { pager.index(ofFileId: $0) }
+        let present = Set(selectedIDs.compactMap { pager.index(ofFileId: $0) } + [focus].compactMap { $0 })
         selectedIDs = present.sorted().compactMap { pager.peek($0)?.fileId }
         tableView.deselectAll(nil)
         // Select the focused row last so it stays NSTableView's selectedRow.
-        let focus = selectedID.flatMap { pager.index(ofFileId: $0) }
         tableView.selectRowIndexes(IndexSet(present.filter { $0 != focus }), byExtendingSelection: false)
         if let focus { tableView.selectRowIndexes(IndexSet(integer: focus), byExtendingSelection: true) }
         onSelectionChange?(selectedIDs)
@@ -222,6 +240,7 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         guard !suppressSelection else { return }
         selectedIDs = tableView.selectedRowIndexes.compactMap { pager.peek($0)?.fileId }
         onSelectionChange?(selectedIDs)
+        if tableView.isSelectingAll { return }
         let row = tableView.selectedRow >= 0 ? pager.peek(tableView.selectedRow) : nil
         // ⌘A / ⌘-click that keep the focus must not restart the preview.
         guard row?.fileId != selectedID else { return }

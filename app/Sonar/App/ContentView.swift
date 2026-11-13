@@ -105,7 +105,7 @@ struct ContentView: View {
                         model.exitSimilarity()
                         return true
                     }
-                    return model.keyboard.handle(key, selected: model.selectedRow, selection: model.selectedRows)
+                    return model.keyboard.handle(key, selected: model.selectedRow, selection: key == .returnKey ? model.selectedRows : [])
                 },
                 onFindSimilar: { model.findSimilar(to: $0) },
                 register: { controller in

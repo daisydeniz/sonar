@@ -62,6 +62,9 @@ final class DragOutTests: XCTestCase {
         XCTAssertEqual(focused, [1, 4, 2], "focus = most recently selected row")
         c.tableView.selectAll(nil)
         XCTAssertEqual(c.selectedIDs.count, 10)
+        XCTAssertEqual(c.selectedID, 2, "select-all keeps the focus")
+        XCTAssertEqual(c.tableView.selectedRow, 2)
+        XCTAssertEqual(focused, [1, 4, 2], "select-all does not fire onSelect")
     }
 
     func testSelectionSurvivesPagerReset() async throws {
