@@ -111,7 +111,8 @@ final class AppModel {
 
     /// A header click: the core re-sorts, the table restarts at the top.
     func setSort(_ key: SortKey, descending: Bool) async {
-        guard key != sortKey || descending != sortDescending else { return }
+        // Similarity results stay in distance order.
+        guard !similarity.isActive, key != sortKey || descending != sortDescending else { return }
         sortKey = key
         sortDescending = descending
         await refreshResults(keepScroll: false)
@@ -266,7 +267,7 @@ final class AppModel {
     /// Runs the current sidebar selection + search text off the main actor
     /// and applies the result unless a newer request superseded it.
     func refreshResults(keepScroll: Bool = true) async {
-        if similarity.isActive { return await refreshSimilar() }
+        if similarity.isActive { return await refreshSimilar(keepScroll: keepScroll) }
         guard let bridge else { return }
         generation += 1
         let mine = generation

@@ -186,6 +186,38 @@ final class SimilarityTests: XCTestCase {
         await model.settle()
         XCTAssertNil(model.similarity.message)
         XCTAssertNil(model.errorMessage)
+        XCTAssertFalse(model.similarity.isLoading, "the spinner must not stick")
+    }
+
+    func testCancelledOnceIsRetriedAndRowsShown() async throws {
+        let counter = QueryLog()
+        let model = fakeModel { q in
+            await counter.add(q)
+            if await counter.queries.count == 1 { throw FfiError.Cancelled }
+            return fakePage([5, 6])
+        }
+        model.findSimilar(to: fakeRow(1))
+        await model.settle()
+        XCTAssertEqual(rows(model).map(\.fileId), [5, 6])
+        XCTAssertFalse(model.similarity.isLoading)
+        XCTAssertNil(model.similarity.message)
+    }
+
+    func testEmptyResultIsNotLoadingAndDeselects() async throws {
+        let model = fakeModel { _ in fakePage([]) }
+        model.select(fakeRow(3))
+        model.findSimilar(to: fakeRow(1))
+        await model.settle()
+        XCTAssertFalse(model.similarity.isLoading)
+        XCTAssertNil(model.selectedRow)
+    }
+
+    func testSortIgnoredInSimilarityMode() async throws {
+        let model = fakeModel { _ in fakePage([1]) }
+        model.findSimilar(to: fakeRow(1))
+        await model.settle()
+        await model.setSort(.name, descending: false)
+        XCTAssertEqual(model.sortKey, .relevance)
     }
 
     func testErrorsMapToInlineMessages() {
@@ -278,8 +310,9 @@ final class SimilarityTests: XCTestCase {
         let model = try await indexedModel()
         let before = rows(model).map(\.fileId)
         XCTAssertFalse(before.isEmpty)
-        model.findSimilar(to: try XCTUnwrap(rows(model).first))
+        model.findSimilar(to: try XCTUnwrap(rows(model).first { $0.category != nil && $0.kind != nil }))
         await model.settle()
+        XCTAssertNil(model.similarity.message)
         XCTAssertNotEqual(rows(model).map(\.fileId), before)
         model.exitSimilarity()
         await model.settle()

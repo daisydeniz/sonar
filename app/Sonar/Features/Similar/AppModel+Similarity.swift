@@ -64,7 +64,7 @@ extension AppModel {
 
     /// Runs the similarity query off the main actor and shows its rows
     /// (nearest first) unless a newer request superseded it.
-    func refreshSimilar() async {
+    func refreshSimilar(keepScroll: Bool = false) async {
         guard let target = similarity.target else { return }
         let search: @Sendable (SimilarQuery) async throws -> SimilarPage
         if let override = similarity.searchOverride {
@@ -78,25 +78,56 @@ extension AppModel {
         let mine = generation
         similarity.markLoading()
         do {
+            // Park the pager on an in-memory loader first: a page fetch of the
+            // old text loader would call `engine.search` and cancel our query.
+            guard try await pager.reset(loader: ArrayResultLoader(rows: []), preservePosition: keepScroll),
+                mine == generation
+            else { return }
             var base = SearchFilters()
             if sidebarSelection == .favorites { base.favoritesOnly = true }
             if case .library(let id) = sidebarSelection { base.libraryIds = [id] }
             let query = SimilarQuery(
                 seed: target.seed, weights: try similarity.sliders.weights(),
                 filters: filters.apply(to: base), limit: Self.similarLimit)
-            let page = try await search(query)
+            let page = try await Self.searchRetryingCancelled(query, search) { mine == self.generation }
             guard mine == generation else { return }
-            let applied = try await pager.reset(loader: ArrayResultLoader(rows: page.rows), preservePosition: false)
+            guard let page else {
+                similarity.finish(hits: [])  // still cancelled after retries: never stick on the spinner
+                return
+            }
+            let applied = try await pager.reset(
+                loader: ArrayResultLoader(rows: page.rows), preservePosition: keepScroll)
             guard applied, mine == generation else { return }
             similarity.finish(hits: page.hits)
-            if let id = selectedFileId, let fresh = pager.cachedRow(fileId: id) { updateSelectedSnapshot(fresh) }
-        } catch FfiError.Cancelled {
-            return  // superseded in the core; drop
+            if page.rows.isEmpty {
+                select(nil)
+            } else if let id = selectedFileId, let fresh = pager.cachedRow(fileId: id) {
+                updateSelectedSnapshot(fresh)
+            }
         } catch {
             guard mine == generation else { return }
             _ = try? await pager.reset(loader: ArrayResultLoader(rows: []), preservePosition: false)
             guard mine == generation else { return }
             similarity.fail(error)
+        }
+    }
+
+    /// Runs `search`; a `Cancelled` while this request is still the newest
+    /// (another core search stole the cancel flag) is retried up to 3 times.
+    /// Returns nil when still cancelled after the retries.
+    private static func searchRetryingCancelled(
+        _ query: SimilarQuery, _ search: @Sendable (SimilarQuery) async throws -> SimilarPage,
+        isCurrent: @MainActor () -> Bool
+    ) async throws -> SimilarPage? {
+        var attempts = 0
+        while true {
+            do {
+                return try await search(query)
+            } catch FfiError.Cancelled {
+                attempts += 1
+                let current = await isCurrent()
+                if attempts > 3 || !current { return nil }
+            }
         }
     }
 }
