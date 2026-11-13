@@ -75,7 +75,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T6.3 (swift-ui) Instant search + filter chips/facets, keyboard-first (⌘F, arrows, space, return). (f824df8)
 - [x] T6.4 (swift-ui) Preview: AVAudioEngine, auto-play on select, pre-buffer neighbors, pitch control, loop toggle, loudness-normalized preview. (2f10fe4)
 - [x] T6.5 (swift-ui) Waveform: peaks from core, CALayer/Metal rendering, zoom, playhead. (3db495a)
-- [ ] T6.6 (swift-ui) Similarity UI: "Find similar", aspect sliders, drop external file to search.
+- [x] T6.6 (swift-ui) Similarity UI: "Find similar", aspect sliders, drop external file to search. (269bfd6)
 - [ ] T6.7 (swift-ui) Drag & drop out to DAW/Finder (file URLs), multi-select.
 - [ ] T6.8 (swift-ui) Organize: favorites, collections, tags, overrides for BPM/key/category, hide.
 - [ ] T6.9 (swift-ui) Duplicates view (exact + near via aspect vectors).
@@ -223,3 +223,10 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T6.5 review) `WaveformTests.testLatestSelectionWins` relies on a 200 ms sleep; gate the fake provider on a continuation so the stale path is always exercised.
 - (from T6.5 review) Waveform colour doesn't follow a system accent-colour change until the next relayout; no playhead latency compensation.
 - (from T6.5) If the engine is dropped while a detached `waveformPeaks`/`previewPcm` task still holds it, `Engine::drop` runs on a pool thread (aborted `testShellFlow` once at teardown); the app never drops it before quit, but verify a quit during a decode is clean.
+- (from T6.6) The table flashes empty on each slider re-query (pager parked on an empty loader so old text pages can't cancel the shared flag); a separate similarity cancel token would let the old rows stay until new ones arrive.
+- (from T6.6) Each refresh re-runs an external-seed query, which re-decodes the dropped file (index refresh, favourite toggle); cache the seed vector by path+mtime (see T4.2 Later).
+- (from T6.6) Facet counts are absent in similarity mode (chips show only selected values).
+- (from T6.6) Optional "Match" column from `SimilarHit.distance` (0 identical … ~1.4 unrelated).
+- (from T6.6) A non-audio drop is silently rejected; add a hint. Drop extensions leave out `aifc`/`caf` (match the core decoder list).
+- (from T6.6 review) No core test that a newer `search` supersedes a running `similar_latest` (external seed in a thread → `Cancelled` or completion, never a stale success).
+- (from T6.6) Nothing analyzed yet gives `FfiError.Internal` ("no vector store yet"); the app maps it to an inline message, but a typed `NotFound`/dedicated case would be cleaner.
