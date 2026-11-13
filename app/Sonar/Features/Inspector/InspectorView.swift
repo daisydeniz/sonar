@@ -5,6 +5,7 @@ import SwiftUI
 struct InspectorView: View {
     let row: FileRow?
     let preview: AudioPreview
+    let waveform: WaveformModel
     let onToggleFavorite: (FileRow) -> Void
 
     var body: some View {
@@ -19,6 +20,7 @@ struct InspectorView: View {
                               systemImage: row.favorite ? "heart.fill" : "heart")
                     }
                 }
+                Section("Waveform") { WaveformView(model: waveform, preview: preview) }
                 PreviewControlsView(preview: preview)
                 Section("Details") {
                     field("Path", row.path)

@@ -14,7 +14,7 @@ struct ContentView: View {
         } detail: {
             detail
                 .inspector(isPresented: $showInspector) {
-                    InspectorView(row: model.selectedRow, preview: model.preview) { row in
+                    InspectorView(row: model.selectedRow, preview: model.preview, waveform: model.waveform) { row in
                         Task { await model.setFavorite(fileIds: [row.fileId], on: !row.favorite) }
                     }
                     .inspectorColumnWidth(min: 240, ideal: 280, max: 400)

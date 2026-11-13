@@ -109,6 +109,28 @@ final class AudioPreview {
 
     func resetPitch() { setPitch(semitones: 0) }
 
+    /// Playhead position as a fraction (0...1) of the selected sound, or nil
+    /// when nothing plays. Cheap; polled by the waveform's display link.
+    func playbackFraction() -> Double? {
+        guard isPlaying, let clip = currentClip, clip.duration > 0,
+            let t = player.playbackTime()
+        else { return nil }
+        return min(max(t / clip.duration, 0), 1)
+    }
+
+    /// Click on the waveform: plays the selection from `fraction` (0...1).
+    /// Needs the clip to be decoded already (playing, or pre-decoded in the cache).
+    func seek(toFraction fraction: Double) {
+        guard let row = currentRow, fraction.isFinite,
+            let clip = currentClip ?? cache.get(row.fileId)
+        else { return }
+        generation += 1
+        playTask?.cancel()
+        playTask = nil
+        isLoading = false
+        begin(clip, row, startAt: min(max(fraction, 0), 1) * clip.duration)
+    }
+
     // MARK: Playback
 
     private func endPlayback() {
@@ -139,11 +161,12 @@ final class AudioPreview {
         }
     }
 
-    private func begin(_ clip: PreviewClip, _ row: FileRow) {
+    private func begin(_ clip: PreviewClip, _ row: FileRow, startAt: TimeInterval = 0) {
         currentClip = clip
         do {
             try player.play(
-                clip, loop: loop, gainDb: row.previewGainDb, pitchCents: Float(pitchSemitones * 100))
+                clip, loop: loop, gainDb: row.previewGainDb, pitchCents: Float(pitchSemitones * 100),
+                startAt: startAt)
             isPlaying = true
         } catch {
             isPlaying = false

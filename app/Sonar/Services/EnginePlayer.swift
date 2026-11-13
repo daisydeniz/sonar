@@ -13,10 +13,20 @@ protocol PreviewPlayer: AnyObject {
     func setPitch(cents: Float)
     /// Pre-starts the output so the first play is fast (no-op by default).
     func warmUp()
+    /// Like `play` but starting `startAt` seconds into the clip (seek).
+    func play(_ clip: PreviewClip, loop: Bool, gainDb: Double?, pitchCents: Float, startAt: TimeInterval) throws
+    /// Seconds into the clip being heard now (loop-wrapped); nil when idle.
+    func playbackTime() -> TimeInterval?
 }
 
 extension PreviewPlayer {
     func warmUp() {}
+    func playbackTime() -> TimeInterval? { nil }
+    func play(
+        _ clip: PreviewClip, loop: Bool, gainDb: Double?, pitchCents: Float, startAt: TimeInterval
+    ) throws {
+        try play(clip, loop: loop, gainDb: gainDb, pitchCents: pitchCents)
+    }
 }
 
 /// AVAudioEngine graph: player -> time-pitch -> EQ (global gain only) -> main
@@ -35,6 +45,9 @@ final class EnginePlayer: PreviewPlayer {
     private var connectedFormat: AVAudioFormat?
     private var playId = 0
     private var configObserver: NSObjectProtocol?
+    private var startOffset: TimeInterval = 0
+    private var playingLoop = false
+    private var playingDuration: TimeInterval = 0
 
     /// Builds the graph for `format`, reconnecting when the clip format changes.
     private func prepare(for format: AVAudioFormat) {
@@ -71,6 +84,12 @@ final class EnginePlayer: PreviewPlayer {
     }
 
     func play(_ clip: PreviewClip, loop: Bool, gainDb: Double?, pitchCents: Float) throws {
+        try play(clip, loop: loop, gainDb: gainDb, pitchCents: pitchCents, startAt: 0)
+    }
+
+    func play(
+        _ clip: PreviewClip, loop: Bool, gainDb: Double?, pitchCents: Float, startAt: TimeInterval
+    ) throws {
         prepare(for: clip.buffer.format)
         guard let engine else { return }
         player.stop()
@@ -78,10 +97,27 @@ final class EnginePlayer: PreviewPlayer {
         let id = playId
         setPitch(cents: pitchCents)
         gain.globalGain = Float(min(max(gainDb ?? 0, -24), 24))
-        player.scheduleBuffer(
-            clip.buffer, at: nil, options: loop ? .loops : [], completionCallbackType: .dataPlayedBack
-        ) { [weak self] _ in
-            Task { @MainActor in self?.completed(id) }
+        let rate = clip.buffer.format.sampleRate
+        let total = Int(clip.buffer.frameLength)
+        let startFrame = rate > 0 ? min(max(Int(startAt * rate), 0), max(total - 1, 0)) : 0
+        let tail = startFrame > 0 ? Self.tail(of: clip.buffer, from: startFrame) : nil
+        startOffset = tail != nil ? Double(startFrame) / rate : 0
+        playingLoop = loop
+        playingDuration = clip.duration
+        if let tail {
+            // Seek: play the tail first (then the whole clip again when looping).
+            player.scheduleBuffer(
+                tail, at: nil, options: [], completionCallbackType: .dataPlayedBack
+            ) { [weak self] _ in
+                if !loop { Task { @MainActor in self?.completed(id) } }
+            }
+            if loop { player.scheduleBuffer(clip.buffer, at: nil, options: .loops, completionHandler: nil) }
+        } else {
+            player.scheduleBuffer(
+                clip.buffer, at: nil, options: loop ? .loops : [], completionCallbackType: .dataPlayedBack
+            ) { [weak self] _ in
+                Task { @MainActor in self?.completed(id) }
+            }
         }
         if !engine.isRunning { try engine.start() }
         player.play()
@@ -89,6 +125,29 @@ final class EnginePlayer: PreviewPlayer {
 
     private func completed(_ id: Int) {
         if id == playId { onFinished?() }
+    }
+
+    /// Copy of `buffer` from frame `from` to its end (seek start).
+    private static func tail(of buffer: AVAudioPCMBuffer, from: Int) -> AVAudioPCMBuffer? {
+        let count = Int(buffer.frameLength) - from
+        guard count > 0, let src = buffer.floatChannelData,
+            let out = AVAudioPCMBuffer(pcmFormat: buffer.format, frameCapacity: AVAudioFrameCount(count)),
+            let dst = out.floatChannelData
+        else { return nil }
+        for ch in 0..<Int(buffer.format.channelCount) {
+            dst[ch].update(from: src[ch] + from, count: count)
+        }
+        out.frameLength = AVAudioFrameCount(count)
+        return out
+    }
+
+    func playbackTime() -> TimeInterval? {
+        guard player.isPlaying, let node = player.lastRenderTime,
+            let t = player.playerTime(forNodeTime: node), t.sampleRate > 0
+        else { return nil }
+        return WaveformMath.playbackTime(
+            elapsed: Double(t.sampleTime) / t.sampleRate, start: startOffset,
+            duration: playingDuration, loop: playingLoop)
     }
 
     func stop() {

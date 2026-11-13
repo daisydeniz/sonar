@@ -34,6 +34,8 @@ final class AppModel {
     let pager = ResultsPager()
     /// Audio preview (auto-play, cache, pitch, loop).
     let preview: AudioPreview
+    /// Waveform of the selected row (peaks from the core, zoom viewport).
+    let waveform = WaveformModel()
     private(set) var progress = IndexingProgress(
         enabled: false, running: false, paused: false, stage: nil, total: 0, done: 0, errors: 0)
     /// Last user-visible error (add/remove/search failures); nil when none.
@@ -92,6 +94,7 @@ final class AppModel {
     func select(_ row: FileRow?) {
         selectedRow = row
         preview.select(row, neighbours: neighbours(of: row))
+        waveform.load(fileId: row?.fileId)
     }
 
     /// Cached rows within `AudioPreview.neighbourReach` of `row` (no fetches).
@@ -117,7 +120,10 @@ final class AppModel {
     ) {
         self.preview = preview
         bridge = engine.map(CoreBridge.init(engine:))
-        if let engine { preview.decoder = CoreDecoder(engine: engine) }
+        if let engine {
+            preview.decoder = CoreDecoder(engine: engine)
+            waveform.provider = CoreWaveformProvider(engine: engine)
+        }
         keyboard.onTogglePreview = { [weak preview] in preview?.toggle() }
         activePollNs = activePollMs * 1_000_000
         idlePollNs = idlePollMs * 1_000_000
@@ -136,7 +142,10 @@ final class AppModel {
         do {
             if bridge == nil {
                 bridge = try await CoreBridge.openDefault()
-                if let engine = bridge?.engine { preview.decoder = CoreDecoder(engine: engine) }
+                if let engine = bridge?.engine {
+                    preview.decoder = CoreDecoder(engine: engine)
+                    waveform.provider = CoreWaveformProvider(engine: engine)
+                }
             }
             engineState = .ready
         } catch {

@@ -78,6 +78,8 @@ final class AppModelTests: XCTestCase {
         let hit = try XCTUnwrap(loadedRows(model).first)
         model.select(hit)
         XCTAssertEqual(model.selectedRow?.fileId, hit.fileId)
+        await model.waveform.settle()  // peaks come from the real core
+        if case .loading = model.waveform.state { XCTFail("waveform still loading") }
 
         // header sort is done by the core: descending is the reverse of ascending
         await model.setSort(.name, descending: false)

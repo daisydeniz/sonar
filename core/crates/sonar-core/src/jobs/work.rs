@@ -355,11 +355,15 @@ mod tests {
         use crate::classify::Kind;
         use crate::fixtures::manifest::Kind as TruthKind;
         let tmp = tempfile::tempdir().unwrap();
+        // A fixed folder under the random temp dir: folder names within
+        // PRIOR_DIR_LEVELS feed key/BPM priors, and a random name such as
+        // `.tmpEmin…` would read as a key.
+        let root = tmp.path().join("fx");
         let opts = FixtureOptions {
             include_long: false,
             ..FixtureOptions::default()
         };
-        let manifest = generate(tmp.path(), &opts).unwrap();
+        let manifest = generate(&root, &opts).unwrap();
         let mut dec = Decoder::new();
         let (mut analyzer, mut note, mut aspects) = (None, None, None);
         let mut w = Workers {
@@ -376,7 +380,7 @@ mod tests {
             let (Some(truth), None) = (f.truth.kind, &f.truth.corrupt) else {
                 continue;
             };
-            let path = tmp.path().join(&f.path);
+            let path = root.join(&f.path);
             let FileResult::Done { analysis, .. } =
                 run_stage(&mut w, Stage::Dsp, &path, cancel.clone())
             else {
