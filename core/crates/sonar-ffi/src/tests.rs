@@ -52,6 +52,28 @@ fn core_version_matches_sonar_core() {
 }
 
 #[test]
+fn category_ids_are_valid_overrides() {
+    let ids = category_ids();
+    assert_eq!(ids.len(), 17);
+    assert!(ids.iter().any(|i| i == "kick"));
+
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let lib = tmp.path().join("lib");
+    write_wavs(&lib, &["a.wav"]);
+    let engine = SonarEngine::open(tmp.path().join("home").display().to_string()).expect("open");
+    engine
+        .add_library(lib.display().to_string())
+        .expect("add library");
+    let page = engine.search(text("")).expect("search");
+    let id = page.rows[0].file_id;
+    for cat in &ids {
+        engine
+            .set_override(vec![id], OverrideField::Category, cat.clone())
+            .unwrap_or_else(|e| panic!("category {cat} rejected: {e:?}"));
+    }
+}
+
+#[test]
 fn add_index_search_favourite_peaks() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let lib = tmp.path().join("lib");

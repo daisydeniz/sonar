@@ -11,6 +11,7 @@ struct ResultsTableView: NSViewRepresentable {
     let onSelectionChange: ([Int64]) -> Void
     let onKey: (TableKey) -> Bool
     let onFindSimilar: (FileRow) -> Void
+    var menuEntries: (([FileRow]) -> [RowMenuEntry])?
     /// Called once with the controller so the model can focus the table.
     let register: (ResultsTableController) -> Void
 
@@ -23,6 +24,7 @@ struct ResultsTableView: NSViewRepresentable {
         controller.onSort = onSort
         controller.onKey = onKey
         controller.onFindSimilar = onFindSimilar
+        controller.menuEntries = menuEntries
         controller.libraryNames = libraryNames
         register(controller)
         return controller.scrollView
@@ -35,6 +37,7 @@ struct ResultsTableView: NSViewRepresentable {
         controller.onSort = onSort
         controller.onKey = onKey
         controller.onFindSimilar = onFindSimilar
+        controller.menuEntries = menuEntries
         controller.libraryNames = libraryNames
     }
 }

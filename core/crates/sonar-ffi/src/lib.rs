@@ -43,3 +43,12 @@ uniffi::setup_scaffolding!();
 pub fn core_version() -> String {
     sonar_core::version().to_owned()
 }
+
+/// The valid values for a category override / filter, in taxonomy order.
+#[uniffi::export]
+pub fn category_ids() -> Vec<String> {
+    sonar_core::classify::category::taxonomy::TAXONOMY
+        .iter()
+        .map(|c| c.id.to_owned())
+        .collect()
+}

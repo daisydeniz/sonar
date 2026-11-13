@@ -38,6 +38,8 @@ final class AppModel {
     let waveform = WaveformModel()
     /// Similarity mode (seed, sliders, status); see `Features/Similar`.
     let similarity = SimilarityModel()
+    /// Organize state (hidden switch, prompts, override error); see `Features/Organize`.
+    let organizeState = OrganizeState()
     private(set) var progress = IndexingProgress(
         enabled: false, running: false, paused: false, stage: nil, total: 0, done: 0, errors: 0)
     /// Last user-visible error (add/remove/search failures); nil when none.
@@ -293,6 +295,7 @@ final class AppModel {
             case .allSamples, .favorites, .library:
                 var filters = SearchFilters()
                 if selection == .favorites { filters.favoritesOnly = true }
+                filters.includeHidden = organizeState.showHidden
                 if case .library(let id) = selection { filters.libraryIds = [id] }
                 loader = EngineResultLoader(
                     bridge: bridge,
@@ -364,7 +367,7 @@ final class AppModel {
         }
     }
 
-    private static func describe(_ error: Error) -> String {
+    static func describe(_ error: Error) -> String {
         if let e = error as? FfiError {
             switch e {
             case .NotFound(let m), .InvalidInput(let m), .Io(let m), .Audio(let m), .Internal(let m):

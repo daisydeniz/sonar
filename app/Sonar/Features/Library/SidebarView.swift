@@ -35,7 +35,23 @@ struct SidebarView: View {
                     Label(collection.name, systemImage: "square.stack")
                         .badge(Int(collection.files))
                         .tag(SidebarItem.collection(collection.id))
+                        .contextMenu {
+                            Button("Rename…") {
+                                model.organizeState.ask(.renameCollection(collection.id), text: collection.name)
+                            }
+                            Button("Delete Collection", role: .destructive) {
+                                Task { await model.deleteCollection(id: collection.id) }
+                            }
+                        }
                 }
+                Button {
+                    model.organizeState.ask(.newCollection([]))
+                } label: {
+                    Label("New Collection…", systemImage: "plus")
+                }
+                .buttonStyle(.plain)
+                .foregroundStyle(.secondary)
+                .accessibilityLabel("New Collection")
             }
         }
         .listStyle(.sidebar)

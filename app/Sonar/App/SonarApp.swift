@@ -24,6 +24,20 @@ struct SonarApp: App {
                     .keyboardShortcut("f", modifiers: [.command, .shift])
                     .disabled(model.selectedRow == nil)
             }
+            CommandMenu("Samples") {
+                Button("Favorite / Unfavorite") { Task { await model.toggleFavoriteOfSelection() } }
+                    .keyboardShortcut("l", modifiers: .command)
+                    .disabled(model.selectedRow == nil)
+                Button("Hide / Unhide") { Task { await model.toggleHiddenOfSelection() } }
+                    .keyboardShortcut("h", modifiers: [.command, .shift])
+                    .disabled(model.selectedRow == nil)
+                Button("Add Tag…") { model.organizeState.ask(.addTag(model.organizeTargetIDs)) }
+                    .disabled(model.selectedRow == nil)
+            }
+            CommandGroup(after: .toolbar) {
+                Toggle("Show Hidden Samples", isOn: Bindable(model.organizeState).showHidden)
+                    .keyboardShortcut(".", modifiers: [.command, .shift])
+            }
             CommandGroup(after: .newItem) {
                 Button("Add Library…") {
                     if let path = FolderPicker.pickFolder() {

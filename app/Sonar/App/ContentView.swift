@@ -15,10 +15,8 @@ struct ContentView: View {
         } detail: {
             detail
                 .inspector(isPresented: $showInspector) {
-                    InspectorView(row: model.selectedRow, preview: model.preview, waveform: model.waveform,
-                        onToggleFavorite: { row in
-                            Task { await model.setFavorite(fileIds: [row.fileId], on: !row.favorite) }
-                        },
+                    InspectorView(model: model, row: model.selectedRow, preview: model.preview, waveform: model.waveform,
+                        onToggleFavorite: { _ in Task { await model.toggleFavoriteOfSelection() } },
                         onFindSimilar: { model.findSimilar(to: $0) })
                     .inspectorColumnWidth(min: 240, ideal: 280, max: 400)
                 }
@@ -27,6 +25,19 @@ struct ContentView: View {
         .onChange(of: model.searchText) { model.searchTextChanged() }
         .onChange(of: model.sidebarSelection) { model.scheduleRefresh() }
         .onChange(of: model.filters) { model.scheduleRefresh() }
+        .onChange(of: model.organizeState.showHidden) { model.scheduleRefresh() }
+        .alert(
+            model.organizeState.prompt?.title ?? "",
+            isPresented: Binding(
+                get: { model.organizeState.prompt != nil },
+                set: { if !$0 { model.organizeState.prompt = nil } })
+        ) {
+            TextField("Name", text: Bindable(model.organizeState).promptText)
+            Button(model.organizeState.prompt?.confirmTitle ?? "OK") { Task { await model.commitPrompt() } }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(model.organizeState.prompt?.message ?? "")
+        }
         .onSubmit(of: .search) { _ = model.keyboard.focusResults?() }
         .onAppear { searchMonitor.install(actions: model.keyboard) }
         .onDisappear { searchMonitor.remove() }
@@ -108,6 +119,7 @@ struct ContentView: View {
                     return model.keyboard.handle(key, selected: model.selectedRow, selection: key == .returnKey ? model.selectedRows : [])
                 },
                 onFindSimilar: { model.findSimilar(to: $0) },
+                menuEntries: { model.rowMenuEntries(for: $0) },
                 register: { controller in
                     model.keyboard.focusResults = { [weak controller] in controller?.focusTable() ?? false }
                 })

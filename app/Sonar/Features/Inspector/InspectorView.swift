@@ -3,6 +3,7 @@ import SwiftUI
 /// Inspector for the selected row's fields.
 @MainActor
 struct InspectorView: View {
+    let model: AppModel
     let row: FileRow?
     let preview: AudioPreview
     let waveform: WaveformModel
@@ -20,21 +21,24 @@ struct InspectorView: View {
                         Label(row.favorite ? "Unfavorite" : "Favorite",
                               systemImage: row.favorite ? "heart.fill" : "heart")
                     }
+                    .help("Favorite (⌘L)")
+                    if model.selectedFileIDs.count > 1 {
+                        Text("Edits apply to \(model.selectedFileIDs.count) selected samples")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
                     Button { onFindSimilar(row) } label: { Label("Find Similar", systemImage: "waveform.badge.magnifyingglass") }
                 }
                 Section("Waveform") { WaveformView(model: waveform, preview: preview) }
                 PreviewControlsView(preview: preview)
+                OverrideFieldsView(model: model, row: row)
+                TagsEditorView(model: model, row: row)
                 Section("Details") {
                     field("Path", row.path)
-                    field("Category", Format.text(row.category))
-                    field("Kind", Format.text(row.kind))
-                    field("BPM", Format.bpm(row.bpm))
-                    field("Key", Format.text(row.key))
                     field("Duration", Format.duration(ms: row.durationMs))
                     field("Sample rate", row.sampleRate.map { "\($0) Hz" } ?? "-")
                     field("Channels", row.channels.map(String.init) ?? "-")
-                    field("Tags", row.tags.isEmpty ? "-" : row.tags.joined(separator: ", "))
                     field("Favorite", row.favorite ? "Yes" : "No")
+                    if row.hidden { field("Hidden", "Yes") }
                 }
             }
             .formStyle(.grouped)

@@ -29,6 +29,12 @@ final class KeyTableView: NSTableView {
     }
 }
 
+/// Box for a menu entry's closure (`representedObject` needs a class).
+final class MenuAction: NSObject {
+    let run: @MainActor () -> Void
+    init(run: @escaping @MainActor () -> Void) { self.run = run }
+}
+
 /// AppKit side of the results table: a view-based, fixed-row-height
 /// `NSTableView` over a `ResultsPager` (ARCHITECTURE §8). Cells are reused;
 /// rows whose page is not loaded yet show a placeholder and are filled in
@@ -79,6 +85,8 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
     }
     /// Context menu "Find Similar" on a row.
     var onFindSimilar: ((FileRow) -> Void)?
+    /// Organize items for the right-clicked rows (the model decides).
+    var menuEntries: (([FileRow]) -> [RowMenuEntry])?
     /// Library names for the Library column.
     var libraryNames: [Int64: String] = [:] {
         didSet { if libraryNames != oldValue { reloadVisibleRows() } }
@@ -200,6 +208,32 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         let item = NSMenuItem(title: "Find Similar", action: #selector(findSimilarClicked), keyEquivalent: "")
         item.target = self
         menu.addItem(item)
+        // Right-clicking inside the selection acts on all of it, else on that row.
+        let clicked = tableView.clickedRow
+        let ids = tableView.isRowSelected(clicked) ? selectedIDs : [pager.peek(clicked)?.fileId].compactMap { $0 }
+        let rows = ids.compactMap { pager.cachedRow(fileId: $0) }
+        let entries = menuEntries?(rows) ?? []
+        if !entries.isEmpty { menu.addItem(.separator()) }
+        for entry in entries { menu.addItem(makeItem(entry)) }
+    }
+
+    private func makeItem(_ entry: RowMenuEntry) -> NSMenuItem {
+        if entry.isSeparator { return .separator() }
+        let item = NSMenuItem(title: entry.title, action: nil, keyEquivalent: "")
+        if !entry.children.isEmpty {
+            let sub = NSMenu(title: entry.title)
+            for child in entry.children { sub.addItem(makeItem(child)) }
+            item.submenu = sub
+        } else if let action = entry.action {
+            item.action = #selector(menuEntryClicked(_:))
+            item.target = self
+            item.representedObject = MenuAction(run: action)
+        }
+        return item
+    }
+
+    @objc private func menuEntryClicked(_ sender: NSMenuItem) {
+        (sender.representedObject as? MenuAction)?.run()
     }
 
     @objc private func findSimilarClicked() {
@@ -228,7 +262,8 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         let field = cell.textField
         if let file = pager.row(at: row) {
             field?.stringValue = text(for: file, column: id.rawValue)
-            field?.textColor = .labelColor
+            // Hidden files (shown via "Show Hidden Samples") are dimmed.
+            field?.textColor = file.hidden ? .tertiaryLabelColor : .labelColor
         } else {
             field?.stringValue = id.rawValue == "name" ? "Loading…" : ""
             field?.textColor = .tertiaryLabelColor
