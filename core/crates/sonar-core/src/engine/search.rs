@@ -18,10 +18,12 @@ use std::sync::{Arc, Mutex};
 
 use super::{lock, Engine};
 use crate::embed::store::dir_for_db;
+use crate::index::vectors::{dir_for_db as vector_dir, VectorStore};
 use crate::search::{
     embedded_file_ids, hybrid_search, Filters, HybridOptions, HybridResults, SearchMode,
     SearchOptions, SemanticSearch, Sort, DEFAULT_LIMIT,
 };
+use crate::similar::{similar, Seed, SimilarOptions, SimilarResults};
 use crate::{Error, Result};
 
 /// One query for [`Engine::search`].
@@ -148,6 +150,20 @@ impl Engine {
         }
         results.hits.drain(..req.offset.min(results.hits.len()));
         Ok(results)
+    }
+
+    /// Files that sound like `seed` (ADR-024) among those `opts.filters`
+    /// allow, so favourites, hidden files and overrides apply as in
+    /// [`Engine::search`]. Opens the aspect vector store read-only per call;
+    /// runs on the caller's thread and honours `opts.cancel`.
+    ///
+    /// # Errors
+    /// [`Error::VectorStore`] (no analysis yet), [`Error::NoVectors`], plus
+    /// everything [`crate::similar::similar`] returns.
+    pub fn similar(&self, seed: &Seed, opts: &SimilarOptions) -> Result<SimilarResults> {
+        self.ensure_index()?;
+        let vs = VectorStore::open_read(vector_dir(&self.inner.db_path))?;
+        similar(&vs, &self.inner.index, seed, opts)
     }
 
     /// Cancels the newest search, if it is still running.

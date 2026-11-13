@@ -7,12 +7,12 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use clap::Args;
 use serde::Serialize;
-use sonar_core::index::vectors::{self, VectorStore};
-use sonar_core::similar::{similar, AspectDistances, AspectWeights, Seed, SimilarOptions};
+use sonar_core::engine::{Engine, EngineOptions};
+use sonar_core::paths;
+use sonar_core::similar::{AspectDistances, AspectWeights, Seed, SimilarOptions};
 use sonar_core::Store;
 
 use crate::search_args::FilterFlags;
-use crate::search_cmd::open_index;
 
 /// `sonar similar` arguments.
 #[derive(Debug, Clone, Args)]
@@ -71,15 +71,21 @@ struct Report {
 /// and prints rank, distance, file id and path.
 pub fn run(args: &SimilarArgs) -> Result<()> {
     let store = Store::open_default().context("opening the Sonar store")?;
-    let index = open_index(&store)?;
-    let dir = vectors::default_dir().context("locating the vector store")?;
-    let vs = VectorStore::open_read(&dir)
-        .context("opening the vector store (run `sonar analyze` first)")?;
+    // Index sync stays the engine's business; a missing index is built on
+    // the first query.
+    let engine = Engine::open_with(
+        paths::data_dir().context("locating the Sonar store")?,
+        EngineOptions {
+            rebuild_index: false,
+            ..EngineOptions::default()
+        },
+    )
+    .context("opening the Sonar engine")?;
     let (seed, seed_path) = match (&args.file, args.id) {
         (Some(path), _) => (Seed::External(path.clone()), Some(path.clone())),
         (None, Some(id)) => (
             Seed::File(id),
-            store.file_path(id).context("looking up the seed")?,
+            engine.file_path(id).context("looking up the seed")?,
         ),
         (None, None) => anyhow::bail!("give a file id or --file PATH"),
     };
@@ -90,7 +96,9 @@ pub fn run(args: &SimilarArgs) -> Result<()> {
         cancel: None,
     };
     let started = Instant::now();
-    let results = similar(&vs, &index, &seed, &opts).context("similarity search")?;
+    let results = engine
+        .similar(&seed, &opts)
+        .context("similarity search (run `sonar analyze` first if there are no vectors)")?;
     let took_ms = started.elapsed().as_secs_f64() * 1e3;
     let hits = results
         .hits

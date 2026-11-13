@@ -18,6 +18,8 @@ mod search_cmd;
 mod similar_cmd;
 mod stats_cmd;
 mod tokenize_cmd;
+mod user_args;
+mod user_cmd;
 mod vectors_cmd;
 mod watch_cmd;
 
@@ -120,6 +122,11 @@ fn main() -> Result<()> {
         Command::Similar(args) => similar_cmd::run(&args)?,
         Command::Bench { command } => bench_cmd::run(command)?,
         Command::Watch { json, debounce_ms } => watch_cmd::run(json, debounce_ms)?,
+        Command::Fav(args) => user_cmd::flag(&args, false)?,
+        Command::Hide(args) => user_cmd::flag(&args, true)?,
+        Command::Tag { command } => user_cmd::tag(&command)?,
+        Command::Collection { command } => user_cmd::collection(&command)?,
+        Command::Override(args) => user_cmd::override_field(&args)?,
         Command::Store {
             command: StoreCommand::Info,
         } => store_info()?,

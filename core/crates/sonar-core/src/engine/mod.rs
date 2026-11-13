@@ -50,6 +50,7 @@ mod events;
 mod indexing;
 mod libraries;
 mod search;
+mod user_data;
 mod worker;
 
 #[cfg(test)]

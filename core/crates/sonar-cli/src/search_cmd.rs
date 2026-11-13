@@ -6,7 +6,7 @@ use std::time::Instant;
 use anyhow::{Context, Result};
 use serde::Serialize;
 use sonar_core::engine::{Engine, EngineOptions, SearchRequest};
-use sonar_core::index::{OpenState, TextIndex};
+use sonar_core::index::TextIndex;
 use sonar_core::paths;
 use sonar_core::search::{FacetCount, Facets, SearchMode};
 use sonar_core::Store;
@@ -160,22 +160,6 @@ pub fn run(args: &Args<'_>) -> Result<()> {
         }
     }
     Ok(())
-}
-
-/// Opens the default text index, building it from `store` first if it is
-/// missing or from another version (says so on stderr).
-pub fn open_index(store: &Store) -> Result<TextIndex> {
-    let (ix, state) = TextIndex::open_default().context("opening the search index")?;
-    if let OpenState::NeedsRebuild(reason) = state {
-        eprintln!("building the search index ({reason})...");
-        let r = ix.rebuild(store).context("building the search index")?;
-        eprintln!(
-            "indexed {} files in {:.2} s",
-            r.docs,
-            r.elapsed.as_secs_f64()
-        );
-    }
-    Ok(ix)
 }
 
 /// Facet counts, one line per dimension (`category: kick 12, snare 9`).

@@ -24,6 +24,15 @@ impl Engine {
         lock(&self.inner.store).file_path(id)
     }
 
+    /// Id of the file at `path` (inside a registered library), `None` if
+    /// unknown.
+    ///
+    /// # Errors
+    /// [`Error::Sqlite`](crate::Error::Sqlite).
+    pub fn file_id_by_path(&self, path: &Path) -> Result<Option<i64>> {
+        lock(&self.inner.store).file_id_by_path(path)
+    }
+
     /// Registers `root` as a library (idempotent) and scans it. When
     /// indexing is enabled the new files are analyzed automatically.
     ///

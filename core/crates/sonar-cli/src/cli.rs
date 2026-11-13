@@ -330,6 +330,34 @@ pub enum Command {
         command: crate::bench_cmd::BenchCommand,
     },
 
+    /// Mark library files as favourites (`--off` to unmark). Files are ids
+    /// (`file_id` of `sonar search --json`) or paths. Visible in the next
+    /// search (`--favorites`).
+    Fav(crate::user_args::FlagArgs),
+
+    /// Hide library files from search (`--off` to show them again; they
+    /// stay on disk and in the library; `--include-hidden` finds them).
+    Hide(crate::user_args::FlagArgs),
+
+    /// Tag library files, remove tags, list tags (user spelling is kept).
+    Tag {
+        /// Tag action.
+        #[command(subcommand)]
+        command: crate::user_args::TagCommand,
+    },
+
+    /// Collections: named, ordered lists of library files.
+    Collection {
+        /// Collection action.
+        #[command(subcommand)]
+        command: crate::user_args::CollectionCommand,
+    },
+
+    /// Override BPM, key, category or kind of files (user value wins over
+    /// the detected one; `--clear` reverts), e.g.
+    /// `sonar override bpm --set 128 12 13`.
+    Override(crate::user_args::OverrideArgs),
+
     /// Inspect the SQLite store (location: $SONAR_HOME/sonar.db, else
     /// ~/Library/Application Support/Sonar/sonar.db).
     Store {

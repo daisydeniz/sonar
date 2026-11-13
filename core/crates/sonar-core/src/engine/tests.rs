@@ -271,3 +271,50 @@ fn large_refreshes_rebuild_small_ones_do_not() {
     assert!(inner.prefers_rebuild(REBUILD_MIN_IDS));
     assert!(inner.prefers_rebuild(REBUILD_ALWAYS_IDS + 1));
 }
+
+/// One file's setter + synchronous index refresh on the 500k bench corpus
+/// (ADR-031). Not part of the gate.
+#[test]
+#[ignore = "benchmark: cargo test --release -p sonar-core --lib setter_latency -- --ignored --nocapture"]
+fn setter_latency_on_500k_files() {
+    use crate::bench::search_corpus::generate_store;
+    use crate::store::OverrideField;
+    let env = Env::new();
+    fs::create_dir_all(&env.home).expect("home");
+    {
+        let store = Store::open(env.home.join(paths::DB_FILE_NAME)).expect("store");
+        generate_store(&store, &env.lib, 500_000, 1_592_610_986).expect("corpus");
+    }
+    let engine = Engine::open(&env.home).expect("open (builds the index)");
+    let mut times: Vec<(&str, Vec<f64>)> = vec![
+        ("favorite", vec![]),
+        ("hidden", vec![]),
+        ("bpm override", vec![]),
+        ("tag", vec![]),
+    ];
+    for i in 0..30_i64 {
+        let id = [1000 + i];
+        let t = Instant::now();
+        engine.set_favorite(&id, true).expect("fav");
+        times[0].1.push(t.elapsed().as_secs_f64() * 1e3);
+        let t = Instant::now();
+        engine.set_hidden(&id, true).expect("hide");
+        times[1].1.push(t.elapsed().as_secs_f64() * 1e3);
+        let t = Instant::now();
+        engine
+            .set_override(&id, OverrideField::Bpm, "128")
+            .expect("bpm");
+        times[2].1.push(t.elapsed().as_secs_f64() * 1e3);
+        let t = Instant::now();
+        engine.add_tags(&id, &["bench".into()]).expect("tag");
+        times[3].1.push(t.elapsed().as_secs_f64() * 1e3);
+    }
+    for (name, v) in &mut times {
+        v.sort_by(f64::total_cmp);
+        println!(
+            "{name:>13}: p50 {:.2} ms, max {:.2} ms",
+            v[v.len() / 2],
+            v[v.len() - 1]
+        );
+    }
+}

@@ -10,13 +10,16 @@
 pub mod analysis;
 pub mod audio_meta;
 pub mod category;
+mod collections;
 mod files;
 pub mod key_pitch;
 mod libraries;
 mod migrations;
+mod overrides;
 mod stats;
 #[cfg(test)]
 mod tests;
+mod user_data;
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -26,9 +29,12 @@ use rusqlite::Connection;
 
 use crate::{paths, Error, Result};
 
+pub use collections::CollectionInfo;
 pub use libraries::Library;
 pub use migrations::LATEST_VERSION;
+pub use overrides::{OverrideField, MAX_BPM, MIN_BPM};
 pub use stats::{LibraryStats, StageStats, StatusCounts, StoreStats};
+pub use user_data::TagInfo;
 
 /// How long a connection waits for a lock held by another connection.
 pub const BUSY_TIMEOUT: Duration = Duration::from_millis(5000);

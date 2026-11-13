@@ -955,4 +955,30 @@ store, index, watcher and jobs by hand any more.
   `start_indexing` the watcher only keeps rows and index fresh (`sonar
   watch`). `remove_library` (new `Store::remove_library`, cascade) is a
   user action; vectors of removed files are reconciled by the next job.
-- **Later**: `similar` and user-data setters (T5.5b) on the engine.
+- **Later**: none (`similar` and the user-data setters arrived in T5.5b, ADR-031).
+
+## ADR-031 — User-data API (T5.5b)
+Favourites, hidden, tags, collections and overrides are written only through
+`Store` methods (`store/user_data.rs`, `collections.rs`, `overrides.rs`) and
+the matching `Engine` methods; scan and analysis never touch these tables.
+- **Multi-id, all-or-nothing**: setters take `&[i64]`, run in one
+  transaction and fail with `Error::FileNotFound` (or `CollectionNotFound`)
+  before changing anything if an id is unknown. They return how many files
+  actually changed (re-setting is a no-op, 0).
+- **Refresh**: the engine calls `refresh_files` for the given ids before
+  returning, only if something changed and the index is built, so the next
+  search sees it (large id sets use the engine's rebuild threshold).
+  Collections are not in the index, so they never refresh. A setter plus
+  refresh is ~87 ms on the 500k index (Later in ROADMAP).
+- **Validation** (`Error::InvalidInput`, nothing written): BPM is a plain
+  decimal number 20..=400 (no unit, sign or exponent; `128 bpm` is an
+  error), rounded to 0.01, stored REAL; key is anything `parse_key` reads,
+  stored canonically; category is a taxonomy id (or a spelling
+  `Category::parse` knows); kind is `loop` / `one_shot` (`one-shot`
+  accepted). Clearing an override deletes the row, so detection shows again.
+- **Tags**: unique ignoring case, the first spelling is kept; names are
+  trimmed, 1..=64 chars, no control characters; a tag nobody carries is
+  deleted. **Collections**: names unique ignoring case, files appended in
+  the order given, re-adding keeps the place.
+- **CLI**: `sonar fav|hide|tag|collection|override` take ids or paths of
+  library files; `sonar similar` now goes through `Engine::similar`.

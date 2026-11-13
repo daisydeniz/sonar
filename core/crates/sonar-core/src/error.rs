@@ -194,6 +194,30 @@ pub enum Error {
         reason: String,
     },
 
+    /// A user-data value that cannot be stored (T5.5b, ADR-031): an
+    /// override that is not a plain number / key / category / kind, an
+    /// empty or oversized tag or collection name, an unknown override field.
+    #[error("invalid value: {reason}")]
+    InvalidInput {
+        /// What is wrong and what is accepted.
+        reason: String,
+    },
+
+    /// No file with this id exists in the store (user-data setters are
+    /// all-or-nothing: nothing was changed).
+    #[error("file {id} not found")]
+    FileNotFound {
+        /// Requested `files.id`.
+        id: i64,
+    },
+
+    /// No collection with this id exists in the store.
+    #[error("collection {id} not found")]
+    CollectionNotFound {
+        /// Requested `collections.id`.
+        id: i64,
+    },
+
     /// Query parameters that cannot be used (e.g. similarity weights that
     /// are negative, not finite or all zero).
     #[error("invalid query: {reason}")]
