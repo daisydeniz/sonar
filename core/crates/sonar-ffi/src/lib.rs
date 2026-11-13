@@ -7,11 +7,26 @@
 //! `app/Generated/SonarCore.swift` (Swift module `SonarCore`, C module
 //! `SonarCoreFFI`, configured in `uniffi.toml`).
 //!
-//! Robustness: the UniFFI scaffolding catches panics so they never unwind
-//! into Swift, but a non-throwing export that panics still aborts the app
-//! (the bindings call it with `try!`). Every export that can fail must
-//! return `Result<_, FfiError>` (a `throws` function in Swift) and must
-//! never `unwrap()`.
+//! Surface (ADR-032): [`SonarEngine`] (an object over
+//! `sonar_core::engine::Engine`), the records/enums in [`types`] and
+//! [`FfiError`].
+//!
+//! Robustness: every export that can fail returns `Result<_, FfiError>` (a
+//! `throws` function in Swift), runs under [`error::guard`] (a panic becomes
+//! `FfiError.Internal`) and never `unwrap()`s. The few non-throwing exports
+//! only flip flags or read counters.
+
+mod convert;
+mod engine;
+mod error;
+mod types;
+
+#[cfg(test)]
+mod tests;
+
+pub use engine::SonarEngine;
+pub use error::FfiError;
+pub use types::*;
 
 uniffi::setup_scaffolding!();
 
@@ -19,15 +34,4 @@ uniffi::setup_scaffolding!();
 #[uniffi::export]
 pub fn core_version() -> String {
     sonar_core::version().to_owned()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn core_version_matches_sonar_core() {
-        assert_eq!(core_version(), sonar_core::version());
-        assert!(!core_version().is_empty());
-    }
 }

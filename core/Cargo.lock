@@ -2042,6 +2042,8 @@ name = "sonar-ffi"
 version = "0.1.0"
 dependencies = [
  "sonar-core",
+ "tempfile",
+ "thiserror",
  "uniffi",
 ]
 

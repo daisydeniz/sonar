@@ -330,6 +330,23 @@ pub enum Command {
         command: crate::bench_cmd::BenchCommand,
     },
 
+    /// Waveform peaks (min/max per bucket) of a library file, an id or a
+    /// path; `--pcm` also decodes the preview PCM (what the app plays for
+    /// formats AVFoundation cannot, e.g. Ogg Vorbis) and prints its size.
+    Wave {
+        /// `file_id` of `sonar search --json`, or a path.
+        file: String,
+        /// Number of buckets (1..=16384).
+        #[arg(long, default_value_t = 64)]
+        buckets: usize,
+        /// Also decode the preview PCM and print rate, channels, length.
+        #[arg(long)]
+        pcm: bool,
+        /// Machine-readable output.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Mark library files as favourites (`--off` to unmark). Files are ids
     /// (`file_id` of `sonar search --json`) or paths. Visible in the next
     /// search (`--favorites`).

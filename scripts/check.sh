@@ -36,7 +36,13 @@ if [[ "$(uname -s)" == "Darwin" && -f "$ROOT/app/project.yml" ]]; then
     -destination 'platform=macOS' -quiet build
   if [[ "${SONAR_SKIP_XCTEST:-0}" != "1" ]] && grep -q "SonarTests" "$ROOT/app/project.yml"; then
     step "xcodebuild test"
-    xcodebuild -project "$ROOT/app/Sonar.xcodeproj" -scheme Sonar \
+    # EngineBridgeTests drives a `sonar fixtures` library through the FFI.
+    # xcodebuild strips the TEST_RUNNER_ prefix, so the tests see
+    # SONAR_FIXTURES_DIR.
+    FIXTURES_DIR="$(mktemp -d "${TMPDIR:-/tmp}/sonar-xctest-fixtures.XXXXXX")"
+    trap 'rm -rf "$FIXTURES_DIR"' EXIT
+    "$SONAR_BIN" fixtures "$FIXTURES_DIR" --skip-long >/dev/null
+    TEST_RUNNER_SONAR_FIXTURES_DIR="$FIXTURES_DIR" TEST_RUNNER_SONAR_REQUIRE_FIXTURES=1 xcodebuild -project "$ROOT/app/Sonar.xcodeproj" -scheme Sonar \
       -destination 'platform=macOS' -quiet test
   fi
 fi

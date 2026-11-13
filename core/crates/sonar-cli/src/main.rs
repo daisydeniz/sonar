@@ -22,6 +22,7 @@ mod user_args;
 mod user_cmd;
 mod vectors_cmd;
 mod watch_cmd;
+mod wave_cmd;
 
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -122,6 +123,12 @@ fn main() -> Result<()> {
         Command::Similar(args) => similar_cmd::run(&args)?,
         Command::Bench { command } => bench_cmd::run(command)?,
         Command::Watch { json, debounce_ms } => watch_cmd::run(json, debounce_ms)?,
+        Command::Wave {
+            file,
+            buckets,
+            pcm,
+            json,
+        } => wave_cmd::run(&file, buckets, pcm, json)?,
         Command::Fav(args) => user_cmd::flag(&args, false)?,
         Command::Hide(args) => user_cmd::flag(&args, true)?,
         Command::Tag { command } => user_cmd::tag(&command)?,

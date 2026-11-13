@@ -982,3 +982,49 @@ the matching `Engine` methods; scan and analysis never touch these tables.
   the order given, re-adding keeps the place.
 - **CLI**: `sonar fav|hide|tag|collection|override` take ids or paths of
   library files; `sonar similar` now goes through `Engine::similar`.
+
+## ADR-032 — FFI v1 surface (T5.6)
+`sonar-ffi` exposes one UniFFI object, `SonarEngine`, a thin wrapper over
+`Engine` (ADR-030/031): conversions only (`convert.rs`), no product logic.
+New in core for it: `Engine::row/rows` (display rows with effective values,
+same query as the index), `Engine::waveform_peaks`, `Engine::preview_pcm`.
+- **Exports** (Swift names): constructors `open(home:)`, `openDefault()`;
+  `libraries()`, `addLibrary(path:)` (scans), `rescanLibrary`,
+  `removeLibrary`, `startWatching/stopWatching`; `startIndexing(includeEmbeddings:)`,
+  `pauseIndexing`, `resumeIndexing`, `cancelIndexing`, `indexingProgress()`,
+  `pollEvents()`; `search(query:)`, `cancelSearch()`, `similar(fileId:limit:)`,
+  `row(fileId:)`, `rows(fileIds:)`; `setFavorite`, `setHidden`, `addTags`,
+  `removeTags`, `tags()`, `setOverride`, `clearOverride`, collection CRUD +
+  `collectionRows`; `waveformPeaks(fileId:buckets:)`, `previewPcm(fileId:)`.
+  Left out for now: facets, `duplicates`, external similarity seeds,
+  overrides listing, CLAP model management.
+- **Types**: records `SearchQuery` (only `text` required; `mode`, `filters`,
+  `sort` are `nil` = hybrid / none / relevance because UniFFI cannot default
+  enums), `SearchFilters` (all defaulted), `SearchPage` (rows + `total` = text
+  matches, `hasMore`, `mode`, `fallback`), `FileRow` (ids, path, name,
+  category, kind, bpm, key, duration, rate, channels, favourite, hidden,
+  tags). A search returns display rows directly (one call per page, the
+  table does not fetch rows lazily); `limit` is cut to 1000.
+- **Errors**: `FfiError` = `NotFound | InvalidInput | Cancelled | Io | Audio |
+  Internal` (case names stay capitalised in Swift), each with a `message`
+  except `Cancelled`. Mapped from `sonar_core::Error`; every export runs under
+  `catch_unwind`, a panic becomes `Internal`.
+- **Threading**: the object is `Sendable`; any thread may call it. Blocking
+  (call off the main actor): `open*`, `addLibrary`, `rescanLibrary`,
+  `removeLibrary`, `search`, `similar`, `waveformPeaks`, `previewPcm`. The rest
+  return immediately. No callbacks: the UI polls `indexingProgress()` (~250 ms)
+  and `pollEvents()` (watcher scans, index refreshed, job finished).
+- **Cancellation**: latest `search` wins; the older call (or one running when
+  `cancelSearch()` fires) throws `Cancelled` and its result must be dropped.
+  Indexing is cancelled with `cancelIndexing()`.
+- **Without the CLAP model**: indexing skips the embed stage, hybrid/semantic
+  search run as text and say why in `SearchPage.fallback`.
+- **Audio**: `waveformPeaks` decodes the whole file (mono, 22.05 kHz) and
+  returns exactly `buckets` (1..16384) `{min, max}` pairs. `previewPcm`
+  returns mono `Float32` at the file's own rate (equal-weight downmix, no
+  resampling), at most 10 min (`truncated` set beyond); meant for formats
+  AVFoundation cannot play (Ogg Vorbis). Nothing is cached in core.
+- **Tests**: Rust tests in `sonar-ffi/src/tests.rs` (incl. the real fixtures
+  set); XCTest `EngineBridgeTests` runs the flow through the generated Swift.
+  `scripts/check.sh` generates `sonar fixtures --skip-long` into a temp dir
+  and passes it as `TEST_RUNNER_SONAR_FIXTURES_DIR` (the test skips without).

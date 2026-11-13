@@ -46,13 +46,17 @@
 //! [`Engine::search`] is cancellable with latest-query-wins semantics; see
 //! `search.rs`.
 
+mod audio;
 mod events;
 mod indexing;
 mod libraries;
+mod rows;
 mod search;
 mod user_data;
 mod worker;
 
+#[cfg(test)]
+mod rows_tests;
 #[cfg(test)]
 mod tests;
 
@@ -63,8 +67,10 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
+pub use audio::{waveform_peaks, PreviewPcm, MAX_PEAK_BUCKETS, MAX_PREVIEW_SECS};
 pub use events::{EngineEvent, EventListener, EVENT_QUEUE_CAPACITY};
 pub use indexing::IndexingStatus;
+pub use rows::FileRow;
 pub use search::SearchRequest;
 
 use crate::embed::EmbedOptions;

@@ -39,7 +39,7 @@ pub use analyzer::SonarTokenizer;
 pub use schema::SCHEMA_VERSION;
 pub(crate) use schema::{ff, Fields, FILE_ID as FILE_ID_FIELD};
 pub use source::IndexDoc;
-pub(crate) use source::{bpm_centi, facet_value};
+pub(crate) use source::{bpm_centi, doc as file_doc, facet_value};
 pub use write::BuildReport;
 
 use crate::text::ANALYZER_VERSION;

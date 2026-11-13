@@ -159,6 +159,12 @@ pub fn decode_file(path: &Path, opts: &DecodeOptions) -> Result<Decoded> {
     Decoder::new().decode(path, opts)
 }
 
+/// Source sample rate (Hz) of `path` from its header only (no packets are
+/// decoded). Errors as [`decode_file`] reports them for the header.
+pub fn probe_sample_rate(path: &Path) -> Result<u32> {
+    source::open(path).map(|opened| opened.sample_rate)
+}
+
 /// Reusable decoder: keeps resampler FFT plans (per rate pair) and scratch
 /// buffers between files. Not shared between threads; create one each.
 #[derive(Default)]

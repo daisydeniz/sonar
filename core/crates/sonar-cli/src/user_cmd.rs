@@ -13,7 +13,7 @@ use crate::user_args::{CollectionCommand, FlagArgs, OverrideArgs, TagCommand, Ta
 
 /// Opens the engine; an index that does not exist yet is built by the first
 /// search, not here.
-fn open() -> Result<Engine> {
+pub(crate) fn open() -> Result<Engine> {
     Engine::open_with(
         paths::data_dir().context("locating the Sonar store")?,
         EngineOptions {
@@ -29,18 +29,23 @@ fn resolve(engine: &Engine, targets: &Targets) -> Result<Vec<i64>> {
     targets
         .files
         .iter()
-        .map(|t| match t.parse::<i64>() {
-            Ok(id) => Ok(id),
-            Err(_) => {
-                let path =
-                    std::path::absolute(Path::new(t)).with_context(|| format!("resolving {t}"))?;
-                engine
-                    .file_id_by_path(&path)
-                    .context("looking up the file")?
-                    .with_context(|| format!("not a file of any library: {t}"))
-            }
-        })
+        .map(|t| resolve_one(engine, t))
         .collect()
+}
+
+/// One id or path of a library file to its file id.
+pub(crate) fn resolve_one(engine: &Engine, t: &str) -> Result<i64> {
+    match t.parse::<i64>() {
+        Ok(id) => Ok(id),
+        Err(_) => {
+            let path =
+                std::path::absolute(Path::new(t)).with_context(|| format!("resolving {t}"))?;
+            engine
+                .file_id_by_path(&path)
+                .context("looking up the file")?
+                .with_context(|| format!("not a file of any library: {t}"))
+        }
+    }
 }
 
 fn files(n: usize) -> String {

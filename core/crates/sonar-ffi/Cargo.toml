@@ -15,3 +15,7 @@ name = "sonar_ffi"
 [dependencies]
 sonar-core = { path = "../sonar-core" }
 uniffi.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

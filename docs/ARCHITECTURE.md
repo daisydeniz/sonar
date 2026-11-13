@@ -181,12 +181,12 @@ always shows the latest query only: `Engine::search` is latest-query-wins
 (a newer search flags the older one, which returns `Cancelled`, never stale
 hits; ADR-030).
 
-## 7. FFI surface (sketch)
-`open(home)`, `add_library(path)`, `remove_library`, `start_indexing`,
-`pause/resume`, `progress() -> Progress`, `search(Query) -> Page<Row>`,
-`row(file_id)`, `waveform_peaks(file_id, n)`, `similar(...)`,
-`set_override`, tags/collections/favorites CRUD, `duplicates()`.
-Pages are small structs (ids + display fields); the table fetches rows lazily.
+## 7. FFI surface (v1, ADR-032)
+One UniFFI object, `SonarEngine` (`sonar-ffi`), over `sonar_core::engine::Engine`:
+libraries, indexing control + polled progress/events, paged `search` (display
+rows), `similar`, `row(s)`, user-data setters, `waveform_peaks`, `preview_pcm`.
+Every fallible export `throws FfiError`; the exact list, blocking rules,
+cancellation and PCM format are in ADR-032. `duplicates()` is not in v1.
 
 ## 8. macOS app (`app/`)
 - Project generated with **XcodeGen** (`app/project.yml`) — never hand-edit
