@@ -36,6 +36,8 @@ final class AppModel {
     let preview: AudioPreview
     /// Waveform of the selected row (peaks from the core, zoom viewport).
     let waveform = WaveformModel()
+    /// Similarity mode (seed, sliders, status); see `Features/Similar`.
+    let similarity = SimilarityModel()
     private(set) var progress = IndexingProgress(
         enabled: false, running: false, paused: false, stage: nil, total: 0, done: 0, errors: 0)
     /// Last user-visible error (add/remove/search failures); nil when none.
@@ -53,8 +55,8 @@ final class AppModel {
     private(set) var sortKey: SortKey = .relevance
     private(set) var sortDescending = false
 
-    @ObservationIgnored private var bridge: CoreBridge?
-    @ObservationIgnored private var generation = 0
+    @ObservationIgnored private(set) var bridge: CoreBridge?
+    @ObservationIgnored var generation = 0
     @ObservationIgnored private var lastAppliedSort: SortKey = .relevance
     @ObservationIgnored private var lastAppliedDescending = false
     @ObservationIgnored private var pollTask: Task<Void, Never>?
@@ -85,6 +87,9 @@ final class AppModel {
     func revealSelected() { keyboard.revealSelected(selectedRow) }
 
     var selectedFileId: Int64? { selectedRow?.fileId }
+
+    /// Replaces the selected row's snapshot with a fresher copy (same file).
+    func updateSelectedSnapshot(_ row: FileRow) { selectedRow = row }
 
     /// Rows in the current result list.
     var resultCount: Int { pager.count }
@@ -242,7 +247,7 @@ final class AppModel {
     @ObservationIgnored private var scheduled: [UUID: Task<Void, Never>] = [:]
 
     /// Runs `body` as a tracked Task that removes itself when done.
-    private func track(_ body: @escaping @MainActor () async -> Void) {
+    func track(_ body: @escaping @MainActor () async -> Void) {
         let id = UUID()
         // The Task starts after this synchronous code, so the insert comes first.
         scheduled[id] = Task {
@@ -261,6 +266,7 @@ final class AppModel {
     /// Runs the current sidebar selection + search text off the main actor
     /// and applies the result unless a newer request superseded it.
     func refreshResults(keepScroll: Bool = true) async {
+        if similarity.isActive { return await refreshSimilar() }
         guard let bridge else { return }
         generation += 1
         let mine = generation

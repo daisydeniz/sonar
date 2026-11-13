@@ -20,6 +20,9 @@ struct SonarApp: App {
             CommandGroup(replacing: .textEditing) {
                 Button("Find Samples") { model.keyboard.focusSearch() }
                     .keyboardShortcut("f", modifiers: .command)
+                Button("Find Similar") { model.findSimilarToSelection() }
+                    .keyboardShortcut("f", modifiers: [.command, .shift])
+                    .disabled(model.selectedRow == nil)
             }
             CommandGroup(after: .newItem) {
                 Button("Add Library…") {

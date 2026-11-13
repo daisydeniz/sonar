@@ -7,6 +7,7 @@ struct InspectorView: View {
     let preview: AudioPreview
     let waveform: WaveformModel
     let onToggleFavorite: (FileRow) -> Void
+    let onFindSimilar: (FileRow) -> Void
 
     var body: some View {
         if let row {
@@ -19,6 +20,7 @@ struct InspectorView: View {
                         Label(row.favorite ? "Unfavorite" : "Favorite",
                               systemImage: row.favorite ? "heart.fill" : "heart")
                     }
+                    Button { onFindSimilar(row) } label: { Label("Find Similar", systemImage: "waveform.badge.magnifyingglass") }
                 }
                 Section("Waveform") { WaveformView(model: waveform, preview: preview) }
                 PreviewControlsView(preview: preview)

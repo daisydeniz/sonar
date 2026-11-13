@@ -51,6 +51,13 @@ struct CoreBridge: Sendable {
         return try await Task.detached { try engine.search(query: query) }.value
     }
 
+    /// Neighbours of a seed (shares the search cancel flag: a newer
+    /// search/similar call makes this one throw `Cancelled`).
+    func similarTo(_ query: SimilarQuery) async throws -> SimilarPage {
+        let engine = engine
+        return try await Task.detached { try engine.similarTo(query: query) }.value
+    }
+
     func collectionRows(id: Int64) async throws -> [FileRow] {
         let engine = engine
         return try await Task.detached { try engine.collectionRows(id: id) }.value

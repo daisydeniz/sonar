@@ -18,7 +18,7 @@ final class KeyTableView: NSTableView {
 /// when the pager reports the page. Sorting is delegated to the core through
 /// `onSort` (header click); nothing is sorted here.
 @MainActor
-final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableViewDelegate {
+final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSMenuDelegate {
     /// Table column: identifier, header title, width, and the core sort key.
     struct Column {
         let id: String
@@ -53,6 +53,8 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         get { tableView.onKey }
         set { tableView.onKey = newValue }
     }
+    /// Context menu "Find Similar" on a row.
+    var onFindSimilar: ((FileRow) -> Void)?
     /// Library names for the Library column.
     var libraryNames: [Int64: String] = [:] {
         didSet { if libraryNames != oldValue { reloadVisibleRows() } }
@@ -81,6 +83,9 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         tableView.dataSource = self
         tableView.delegate = self
         tableView.setAccessibilityLabel("Search results")
+        let menu = NSMenu()
+        menu.delegate = self
+        tableView.menu = menu
         scrollView.documentView = tableView
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
@@ -144,6 +149,21 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         } else {
             tableView.deselectAll(nil)
         }
+    }
+
+    // MARK: Context menu
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        menu.removeAllItems()
+        guard tableView.clickedRow >= 0, pager.peek(tableView.clickedRow) != nil else { return }
+        let item = NSMenuItem(title: "Find Similar", action: #selector(findSimilarClicked), keyEquivalent: "")
+        item.target = self
+        menu.addItem(item)
+    }
+
+    @objc private func findSimilarClicked() {
+        let row = tableView.clickedRow
+        if row >= 0, let file = pager.peek(row) { onFindSimilar?(file) }
     }
 
     // MARK: NSTableViewDataSource
