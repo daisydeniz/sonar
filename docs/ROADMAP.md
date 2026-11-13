@@ -72,7 +72,7 @@ Owner tags map to subagents in `.claude/agents/`.
 ## M6 — macOS app MVP
 - [x] T6.1 (swift-ui) App shell: sidebar (libraries, collections, favorites), toolbar search, results, inspector; add/remove library; indexing progress (pause/resume). (b382ea8)
 - [x] T6.2 (swift-ui) Results table: NSTableView, lazy paging from core, sortable columns (name, category, kind, BPM, key, duration, library), 1M rows smooth. AC: XCTest perf test + manual-free scroll benchmark. (dd5c882)
-- [ ] T6.3 (swift-ui) Instant search + filter chips/facets, keyboard-first (⌘F, arrows, space, return).
+- [x] T6.3 (swift-ui) Instant search + filter chips/facets, keyboard-first (⌘F, arrows, space, return). (f824df8)
 - [ ] T6.4 (swift-ui) Preview: AVAudioEngine, auto-play on select, pre-buffer neighbors, pitch control, loop toggle, loudness-normalized preview.
 - [ ] T6.5 (swift-ui) Waveform: peaks from core, CALayer/Metal rendering, zoom, playhead.
 - [ ] T6.6 (swift-ui) Similarity UI: "Find similar", aspect sliders, drop external file to search.
@@ -211,3 +211,6 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T6.2 review) After a reset that drops the selected file from page 0, the inspector keeps the old snapshot and `selectedID` stays set; decide: clear the selection or re-highlight when scrolled to.
 - (from T6.2 review) The Library column shows the folder name but the core sorts by library id; sort by display name in the core.
 - (from T6.2 review) The perf test's big jumps time mostly placeholder rows (page landing reload is untimed); also time the reload after a page arrives.
+- (from T6.3 review) ⌘F/Esc focus the toolbar `NSSearchField` by walking the window's views; this fails in full screen (toolbar in a separate window) or when the toolbar collapses the field into a button (silent no-op).
+- (from T6.3 review) Library chips selected under All Samples stay set (hidden) when a sidebar library is chosen, so "Clear filters" shows with no visible chip.
+- (from T6.3) `ResultsPagerTests.testResetDropsOldGenerationResults` flaked once under check.sh load (150 ms loader vs 300 ms sleep); make the loader signal completion.
