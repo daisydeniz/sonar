@@ -65,7 +65,7 @@ impl Engine {
         let mut store = Store::open(&self.inner.db_path)?;
         let report = scan::scan_library(&mut store, library_id)?;
         if !report.touched.is_empty() && self.inner.index_ready.load(Ordering::SeqCst) {
-            self.inner.index.refresh_files(&store, &report.touched)?;
+            self.inner.sync_index(&store, &report.touched)?;
         }
         let c = &report.counts;
         if c.added + c.changed + c.restored > 0 {

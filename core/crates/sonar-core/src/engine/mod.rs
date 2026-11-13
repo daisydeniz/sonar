@@ -139,6 +139,31 @@ pub(crate) struct Inner {
     search_cancel: Mutex<Arc<AtomicBool>>,
 }
 
+/// A refresh of at least this many files, or of more than a quarter of the
+/// index, is done as a full rebuild: one pass over the store beats one
+/// query per id (a first scan of a big library keeps the rebuild cost).
+const REBUILD_MIN_IDS: usize = 1000;
+/// Refreshes above this many ids always rebuild.
+const REBUILD_ALWAYS_IDS: usize = 50_000;
+
+impl Inner {
+    /// Whether refreshing `n` files is better done as a full rebuild.
+    fn prefers_rebuild(&self, n: usize) -> bool {
+        n > REBUILD_ALWAYS_IDS
+            || (n >= REBUILD_MIN_IDS && (n as u64).saturating_mul(4) > self.index.num_docs())
+    }
+
+    /// Brings the index up to date for `ids`: [`TextIndex::refresh_files`],
+    /// or a full rebuild when the set is large (see [`REBUILD_MIN_IDS`]).
+    pub(crate) fn sync_index(&self, store: &Store, ids: &[i64]) -> Result<()> {
+        if self.prefers_rebuild(ids.len()) {
+            self.index.rebuild(store).map(|_| ())
+        } else {
+            self.index.refresh_files(store, ids)
+        }
+    }
+}
+
 /// Locks a mutex, treating poison as recoverable (a panic elsewhere must
 /// not take the whole engine down; the guarded data stays consistent).
 pub(crate) fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {

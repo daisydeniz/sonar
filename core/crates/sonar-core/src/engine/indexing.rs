@@ -117,7 +117,7 @@ impl Inner {
         match started {
             Ok(()) => {
                 self.events.push(EngineEvent::IndexingStarted);
-                let _ = self.tx.send(Msg::Wake);
+                let _ = self.tx.try_send(Msg::Wake);
             }
             Err(e) => self.events.push(EngineEvent::Error {
                 message: format!("cannot start indexing: {e}"),
@@ -228,7 +228,7 @@ impl Engine {
         if started {
             self.inner.events.push(EngineEvent::IndexingStarted);
         }
-        let _ = self.inner.tx.send(Msg::Wake);
+        let _ = self.inner.tx.try_send(Msg::Wake);
         Ok(started)
     }
 

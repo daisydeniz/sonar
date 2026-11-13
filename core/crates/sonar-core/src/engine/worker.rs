@@ -41,8 +41,10 @@ pub(super) fn run(inner: &Arc<Inner>, rx: &Receiver<Msg>) {
         }
     };
     let mut shutdown = false;
+    // Ids whose refresh failed, retried next round (see `Retry`).
+    let mut retry = Retry::default();
     while !shutdown {
-        let first = if inner.job_running() {
+        let first = if inner.job_running() || !retry.ids.is_empty() {
             match rx.recv_timeout(JOB_POLL) {
                 Ok(m) => Some(m),
                 Err(RecvTimeoutError::Timeout) => None,
@@ -56,15 +58,16 @@ pub(super) fn run(inner: &Arc<Inner>, rx: &Receiver<Msg>) {
         };
         // Seen before draining: everything the job sent is then in hand.
         let finished = inner.job_finished();
-        let mut ids: Vec<i64> = Vec::new();
+        let mut ids: Vec<i64> = std::mem::take(&mut retry.ids);
         let mut watched = Vec::new();
         let mut ended = None;
         for msg in first.into_iter().chain(rx.try_iter()) {
             match msg {
                 Msg::Refresh(v) => ids.extend(v),
-                Msg::Watched(event) => {
-                    if let WatchEvent::Scanned { touched, .. } = &event {
-                        ids.extend(touched.iter().copied());
+                Msg::Watched(mut event) => {
+                    // The ids are consumed here; queued events do not carry them.
+                    if let WatchEvent::Scanned { touched, .. } = &mut event {
+                        ids.extend(std::mem::take(touched));
                     }
                     watched.push(event);
                 }
@@ -73,7 +76,7 @@ pub(super) fn run(inner: &Arc<Inner>, rx: &Receiver<Msg>) {
                 Msg::Shutdown => shutdown = true,
             }
         }
-        refresh(inner, store.as_ref(), ids);
+        retry.record(refresh(inner, store.as_ref(), ids));
         for event in watched {
             let new_work = matches!(
                 &event,
@@ -90,20 +93,58 @@ pub(super) fn run(inner: &Arc<Inner>, rx: &Receiver<Msg>) {
     inner.finish_job(rx);
 }
 
-/// Brings the text index up to date for `ids` (de-duplicated).
-fn refresh(inner: &Inner, store: Option<&Store>, mut ids: Vec<i64>) {
+/// Rounds a failing refresh is retried before its ids are dropped (the
+/// next scan or analysis of those files refreshes them again anyway).
+const MAX_RETRIES: u32 = 5;
+
+/// Ids a refresh could not write (e.g. another process holds the Tantivy
+/// writer lock), kept for the next round.
+#[derive(Default)]
+struct Retry {
+    ids: Vec<i64>,
+    failures: u32,
+}
+
+impl Retry {
+    fn record(&mut self, failed: Vec<i64>) {
+        if failed.is_empty() {
+            self.failures = 0;
+            return;
+        }
+        self.failures += 1;
+        if self.failures >= MAX_RETRIES {
+            tracing::error!(files = failed.len(), "text index refresh given up");
+            self.failures = 0;
+        } else {
+            self.ids = failed;
+        }
+    }
+}
+
+/// Brings the text index up to date for `ids` (de-duplicated). Returns the
+/// ids that could not be written.
+fn refresh(inner: &Inner, store: Option<&Store>, mut ids: Vec<i64>) -> Vec<i64> {
     ids.sort_unstable();
     ids.dedup();
     if ids.is_empty() || !inner.index_ready.load(std::sync::atomic::Ordering::SeqCst) {
-        return;
+        return Vec::new();
     }
-    let Some(store) = store else { return };
-    match inner.index.refresh_files(store, &ids) {
-        Ok(()) => inner
-            .events
-            .push(EngineEvent::IndexRefreshed { files: ids.len() }),
-        Err(e) => inner.events.push(EngineEvent::Error {
-            message: format!("text index refresh failed: {e}"),
-        }),
+    let Some(store) = store else {
+        return Vec::new();
+    };
+    match inner.sync_index(store, &ids) {
+        Ok(()) => {
+            inner
+                .events
+                .push(EngineEvent::IndexRefreshed { files: ids.len() });
+            Vec::new()
+        }
+        Err(e) => {
+            tracing::warn!("text index refresh failed: {e}");
+            inner.events.push(EngineEvent::Error {
+                message: format!("text index refresh failed: {e}"),
+            });
+            ids
+        }
     }
 }

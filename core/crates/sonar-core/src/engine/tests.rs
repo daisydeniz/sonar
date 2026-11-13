@@ -260,3 +260,14 @@ fn cancel_disables_automatic_indexing() {
         .expect("count");
     assert_eq!(analyzed, 2);
 }
+
+#[test]
+fn large_refreshes_rebuild_small_ones_do_not() {
+    let env = Env::new();
+    let engine = Engine::open(&env.home).expect("open");
+    let inner = &engine.inner;
+    // Empty index: a handful of ids is a refresh, a thousand is a rebuild.
+    assert!(!inner.prefers_rebuild(10));
+    assert!(inner.prefers_rebuild(REBUILD_MIN_IDS));
+    assert!(inner.prefers_rebuild(REBUILD_ALWAYS_IDS + 1));
+}
