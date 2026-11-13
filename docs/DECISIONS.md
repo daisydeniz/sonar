@@ -1080,7 +1080,7 @@ Accepted. `sonar_core::dupes::find_duplicates`, `Engine::duplicates(_latest)`,
 `sonar dupes [--exact-only|--near-only] [--threshold X] [--json]`, FFI
 `duplicates(query: DuplicatesQuery) -> DuplicatesResult` + `cancelDuplicates()`.
 - **Files**: online libraries, status ≠ `missing`; hidden files included (UI
-  reads `FileRow.hidden`). Zero-byte files and digital silence never group.
+  reads `FileRow.hidden`). Zero-byte files never group; digital silence never near-groups (byte-identical silent files still form exact groups).
 - **Exact**: candidates share `(size, quick_hash)` (lossless blocking), then
   full **XXH3-128** (twox-hash, already a dep; non-cryptographic is enough
   for accidental copies, 128 bits make collisions negligible) cached in

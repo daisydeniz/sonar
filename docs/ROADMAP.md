@@ -79,7 +79,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T6.7 (swift-ui) Drag & drop out to DAW/Finder (file URLs), multi-select. (2c00c44)
 - [x] T6.8 (swift-ui) Organize: favorites, collections, tags, overrides for BPM/key/category, hide. (8191ddb)
 - [ ] T6.9 (swift-ui) Duplicates view (exact + near via aspect vectors).
-  - [ ] T6.9a (search-ranking) (split from T6.9: the core has no duplicate finder and FFI v1 left out `duplicates`) Core `dupes` module + `sonar dupes` CLI + FFI `duplicates()`: exact groups (same size + quick_hash, confirmed by a full content hash cached in `files.content_hash`) and near-duplicate groups via aspect-vector distance with a calibrated threshold (re-encodes, format/rate/bit-depth/gain variants of the same sound), candidates blocked by duration so no all-pairs scan; cancellable; missing/offline files excluded. AC: fixture tests (identical copies → exact group; format/rate/gain variants → near group; different sounds never grouped); threshold calibration numbers in an ADR; 500k synthetic timing recorded in STATUS; FFI XCTest/Rust test green in check.sh.
+  - [x] T6.9a (search-ranking) (split from T6.9: the core has no duplicate finder and FFI v1 left out `duplicates`) Core `dupes` module + `sonar dupes` CLI + FFI `duplicates()`: exact groups (same size + quick_hash, confirmed by a full content hash cached in `files.content_hash`) and near-duplicate groups via aspect-vector distance with a calibrated threshold (re-encodes, format/rate/bit-depth/gain variants of the same sound), candidates blocked by duration so no all-pairs scan; cancellable; missing/offline files excluded. AC: fixture tests (identical copies → exact group; format/rate/gain variants → near group; different sounds never grouped); threshold calibration numbers in an ADR; 500k synthetic timing recorded in STATUS; FFI XCTest/Rust test green in check.sh. (0a6fe92)
   - [ ] T6.9b (swift-ui) Duplicates view in the app over FFI `duplicates()`: sidebar entry, groups list (exact / near), per-file path/size/format, preview + reveal, hide or "keep one" via existing user-data setters (no file deletion). AC: XCTests over a fixture library.
 
 ## M7 — Polish & release
@@ -239,3 +239,7 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T6.7) Edit > Copy menu validation while the table is focused is untested.
 - (from T6.8 review) Deleting a collection has no confirmation dialog.
 - (from T6.8) Inspector can't show which fields are overridden (FileRow has no override flag); "Revert" is always offered (no-op without override).
+- (from T6.9a review) A cached `content_hash` is trusted without re-statting the file; a file edited since the last scan (watcher not caught up) can still join an exact group. Compare size+mtime first.
+- (from T6.9a review) No unit test for `scan::lock` acquire returning `None` when cancelled while waiting.
+- (from T6.9a review) Exact pass looks up `file_path` once per uncached candidate; batch it if first-run cost on large libraries matters.
+- (from T6.9a) Near matching depends on library z-score stats; in a tiny library of near-identical files the stats degenerate and near groups can be missed.
