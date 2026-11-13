@@ -40,17 +40,19 @@ final class KeyboardActions {
         onTogglePreview?()
     }
 
-    func revealSelected(_ row: FileRow?) {
-        guard let row else { return }
-        reveal([URL(fileURLWithPath: row.path)])
+    /// Reveals the whole multi-selection, or just the focused row.
+    func revealSelected(_ row: FileRow?, selection: [FileRow] = []) {
+        let rows = selection.count > 1 ? selection : (row.map { [$0] } ?? [])
+        guard !rows.isEmpty else { return }
+        reveal(rows.map { URL(fileURLWithPath: $0.path) })
     }
 
     /// Routes a table key; returns whether it was handled.
     @discardableResult
-    func handle(_ key: TableKey, selected: FileRow?) -> Bool {
+    func handle(_ key: TableKey, selected: FileRow?, selection: [FileRow] = []) -> Bool {
         switch key {
         case .space: togglePreview()
-        case .returnKey: revealSelected(selected)
+        case .returnKey: revealSelected(selected, selection: selection)
         case .escape: focusSearch()
         }
         return true

@@ -99,12 +99,13 @@ struct ContentView: View {
                 libraryNames: Dictionary(uniqueKeysWithValues: model.libraries.map { ($0.id, URL(fileURLWithPath: $0.rootPath).lastPathComponent) }),
                 onSelect: { model.select($0) },
                 onSort: { key, descending in Task { await model.setSort(key, descending: descending) } },
+                onSelectionChange: { model.selectedFileIDs = $0 },
                 onKey: { key in
                     if key == .escape, model.similarity.isActive {
                         model.exitSimilarity()
                         return true
                     }
-                    return model.keyboard.handle(key, selected: model.selectedRow)
+                    return model.keyboard.handle(key, selected: model.selectedRow, selection: model.selectedRows)
                 },
                 onFindSimilar: { model.findSimilar(to: $0) },
                 register: { controller in

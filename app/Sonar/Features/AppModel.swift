@@ -84,7 +84,13 @@ final class AppModel {
     /// Space in the table (wired to `AudioPreview.toggle`).
     func togglePreview() { keyboard.togglePreview() }
     /// Return in the table: reveal the selected file in Finder.
-    func revealSelected() { keyboard.revealSelected(selectedRow) }
+    func revealSelected() { keyboard.revealSelected(selectedRow, selection: selectedRows) }
+
+    /// Ids of every selected (loaded) row in table order; the focused file
+    /// (`selectedRow`) is the most recently clicked one. T6.8 acts on this.
+    var selectedFileIDs: [Int64] = []
+    /// Cached rows of `selectedFileIDs`.
+    var selectedRows: [FileRow] { selectedFileIDs.compactMap { pager.cachedRow(fileId: $0) } }
 
     var selectedFileId: Int64? { selectedRow?.fileId }
 

@@ -11,11 +11,14 @@ final class SyntheticPageLoader: ResultPageLoader, @unchecked Sendable {
     let prefix: String
     /// Pages other than the first take this long (0 = immediate).
     let delayNs: UInt64
+    /// Directory the row paths point into (default: a nonexistent `/synthetic`).
+    let directory: String
 
     private let lock = NSLock()
     private var offsets: [Int] = []
 
-    init(rowCount: Int, claimedTotal: Int? = nil, prefix: String = "row", delayNs: UInt64 = 0) {
+    init(rowCount: Int, claimedTotal: Int? = nil, prefix: String = "row", delayNs: UInt64 = 0, directory: String = "/synthetic") {
+        self.directory = directory
         self.rowCount = rowCount
         self.claimedTotal = claimedTotal ?? rowCount
         self.prefix = prefix
@@ -35,7 +38,7 @@ final class SyntheticPageLoader: ResultPageLoader, @unchecked Sendable {
 
     private func makeRow(_ i: Int) -> FileRow {
         FileRow(
-            fileId: Int64(i), libraryId: 1, path: "/synthetic/\(prefix)\(i).wav", name: "\(prefix) \(i)",
+            fileId: Int64(i), libraryId: 1, path: "\(directory)/\(prefix)\(i).wav", name: "\(prefix) \(i)",
             folders: "synthetic", category: "kick", kind: i % 2 == 0 ? "loop" : "one_shot",
             bpm: Double(60 + i % 120), key: "Am", durationMs: UInt64(500 + i % 4000),
             sampleRate: 44100, channels: 2, favorite: false, hidden: false, tags: [])

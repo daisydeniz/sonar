@@ -2,6 +2,13 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// True while a drag that started in our own results table is in flight
+/// (a self-drop must not start a similarity search; ADR: ignore it).
+@MainActor
+enum DragOutState {
+    static var isDraggingFromTable = false
+}
+
 /// Which dropped files start a similarity search.
 enum SimilarityDrop {
     static let audioExtensions: Set<String> = ["wav", "aif", "aiff", "flac", "mp3", "ogg", "m4a"]
@@ -9,6 +16,15 @@ enum SimilarityDrop {
     /// The first file URL with an audio extension (multi-file drops use it).
     static func firstAudioURL(in urls: [URL]) -> URL? {
         urls.first { $0.isFileURL && audioExtensions.contains($0.pathExtension.lowercased()) }
+    }
+}
+
+extension SimilarityDrop {
+    /// Whether a drop of `urls` starts a similarity search: never for a drag
+    /// that began in our own results table.
+    @MainActor
+    static func accepts(_ urls: [URL]) -> Bool {
+        !DragOutState.isDraggingFromTable && firstAudioURL(in: urls) != nil
     }
 }
 
@@ -26,9 +42,10 @@ struct SimilarityDropDelegate: DropDelegate {
     }
 
     func validateDrop(info: DropInfo) -> Bool {
+        if DragOutState.isDraggingFromTable { return false }
         let urls = draggedURLs()
         if urls.isEmpty { return info.hasItemsConforming(to: [.fileURL]) }
-        return SimilarityDrop.firstAudioURL(in: urls) != nil
+        return SimilarityDrop.accepts(urls)
     }
 
     func dropEntered(info: DropInfo) { isTargeted = true }
@@ -36,6 +53,7 @@ struct SimilarityDropDelegate: DropDelegate {
 
     func performDrop(info: DropInfo) -> Bool {
         isTargeted = false
+        if DragOutState.isDraggingFromTable { return false }
         let providers = info.itemProviders(for: [.fileURL])
         guard !providers.isEmpty else { return false }
         let model = model

@@ -8,6 +8,7 @@ struct ResultsTableView: NSViewRepresentable {
     let libraryNames: [Int64: String]
     let onSelect: (FileRow?) -> Void
     let onSort: (SortKey, Bool) -> Void
+    let onSelectionChange: ([Int64]) -> Void
     let onKey: (TableKey) -> Bool
     let onFindSimilar: (FileRow) -> Void
     /// Called once with the controller so the model can focus the table.
@@ -18,6 +19,7 @@ struct ResultsTableView: NSViewRepresentable {
     func makeNSView(context: Context) -> NSScrollView {
         let controller = context.coordinator
         controller.onSelect = onSelect
+        controller.onSelectionChange = onSelectionChange
         controller.onSort = onSort
         controller.onKey = onKey
         controller.onFindSimilar = onFindSimilar
@@ -29,6 +31,7 @@ struct ResultsTableView: NSViewRepresentable {
     func updateNSView(_ view: NSScrollView, context: Context) {
         let controller = context.coordinator
         controller.onSelect = onSelect
+        controller.onSelectionChange = onSelectionChange
         controller.onSort = onSort
         controller.onKey = onKey
         controller.onFindSimilar = onFindSimilar
