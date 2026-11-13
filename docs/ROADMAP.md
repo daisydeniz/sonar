@@ -70,7 +70,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T5.6 (rust-core + architect) FFI v1 over the Engine per ARCHITECTURE §7 (added by the founder, 2026-11-11: M6 tasks are owned by swift-ui and must not have to design the core API ad hoc). `open`, libraries add/remove/list, indexing start/pause/resume + polled progress, paged `search` (ids + display fields) with cancellation, `row`, user-data setters, `waveform_peaks(file_id, n)`, and `preview_pcm(file_id)` (decoded PCM for formats AVFoundation cannot play, e.g. Ogg Vorbis). Every fallible export `throws`; no panic crosses the bridge. AC: an XCTest drives a `sonar fixtures` library end to end through the generated Swift bindings (add → index → search → set favourite → search again → peaks), green in `scripts/check.sh`. (b0c04c3)
 
 ## M6 — macOS app MVP
-- [ ] T6.1 (swift-ui) App shell: sidebar (libraries, collections, favorites), toolbar search, results, inspector; add/remove library; indexing progress (pause/resume).
+- [x] T6.1 (swift-ui) App shell: sidebar (libraries, collections, favorites), toolbar search, results, inspector; add/remove library; indexing progress (pause/resume). (HASH)
 - [ ] T6.2 (swift-ui) Results table: NSTableView, lazy paging from core, sortable columns (name, category, kind, BPM, key, duration, library), 1M rows smooth. AC: XCTest perf test + manual-free scroll benchmark.
 - [ ] T6.3 (swift-ui) Instant search + filter chips/facets, keyboard-first (⌘F, arrows, space, return).
 - [ ] T6.4 (swift-ui) Preview: AVAudioEngine, auto-play on select, pre-buffer neighbors, pitch control, loop toggle, loudness-normalized preview.
@@ -203,3 +203,6 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T5.6 review) `Error::Io` shows only "I/O error at <path>", so Swift loses the cause ("No such file", "Permission denied"); build the FFI message from the error's source chain.
 - (from T5.6 review) No test actually observes `FfiError.Cancelled` from a superseded search (needs a search on a second thread + `cancel_search`).
 - (from T5.6 review) Deep paging re-runs the search for `offset + limit` hits, and a superseded call can still return rows fetched after the cancel check; for T6.2 consider an ids-only full-result call + `rows(fileIds:)`, and tag UI requests with a generation number.
+- (from T6.1 review) `AppModelTests` checks `paused` only if the fixture job is still running, so on a fast machine the pause path may not be exercised; pause before any await or use a larger library.
+- (from T6.1 review) The `.failed` engine state is not tested through `AppModel`; inject an opener closure and assert it.
+- (from T6.1 review) Each watcher `EngineEvent.error` becomes a modal alert; repeated retry errors (SQLITE_BUSY) could spam it. Use a non-modal status message.
