@@ -65,13 +65,14 @@ struct TagsEditorView: View {
             HStack {
                 TextField("Add tag", text: $draft)
                     .onSubmit(commit)
+                    .onChange(of: row.fileId) { draft = "" }
                     .accessibilityLabel("Add tag")
                 let suggestions = model.organizeState.tags.filter { !row.tags.contains($0.name) }
                 if !suggestions.isEmpty {
                     Menu {
                         ForEach(suggestions, id: \.name) { info in
                             Button("\(info.name) (\(info.files))") {
-                                Task { await model.addTags(info.name) }
+                                Task { await model.addTags(names: [info.name]) }
                             }
                         }
                     } label: {

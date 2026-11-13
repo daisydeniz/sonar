@@ -42,7 +42,6 @@ extension AppModel {
             errorMessage = Self.describe(error)
         }
         await reloadSidebar()
-        organizeState.tags = (try? await bridge.allTags()) ?? organizeState.tags
         await refreshResults()
         return ok
     }
@@ -65,8 +64,10 @@ extension AppModel {
     func setHidden(fileIds: [Int64], on: Bool) async {
         guard !fileIds.isEmpty else { return }
         await organize { try await $0.setHidden(fileIds: fileIds, on: on) }
-        if on, !organizeState.showHidden, let id = selectedFileId, fileIds.contains(id) {
-            selectedFileIDs = []
+        guard on, !organizeState.showHidden else { return }
+        // Drop what the reloaded results no longer contain (the hidden files).
+        selectedFileIDs.removeAll { fileIds.contains($0) && pager.index(ofFileId: $0) == nil }
+        if let id = selectedFileId, fileIds.contains(id), pager.index(ofFileId: id) == nil {
             select(nil)
         }
     }
@@ -82,7 +83,11 @@ extension AppModel {
 
     /// Adds comma-separated tags to the files (default: the selection).
     func addTags(_ text: String, to ids: [Int64]? = nil) async {
-        let tags = Self.parseTags(text)
+        await addTags(names: Self.parseTags(text), to: ids)
+    }
+
+    /// Adds already-split tags (suggestions: a name is never re-split).
+    func addTags(names tags: [String], to ids: [Int64]? = nil) async {
         let ids = ids ?? organizeTargetIDs
         guard !tags.isEmpty, !ids.isEmpty else { return }
         await organize { try await $0.addTags(fileIds: ids, tags: tags) }

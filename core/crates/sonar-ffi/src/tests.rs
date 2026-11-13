@@ -54,7 +54,10 @@ fn core_version_matches_sonar_core() {
 #[test]
 fn category_ids_are_valid_overrides() {
     let ids = category_ids();
-    assert_eq!(ids.len(), 17);
+    assert_eq!(
+        ids.len(),
+        sonar_core::classify::category::taxonomy::TAXONOMY.len()
+    );
     assert!(ids.iter().any(|i| i == "kick"));
 
     let tmp = tempfile::tempdir().expect("tempdir");

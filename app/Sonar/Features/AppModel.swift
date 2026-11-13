@@ -198,6 +198,7 @@ final class AppModel {
         do {
             libraries = try await bridge.libraries()
             collections = try await bridge.collections()
+            organizeState.tags = try await bridge.allTags()  // suggestions, loaded with the sidebar
         } catch {
             errorMessage = Self.describe(error)
         }

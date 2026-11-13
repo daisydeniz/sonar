@@ -22,7 +22,11 @@ struct OverrideFieldsView: View {
                     .accessibilityLabel("Override error: \(error)")
             }
         }
-        .onChange(of: row, initial: true) { syncDrafts() }
+        .onChange(of: row.fileId, initial: true) { syncDrafts() }
+        // Only a changed value (revert, re-analysis) resyncs; a plain row
+        // refresh must not clobber an in-progress edit.
+        .onChange(of: row.bpm) { syncDrafts() }
+        .onChange(of: row.key) { syncDrafts() }
     }
 
     private func syncDrafts() {

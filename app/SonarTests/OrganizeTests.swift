@@ -65,6 +65,23 @@ final class OrganizeTests: XCTestCase {
         XCTAssertEqual(model.resultCount, 0)
     }
 
+    func testHidingTheFocusedRowClearsModelAndTableSelection() async throws {
+        let model = try await indexedModel()
+        let controller = ResultsTableController(pager: model.pager)
+        controller.onSelect = { model.select($0) }
+        controller.onSelectionChange = { model.selectedFileIDs = $0 }
+        controller.tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        let id = try XCTUnwrap(controller.selectedID)
+        XCTAssertEqual(model.selectedFileId, id)
+
+        await model.setHidden(fileIds: [id], on: true)
+        XCTAssertNil(model.selectedFileId)
+        XCTAssertTrue(model.selectedFileIDs.isEmpty)
+        XCTAssertNil(controller.selectedID, "table focus follows the results")
+        XCTAssertTrue(controller.selectedIDs.isEmpty)
+        XCTAssertEqual(controller.tableView.selectedRow, -1)
+    }
+
     func testHideRemovesFromSearchAndShowHiddenBringsBack() async throws {
         let model = try await indexedModel()
         let total = model.resultCount

@@ -191,6 +191,7 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         suppressSelection = true
         defer { suppressSelection = false }
         let focus = selectedID.flatMap { pager.index(ofFileId: $0) }
+        if focus == nil { selectedID = nil }  // the focused file left the results
         let present = Set(selectedIDs.compactMap { pager.index(ofFileId: $0) } + [focus].compactMap { $0 })
         selectedIDs = present.sorted().compactMap { pager.peek($0)?.fileId }
         tableView.deselectAll(nil)
