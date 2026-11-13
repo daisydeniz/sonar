@@ -334,12 +334,27 @@ fn take_lock(dir: &Path) -> Result<File> {
         .write(true)
         .open(&path)
         .map_err(|e| Error::io(&path, e))?;
-    match file.try_lock() {
-        Ok(()) => Ok(file),
-        Err(std::fs::TryLockError::WouldBlock) => Err(Error::VectorStore {
-            path,
-            reason: "another Sonar process is writing it".into(),
-        }),
-        Err(std::fs::TryLockError::Error(e)) => Err(Error::io(path, e)),
+    // `flock` belongs to the open file description, and a child spawned by
+    // another thread (`Command`) shares it until its `exec`, so a lock just
+    // released by `drop` can stay held for a few milliseconds: wait briefly
+    // before reporting a real second writer (same as the embedding store).
+    let deadline = std::time::Instant::now() + LOCK_PATIENCE;
+    loop {
+        match file.try_lock() {
+            Ok(()) => return Ok(file),
+            Err(std::fs::TryLockError::WouldBlock) if std::time::Instant::now() < deadline => {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Err(std::fs::TryLockError::WouldBlock) => {
+                return Err(Error::VectorStore {
+                    path,
+                    reason: "another Sonar process is writing it".into(),
+                })
+            }
+            Err(std::fs::TryLockError::Error(e)) => return Err(Error::io(path, e)),
+        }
     }
 }
+
+/// How long `take_lock` waits for a lock that a forking thread may still hold.
+const LOCK_PATIENCE: std::time::Duration = std::time::Duration::from_millis(500);

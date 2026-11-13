@@ -185,3 +185,4 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T5.4 review) Hybrid cancellation is checked only after text leg + embed + candidate pass; finer-grained cancel in the T5.5 Engine.
 - (from T5.4 review) Hybrid always mixes up to 200 CLAP neighbours, so exact-name queries also list non-matching files while `text_total` counts name matches only; make this visible in the UI.
 - (from T5.4 review) `eval/text_search.rs` `skipped` sums skipped queries and missing judged files; split the counts.
+- (from T5.4 merge) flock retry loop is duplicated in `embed/store.rs` and `index/vectors/mod.rs` `take_lock`; extract a shared helper.
