@@ -18,6 +18,7 @@ pub mod jobs;
 pub mod key;
 pub mod meta;
 pub mod paths;
+pub mod preview;
 pub mod quiet_panic;
 pub mod scan;
 pub mod search;

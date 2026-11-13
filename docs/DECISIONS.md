@@ -1039,3 +1039,20 @@ ADR-032 surface; the counting itself stays in core (ADR-018).
   [LibraryFacet], tags: [FacetCount], favorites }`; counts are `UInt64`,
   lists sorted by count desc, any-of dimensions drill-sideways. Pure
   semantic mode has no text leg, so its facets are `nil`.
+
+## ADR-034 — Preview loudness normalization (T6.4)
+The preview player normalizes level so auditioning mixed material is
+comfortable. The gain is computed in core (`sonar_core::preview`), exposed as
+`FileRow.previewGainDb: Double?` (defaulted FFI field, ADR-033 style).
+- Target -16 LUFS integrated: `gain = -16 - loudness`.
+- Peak ceiling -1 dBFS: `gain = min(gain, -1 - peak)` when the peak is known.
+- Loudness missing/non-finite (too short for BS.1770 gating) but peak known:
+  `gain = -6 - peak`.
+- Clamped to [-24, +12] dB; neither value usable -> `nil`.
+- Swift applies it in dB as `AVAudioUnitEQ.globalGain` (player → TimePitch →
+  EQ → mixer; node `volume` caps at 1.0 and could not boost); unanalyzed
+  (`nil`) plays at 0 dB. Files are never modified.
+- Player (T6.4): one AVAudioEngine; pitch ±12 st via AVAudioUnitTimePitch
+  (tempo kept); loop = buffer scheduled with `.loops`; decoded-buffer LRU
+  (8 entries / 256 MB) filled for the selection ±2; AVAudioFile decode with
+  `previewPcm` fallback, capped at 600 s; latest selection wins.

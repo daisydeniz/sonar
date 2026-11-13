@@ -32,6 +32,8 @@ final class AppModel {
     private(set) var collections: [CollectionInfo] = []
     /// Lazily paged results behind the table (latest-wins via its generations).
     let pager = ResultsPager()
+    /// Audio preview (auto-play, cache, pitch, loop).
+    let preview: AudioPreview
     private(set) var progress = IndexingProgress(
         enabled: false, running: false, paused: false, stage: nil, total: 0, done: 0, errors: 0)
     /// Last user-visible error (add/remove/search failures); nil when none.
@@ -75,7 +77,7 @@ final class AppModel {
     /// Clears every filter chip and re-queries.
     func clearFilters() { filters = FilterState() }
 
-    /// Space in the table; T6.4 wires the preview to `keyboard.onTogglePreview`.
+    /// Space in the table (wired to `AudioPreview.toggle`).
     func togglePreview() { keyboard.togglePreview() }
     /// Return in the table: reveal the selected file in Finder.
     func revealSelected() { keyboard.revealSelected(selectedRow) }
@@ -85,8 +87,19 @@ final class AppModel {
     /// Rows in the current result list.
     var resultCount: Int { pager.count }
 
-    /// Table selection changed (nil = nothing selected).
-    func select(_ row: FileRow?) { selectedRow = row }
+    /// Table selection changed (nil = nothing selected): updates the preview
+    /// (auto-play + pre-decode of the cached neighbours, nearest first).
+    func select(_ row: FileRow?) {
+        selectedRow = row
+        preview.select(row, neighbours: neighbours(of: row))
+    }
+
+    /// Cached rows within `AudioPreview.neighbourReach` of `row` (no fetches).
+    private func neighbours(of row: FileRow?) -> [FileRow] {
+        guard let row, let i = pager.index(ofFileId: row.fileId) else { return [] }
+        return (1...AudioPreview.neighbourReach).flatMap { d in [pager.peek(i + d), pager.peek(i - d)] }
+            .compactMap { $0 }
+    }
 
     /// A header click: the core re-sorts, the table restarts at the top.
     func setSort(_ key: SortKey, descending: Bool) async {
@@ -98,8 +111,14 @@ final class AppModel {
 
     /// `engine` is injectable (tests pass one opened on a temp home); `nil`
     /// opens the default home in `start()`.
-    init(engine: SonarEngine? = nil, activePollMs: UInt64 = 250, idlePollMs: UInt64 = 1000) {
+    init(
+        engine: SonarEngine? = nil, preview: AudioPreview = AudioPreview(), activePollMs: UInt64 = 250,
+        idlePollMs: UInt64 = 1000
+    ) {
+        self.preview = preview
         bridge = engine.map(CoreBridge.init(engine:))
+        if let engine { preview.decoder = CoreDecoder(engine: engine) }
+        keyboard.onTogglePreview = { [weak preview] in preview?.toggle() }
         activePollNs = activePollMs * 1_000_000
         idlePollNs = idlePollMs * 1_000_000
         pager.onError = { [weak self] in self?.errorMessage = Self.describe($0) }
@@ -115,7 +134,10 @@ final class AppModel {
         guard !isStarted else { return }
         isStarted = true
         do {
-            if bridge == nil { bridge = try await CoreBridge.openDefault() }
+            if bridge == nil {
+                bridge = try await CoreBridge.openDefault()
+                if let engine = bridge?.engine { preview.decoder = CoreDecoder(engine: engine) }
+            }
             engineState = .ready
         } catch {
             engineState = .failed(Self.describe(error))
@@ -127,6 +149,7 @@ final class AppModel {
             errorMessage = Self.describe(error)  // engine works; only watching failed
         }
         await reloadSidebar()
+        preview.warmUp()
         if !libraries.isEmpty {
             do {
                 try bridge?.startIndexing(includeEmbeddings: true)
@@ -262,7 +285,7 @@ final class AppModel {
             lastAppliedSort = key
             lastAppliedDescending = descending
             if pager.count == 0 {
-                selectedRow = nil
+                select(nil)
             } else if let id = selectedFileId, let fresh = pager.cachedRow(fileId: id) {
                 selectedRow = fresh
             }

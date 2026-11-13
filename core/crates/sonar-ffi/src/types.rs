@@ -254,6 +254,9 @@ pub struct FileRow {
     pub sample_rate: Option<u32>,
     /// Channels, once indexed.
     pub channels: Option<u16>,
+    /// Preview gain in dB (ADR-034); `nil` = play at 0 dB.
+    #[uniffi(default = None)]
+    pub preview_gain_db: Option<f64>,
     /// Favourite.
     pub favorite: bool,
     /// Hidden.

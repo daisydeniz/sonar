@@ -83,6 +83,8 @@ fn add_index_search_favourite_peaks() {
     let hit = &page.rows[0];
     assert!(hit.name.starts_with("zorg_"));
     assert!(hit.duration_ms.is_some(), "indexed: duration is known");
+    let gain = hit.preview_gain_db.expect("analyzed: preview gain known");
+    assert!((-24.0..=12.0).contains(&gain), "gain {gain}");
     assert!(!hit.favorite);
 
     assert_eq!(

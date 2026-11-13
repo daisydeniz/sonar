@@ -36,6 +36,9 @@ pub struct FileRow {
     pub sample_rate: Option<u32>,
     /// Channel count of the stored format, once the meta stage ran.
     pub channels: Option<u16>,
+    /// Preview gain (dB, ADR-034); `None` until the meta stage ran or when
+    /// no level is usable (play at 0 dB).
+    pub preview_gain_db: Option<f64>,
     /// In the user's favourites.
     pub favorite: bool,
     /// Hidden by the user.
@@ -65,6 +68,9 @@ fn load(store: &Store, id: i64) -> Result<Option<FileRow>> {
         duration_ms: doc.duration_ms,
         sample_rate: meta.as_ref().map(|m| m.sample_rate),
         channels: meta.as_ref().map(|m| m.channels),
+        preview_gain_db: meta
+            .as_ref()
+            .and_then(|m| crate::preview::preview_gain_db(m.loudness_lufs, m.peak_dbfs)),
         favorite: doc.favorite,
         hidden: doc.hidden,
         tags: doc.tags,

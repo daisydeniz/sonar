@@ -161,6 +161,7 @@ impl From<core_engine::FileRow> for FileRow {
             duration_ms: r.duration_ms,
             sample_rate: r.sample_rate,
             channels: r.channels,
+            preview_gain_db: r.preview_gain_db,
             favorite: r.favorite,
             hidden: r.hidden,
             tags: r.tags,
