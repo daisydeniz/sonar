@@ -1028,3 +1028,14 @@ same query as the index), `Engine::waveform_peaks`, `Engine::preview_pcm`.
   set); XCTest `EngineBridgeTests` runs the flow through the generated Swift.
   `scripts/check.sh` generates `sonar fixtures --skip-long` into a temp dir
   and passes it as `TEST_RUNNER_SONAR_FIXTURES_DIR` (the test skips without).
+
+## ADR-033 — FFI facets (T6.3)
+Filter-chip counts reach Swift through an additive, defaulted change to the
+ADR-032 surface; the counting itself stays in core (ADR-018).
+- `SearchQuery.facets: Bool` (default `false`); `SearchPage.facets:
+  SearchFacets?` is set only when requested. It costs one extra collector
+  pass, so the app asks only for the first page of a query.
+- `SearchFacets { categories, kinds, keys: [FacetCount], libraries:
+  [LibraryFacet], tags: [FacetCount], favorites }`; counts are `UInt64`,
+  lists sorted by count desc, any-of dimensions drill-sideways. Pure
+  semantic mode has no text leg, so its facets are `nil`.

@@ -5,6 +5,7 @@ import SwiftUI
 struct ContentView: View {
     @Bindable var model: AppModel
     @State private var showInspector = true
+    @State private var searchMonitor = SearchKeyMonitor()
 
     var body: some View {
         NavigationSplitView {
@@ -22,6 +23,10 @@ struct ContentView: View {
         .searchable(text: $model.searchText, prompt: "Search samples")
         .onChange(of: model.searchText) { model.scheduleRefresh() }
         .onChange(of: model.sidebarSelection) { model.scheduleRefresh() }
+        .onChange(of: model.filters) { model.scheduleRefresh() }
+        .onSubmit(of: .search) { model.keyboard.focusResults?() }
+        .onAppear { searchMonitor.install(actions: model.keyboard) }
+        .onDisappear { searchMonitor.remove() }
         .toolbar {
             ToolbarItem { IndexingStatusView(model: model) }
             ToolbarItem {
@@ -46,20 +51,34 @@ struct ContentView: View {
                 "Could not open Sonar's library", systemImage: "exclamationmark.triangle",
                 description: Text(message))
         case .ready:
-            if model.resultCount == 0 {
-                ContentUnavailableView(
-                    model.libraries.isEmpty ? "No libraries yet" : "No results",
-                    systemImage: model.libraries.isEmpty ? "folder.badge.plus" : "magnifyingglass",
-                    description: Text(model.libraries.isEmpty
-                        ? "Add a folder of samples with File > Add Library…"
-                        : "Try a different search."))
-            } else {
-                ResultsTableView(
-                    pager: model.pager,
-                    libraryNames: Dictionary(uniqueKeysWithValues: model.libraries.map { ($0.id, URL(fileURLWithPath: $0.rootPath).lastPathComponent) }),
-                    onSelect: { model.select($0) },
-                    onSort: { key, descending in Task { await model.setSort(key, descending: descending) } })
+            VStack(spacing: 0) {
+                if model.showsFilterBar {
+                    FilterBarView(model: model)
+                    Divider()
+                }
+                results
             }
+        }
+    }
+
+    @ViewBuilder private var results: some View {
+        if model.resultCount == 0 {
+            ContentUnavailableView(
+                model.libraries.isEmpty ? "No libraries yet" : "No results",
+                systemImage: model.libraries.isEmpty ? "folder.badge.plus" : "magnifyingglass",
+                description: Text(model.libraries.isEmpty
+                    ? "Add a folder of samples with File > Add Library…"
+                    : "Try a different search or clear the filters."))
+        } else {
+            ResultsTableView(
+                pager: model.pager,
+                libraryNames: Dictionary(uniqueKeysWithValues: model.libraries.map { ($0.id, URL(fileURLWithPath: $0.rootPath).lastPathComponent) }),
+                onSelect: { model.select($0) },
+                onSort: { key, descending in Task { await model.setSort(key, descending: descending) } },
+                onKey: { key in model.keyboard.handle(key, selected: model.selectedRow) },
+                register: { controller in
+                    model.keyboard.focusResults = { [weak controller] in controller?.focusTable() }
+                })
         }
     }
 }

@@ -1,5 +1,17 @@
 import AppKit
 
+/// `NSTableView` that reports Space / Return / Esc instead of beeping;
+/// arrows and everything else stay native.
+final class KeyTableView: NSTableView {
+    /// Returns true when the key was handled.
+    var onKey: ((TableKey) -> Bool)?
+
+    override func keyDown(with event: NSEvent) {
+        if let key = TableKey.from(event), onKey?(key) == true { return }
+        super.keyDown(with: event)
+    }
+}
+
 /// AppKit side of the results table: a view-based, fixed-row-height
 /// `NSTableView` over a `ResultsPager` (ARCHITECTURE §8). Cells are reused;
 /// rows whose page is not loaded yet show a placeholder and are filled in
@@ -29,13 +41,18 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
     static let rowHeight: CGFloat = 22
 
     let scrollView = NSScrollView()
-    let tableView = NSTableView()
+    let tableView = KeyTableView()
     let pager: ResultsPager
 
     /// Selection changed (nil = none, or the selected row is still loading).
     var onSelect: ((FileRow?) -> Void)?
     /// Header click: the core sort key and direction.
     var onSort: ((SortKey, Bool) -> Void)?
+    /// Space / Return / Esc in the table (model-level routing).
+    var onKey: ((TableKey) -> Bool)? {
+        get { tableView.onKey }
+        set { tableView.onKey = newValue }
+    }
     /// Library names for the Library column.
     var libraryNames: [Int64: String] = [:] {
         didSet { if libraryNames != oldValue { reloadVisibleRows() } }
@@ -68,6 +85,15 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         pager.onChange = { [weak self] in self?.pagerChanged($0) }
+    }
+
+    /// Moves keyboard focus into the table and selects the first row if
+    /// nothing is selected (selection goes through `onSelect`).
+    func focusTable() {
+        tableView.window?.makeFirstResponder(tableView)
+        if tableView.selectedRow < 0, pager.count > 0 {
+            tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+        }
     }
 
     // MARK: Pager changes

@@ -2,6 +2,8 @@
 //! from `sonar-core` types are in `convert.rs`. Ids are `Int64` in Swift
 //! (`files.id`, `libraries.id`).
 
+use crate::facet_types::SearchFacets;
+
 /// A registered library root.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct LibraryInfo {
@@ -218,6 +220,10 @@ pub struct SearchQuery {
     /// Also match an unfinished last word (as-you-type).
     #[uniffi(default = true)]
     pub prefix: bool,
+    /// Also count facets for filter chips; costs one extra collector pass,
+    /// ask only on the first page.
+    #[uniffi(default = false)]
+    pub facets: bool,
 }
 
 /// Everything a result row shows for one file (effective values: user
@@ -271,6 +277,9 @@ pub struct SearchPage {
     pub mode: SearchMode,
     /// Why hybrid/semantic ran as text, if it did.
     pub fallback: Option<String>,
+    /// Facet counts; `Some` only when `SearchQuery.facets` was set and a
+    /// text leg ran (`nil` in pure semantic mode, which has no text leg).
+    pub facets: Option<SearchFacets>,
 }
 
 /// Which field of a file the user overrides.

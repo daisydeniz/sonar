@@ -41,6 +41,7 @@ fn text(q: &str) -> SearchQuery {
         offset: 0,
         limit: 50,
         prefix: true,
+        facets: false,
     }
 }
 
@@ -230,6 +231,58 @@ fn cancel_with_nothing_in_flight_keeps_search_working() {
     // Nothing in flight: cancelling must not poison the next search.
     engine.cancel_search();
     assert!(engine.search(text("kick")).expect("search").rows.is_empty());
+}
+
+/// Facets: opt-in, consistent with the unfiltered result, drill-sideways.
+#[test]
+fn facets_are_opt_in_and_drill_sideways() {
+    use sonar_core::fixtures::{generate, FixtureOptions};
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let fx = tmp.path().join("fx");
+    let opts = FixtureOptions {
+        include_long: false,
+        ..FixtureOptions::default()
+    };
+    generate(&fx, &opts).expect("fixtures");
+    let engine = SonarEngine::open(tmp.path().join("home").display().to_string()).expect("open");
+    engine.add_library(fx.display().to_string()).expect("add");
+    engine.start_indexing(false).expect("start");
+    wait_idle(&engine);
+
+    let off = engine.search(text("")).expect("no facets");
+    assert!(off.facets.is_none());
+
+    let on = engine
+        .search(SearchQuery {
+            facets: true,
+            ..text("")
+        })
+        .expect("facets");
+    let f = on.facets.expect("requested facets");
+    assert!(!f.categories.is_empty() && !f.kinds.is_empty());
+    assert!(f.categories.windows(2).all(|w| w[0].count >= w[1].count));
+    // Each dimension counts a file at most once: sums stay within the total.
+    let sum = |v: &[FacetCount]| v.iter().map(|c| c.count).sum::<u64>();
+    assert!(sum(&f.categories) <= on.total && sum(&f.kinds) <= on.total);
+    assert!(f.libraries.iter().map(|l| l.count).sum::<u64>() == on.total);
+
+    // Drill-sideways: filtering on one category keeps the others listed.
+    let top = f.categories[0].value.clone();
+    let narrowed = engine
+        .search(SearchQuery {
+            facets: true,
+            filters: Some(SearchFilters {
+                categories: vec![top.clone()],
+                ..SearchFilters::default()
+            }),
+            ..text("")
+        })
+        .expect("narrowed");
+    assert!(narrowed.total < on.total);
+    let nf = narrowed.facets.expect("facets");
+    assert_eq!(nf.categories.len(), f.categories.len());
+    assert!(nf.categories.iter().any(|c| c.value != top));
+    assert_eq!(sum(&nf.categories), sum(&f.categories));
 }
 
 /// The same flow as `app/SonarTests/EngineBridgeTests.swift`, on the real

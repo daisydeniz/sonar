@@ -19,6 +19,7 @@
 mod convert;
 mod engine;
 mod error;
+mod facet_types;
 mod types;
 
 #[cfg(test)]
@@ -26,6 +27,7 @@ mod tests;
 
 pub use engine::SonarEngine;
 pub use error::FfiError;
+pub use facet_types::{FacetCount, LibraryFacet, SearchFacets};
 pub use types::*;
 
 uniffi::setup_scaffolding!();

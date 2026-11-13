@@ -212,6 +212,6 @@ pub fn request(q: SearchQuery) -> Result<SearchRequest, FfiError> {
         offset: usize::try_from(q.offset).unwrap_or(usize::MAX),
         limit: usize::try_from(q.limit).unwrap_or(usize::MAX),
         prefix: q.prefix,
-        facets: false,
+        facets: q.facets,
     })
 }

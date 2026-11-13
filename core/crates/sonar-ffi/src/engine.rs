@@ -18,6 +18,7 @@ use sonar_core::watch::WatchOptions;
 
 use crate::convert::{self, count};
 use crate::error::{guard, guard_ffi, FfiError};
+use crate::facet_types::SearchFacets;
 use crate::types::{
     AddedLibrary, CollectionInfo, EngineEvent, FileRow, IndexingProgress, LibraryInfo,
     OverrideField, PreviewPcm, ScanInfo, SearchPage, SearchQuery, TagInfo, WaveformPeak,
@@ -159,6 +160,7 @@ impl SonarEngine {
             total: count(results.text_total),
             mode: results.mode.into(),
             fallback: results.fallback,
+            facets: results.facets.map(SearchFacets::from),
         })
     }
 

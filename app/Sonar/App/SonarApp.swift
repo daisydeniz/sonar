@@ -17,6 +17,10 @@ struct SonarApp: App {
                 .task { if !Self.isTesting { await model.start() } }
         }
         .commands {
+            CommandGroup(after: .textEditing) {
+                Button("Find Samples") { model.keyboard.focusSearch() }
+                    .keyboardShortcut("f", modifiers: .command)
+            }
             CommandGroup(after: .newItem) {
                 Button("Add Library…") {
                     if let path = FolderPicker.pickFolder() {

@@ -42,8 +42,13 @@ if [[ "$(uname -s)" == "Darwin" && -f "$ROOT/app/project.yml" ]]; then
     FIXTURES_DIR="$(mktemp -d "${TMPDIR:-/tmp}/sonar-xctest-fixtures.XXXXXX")"
     trap 'rm -rf "$FIXTURES_DIR"' EXIT
     "$SONAR_BIN" fixtures "$FIXTURES_DIR" --skip-long >/dev/null
-    TEST_RUNNER_SONAR_FIXTURES_DIR="$FIXTURES_DIR" TEST_RUNNER_SONAR_REQUIRE_FIXTURES=1 xcodebuild -project "$ROOT/app/Sonar.xcodeproj" -scheme Sonar \
-      -destination 'platform=macOS' -quiet test
+    # -quiet hides assertion text; on failure print it from the result bundle.
+    RESULT_BUNDLE="$FIXTURES_DIR/xctest.xcresult"
+    if ! TEST_RUNNER_SONAR_FIXTURES_DIR="$FIXTURES_DIR" TEST_RUNNER_SONAR_REQUIRE_FIXTURES=1 xcodebuild -project "$ROOT/app/Sonar.xcodeproj" -scheme Sonar \
+      -destination 'platform=macOS' -resultBundlePath "$RESULT_BUNDLE" -quiet test; then
+      xcrun xcresulttool get test-results summary --path "$RESULT_BUNDLE" --compact || true
+      exit 1
+    fi
   fi
 fi
 

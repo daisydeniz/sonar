@@ -9,6 +9,8 @@ struct PageResult: Sendable {
     var total: Int
     /// The page was full, so more rows may follow.
     var hasMore: Bool
+    /// Facet counts (only when the loader asked for them on page 0).
+    var facets: SearchFacets? = nil
 }
 
 /// Source of result pages (the engine in the app, a synthetic one in tests).
@@ -46,6 +48,8 @@ final class ResultsPager {
 
     /// Rows in the result list (estimated until the last page is seen).
     private(set) var count = 0
+    /// Facet counts of the current query (from its first page; nil if none).
+    private(set) var facets: SearchFacets?
 
     @ObservationIgnored let pageSize: Int
     @ObservationIgnored let maxCachedPages: Int
@@ -140,6 +144,7 @@ final class ResultsPager {
             self.loader = loader
             resetting = false
             store(page: 0, result: result)
+            facets = result.facets
             count = 0  // so the first countAfter() sets it from page 0
             count = countAfter(page: 0, result: result)
             onChange?(.reset(preservePosition: preservePosition))

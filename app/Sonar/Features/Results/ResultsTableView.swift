@@ -8,6 +8,9 @@ struct ResultsTableView: NSViewRepresentable {
     let libraryNames: [Int64: String]
     let onSelect: (FileRow?) -> Void
     let onSort: (SortKey, Bool) -> Void
+    let onKey: (TableKey) -> Bool
+    /// Called once with the controller so the model can focus the table.
+    let register: (ResultsTableController) -> Void
 
     func makeCoordinator() -> ResultsTableController { ResultsTableController(pager: pager) }
 
@@ -15,7 +18,9 @@ struct ResultsTableView: NSViewRepresentable {
         let controller = context.coordinator
         controller.onSelect = onSelect
         controller.onSort = onSort
+        controller.onKey = onKey
         controller.libraryNames = libraryNames
+        register(controller)
         return controller.scrollView
     }
 
@@ -23,6 +28,7 @@ struct ResultsTableView: NSViewRepresentable {
         let controller = context.coordinator
         controller.onSelect = onSelect
         controller.onSort = onSort
+        controller.onKey = onKey
         controller.libraryNames = libraryNames
     }
 }

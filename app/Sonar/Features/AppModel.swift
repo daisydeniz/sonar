@@ -39,6 +39,10 @@ final class AppModel {
 
     var sidebarSelection: SidebarItem = .allSamples
     var searchText = ""
+    /// Filter chips (core-filtered; changing them re-queries via `scheduleRefresh`).
+    var filters = FilterState()
+    /// Keyboard hooks (preview toggle, reveal, focus moves).
+    let keyboard = KeyboardActions()
     /// Selected row (a snapshot, so it survives page eviction and resets).
     private(set) var selectedRow: FileRow?
     /// Core sort key of the table; `.relevance` = the core's default order.
@@ -54,6 +58,27 @@ final class AppModel {
     @ObservationIgnored private var isStarted = false
     @ObservationIgnored private let activePollNs: UInt64
     @ObservationIgnored private let idlePollNs: UInt64
+
+    /// Facet counts of the current query (nil for collections / semantic mode).
+    var facets: SearchFacets? { pager.facets }
+    /// Library chips are redundant while the sidebar picks one library.
+    var showsLibraryChips: Bool {
+        if case .allSamples = sidebarSelection { return true }
+        return sidebarSelection == .favorites
+    }
+    /// Filters do not apply to a collection's own contents.
+    var showsFilterBar: Bool {
+        if case .collection = sidebarSelection { return false }
+        return true
+    }
+
+    /// Clears every filter chip and re-queries.
+    func clearFilters() { filters = FilterState() }
+
+    /// Space in the table; T6.4 wires the preview to `keyboard.onTogglePreview`.
+    func togglePreview() { keyboard.togglePreview() }
+    /// Return in the table: reveal the selected file in Finder.
+    func revealSelected() { keyboard.revealSelected(selectedRow) }
 
     var selectedFileId: Int64? { selectedRow?.fileId }
 
@@ -177,7 +202,22 @@ final class AppModel {
 
     /// Fire-and-forget refresh for view callbacks (typing, selection).
     func scheduleRefresh() {
-        Task { await refreshResults(keepScroll: false) }
+        track(Task { await refreshResults(keepScroll: false) })
+    }
+
+    /// Fire-and-forget refreshes started by `scheduleRefresh` / `pollOnce`,
+    /// kept so `settle()` can await them (tests; latest-wins is unchanged).
+    @ObservationIgnored private var scheduled: [Task<Void, Never>] = []
+
+    private func track(_ task: Task<Void, Never>) { scheduled.append(task) }
+
+    /// Awaits every refresh scheduled so far (including ones they schedule).
+    func settle() async {
+        while !scheduled.isEmpty {
+            let tasks = scheduled
+            scheduled = []
+            for t in tasks { await t.value }
+        }
     }
 
     /// Runs the current sidebar selection + search text off the main actor
@@ -188,6 +228,7 @@ final class AppModel {
         let mine = generation
         let selection = sidebarSelection
         let text = searchText
+        let chips = filters
         let key = sortKey
         let descending = sortDescending
         let sortChanged = key != lastAppliedSort || descending != lastAppliedDescending
@@ -205,8 +246,9 @@ final class AppModel {
                 loader = EngineResultLoader(
                     bridge: bridge,
                     query: SearchQuery(
-                        text: text, filters: filters, sort: key == .relevance ? nil : key,
-                        descending: descending))
+                        text: text, filters: chips.apply(to: filters),
+                        sort: key == .relevance ? nil : key, descending: descending),
+                    wantsFacets: true)
             }
             let applied = try await pager.reset(
                 loader: loader, preservePosition: keepScroll && !sortChanged)
@@ -264,10 +306,10 @@ final class AppModel {
         }
         wasRunning = progress.running
         if refresh {
-            Task {
+            track(Task {
                 await reloadSidebar()
                 await refreshResults()
-            }
+            })
         }
     }
 

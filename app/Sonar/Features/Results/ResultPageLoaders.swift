@@ -5,13 +5,22 @@ import Foundation
 struct EngineResultLoader: ResultPageLoader {
     let bridge: CoreBridge
     let query: SearchQuery
+    /// Ask the core for facet counts. Only page 0 requests them (a facet
+    /// pass costs a collector run; further pages never repeat it).
+    var wantsFacets = false
 
-    func loadPage(offset: Int, limit: Int) async throws -> PageResult {
+    /// The query for one page; facets only on the first page.
+    func pageQuery(offset: Int, limit: Int) -> SearchQuery {
         var q = query
         q.offset = UInt32(offset)
         q.limit = UInt32(limit)
-        let page = try await bridge.search(q)
-        return PageResult(rows: page.rows, total: Int(page.total), hasMore: page.hasMore)
+        q.facets = wantsFacets && offset == 0
+        return q
+    }
+
+    func loadPage(offset: Int, limit: Int) async throws -> PageResult {
+        let page = try await bridge.search(pageQuery(offset: offset, limit: limit))
+        return PageResult(rows: page.rows, total: Int(page.total), hasMore: page.hasMore, facets: page.facets)
     }
 }
 
