@@ -73,7 +73,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T6.1 (swift-ui) App shell: sidebar (libraries, collections, favorites), toolbar search, results, inspector; add/remove library; indexing progress (pause/resume). (b382ea8)
 - [x] T6.2 (swift-ui) Results table: NSTableView, lazy paging from core, sortable columns (name, category, kind, BPM, key, duration, library), 1M rows smooth. AC: XCTest perf test + manual-free scroll benchmark. (dd5c882)
 - [x] T6.3 (swift-ui) Instant search + filter chips/facets, keyboard-first (⌘F, arrows, space, return). (f824df8)
-- [ ] T6.4 (swift-ui) Preview: AVAudioEngine, auto-play on select, pre-buffer neighbors, pitch control, loop toggle, loudness-normalized preview.
+- [x] T6.4 (swift-ui) Preview: AVAudioEngine, auto-play on select, pre-buffer neighbors, pitch control, loop toggle, loudness-normalized preview. (2f10fe4)
 - [ ] T6.5 (swift-ui) Waveform: peaks from core, CALayer/Metal rendering, zoom, playhead.
 - [ ] T6.6 (swift-ui) Similarity UI: "Find similar", aspect sliders, drop external file to search.
 - [ ] T6.7 (swift-ui) Drag & drop out to DAW/Finder (file URLs), multi-select.
@@ -214,3 +214,7 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T6.3 review) ⌘F/Esc focus the toolbar `NSSearchField` by walking the window's views; this fails in full screen (toolbar in a separate window) or when the toolbar collapses the field into a button (silent no-op).
 - (from T6.3 review) Library chips selected under All Samples stay set (hidden) when a sidebar library is chosen, so "Clear filters" shows with no visible chip.
 - (from T6.3) `ResultsPagerTests.testResetDropsOldGenerationResults` flaked once under check.sh load (150 ms loader vs 300 ms sleep); make the loader signal completion.
+- (from T6.4 review) Selection decodes in `AudioPreview` are neither cancelled nor capped (only prefetch is, at 2); holding ↓ over long uncached files can run many full decodes at once. Cancel stale ones / keep one pending.
+- (from T6.4 review) Preview decode is capped in seconds (600 s), not bytes; hi-rate multichannel clips can exceed the 256 MB cache. Also cap frames by bytes (`AVAudioFrameCount(clamping:)`).
+- (from T6.4 review) `AppModel.start()` calls `preview.warmUp()`, so `AppModelTests`/`FilterSearchTests` start the real audio engine; inject a fake player there.
+- (from T6.4) Toggling loop while playing restarts the sound from the start; keep the position.
