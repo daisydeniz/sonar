@@ -75,6 +75,26 @@ impl Store {
         Ok(self.conn().query_row(&sql, [&text], from_row)?)
     }
 
+    /// Removes a library and, by cascade, its file rows and everything
+    /// attached to them (analysis, stages, tags, favourites...): this is the
+    /// user's explicit "forget this folder". Nothing on disk is touched.
+    /// Returns the ids of the removed files (so derived indexes can drop
+    /// them), or `None` if there was no such library.
+    ///
+    /// # Errors
+    /// [`Error::Sqlite`].
+    pub fn remove_library(&mut self, id: i64) -> Result<Option<Vec<i64>>> {
+        let tx = self.conn_mut().transaction()?;
+        let ids = {
+            let mut stmt = tx.prepare("SELECT id FROM files WHERE library_id = ?1")?;
+            let rows = stmt.query_map([id], |r| r.get::<_, i64>(0))?;
+            rows.collect::<rusqlite::Result<Vec<_>>>()?
+        };
+        let gone = tx.execute("DELETE FROM libraries WHERE id = ?1", [id])?;
+        tx.commit()?;
+        Ok((gone > 0).then_some(ids))
+    }
+
     /// All libraries, ordered by id.
     ///
     /// # Errors
@@ -200,6 +220,36 @@ mod tests {
         // ancestors (macOS temp dirs live under the `/var` symlink).
         assert_eq!(store.library_by_root(&r2).expect("offline"), Some(l2));
         assert_eq!(store.library_by_root(r1.join("nope")).expect("child"), None);
+    }
+
+    #[test]
+    fn remove_library_drops_its_files_only() {
+        let tmp = tempfile::tempdir().expect("tempdir");
+        let (r1, r2) = (tmp.path().join("one"), tmp.path().join("two"));
+        for r in [&r1, &r2] {
+            fs::create_dir(r).expect("mkdir");
+        }
+        let mut store = mem();
+        let l1 = store.add_library(&r1).expect("add 1");
+        let l2 = store.add_library(&r2).expect("add 2");
+        for (lib, name) in [(l1.id, "a.wav"), (l2.id, "b.wav")] {
+            store
+                .conn()
+                .execute(
+                    "INSERT INTO files (library_id, rel_path, size, mtime) VALUES (?1, ?2, 1, 1)",
+                    params![lib, name],
+                )
+                .expect("insert file");
+        }
+        let ids = store.remove_library(l1.id).expect("remove").expect("known");
+        assert_eq!(ids.len(), 1);
+        assert_eq!(store.libraries().expect("list"), vec![l2]);
+        let left: i64 = store
+            .conn()
+            .query_row("SELECT COUNT(*) FROM files", [], |r| r.get(0))
+            .expect("count");
+        assert_eq!(left, 1);
+        assert_eq!(store.remove_library(l1.id).expect("again"), None);
     }
 
     #[test]

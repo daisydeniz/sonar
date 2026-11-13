@@ -114,3 +114,48 @@ fn reports_added_file_as_json_lines() {
 
     // `child` is killed and reaped when it drops, also if an assertion fails.
 }
+
+/// With a search index in place, `sonar watch` refreshes it for the files
+/// each scan touched: a new file is searchable without `sonar index`.
+#[test]
+fn watch_keeps_an_existing_search_index_fresh() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let base = fs::canonicalize(tmp.path()).expect("canon");
+    let lib = base.join("lib");
+    fs::create_dir(&lib).expect("mkdir");
+    let home = base.join("home");
+    let tone: Vec<f32> = (0..400).map(|i| 0.4 * (i as f32 * 0.05).sin()).collect();
+    let bytes = encode(&WavSpec::new(16_000, 1, SampleFormat::Int16), &tone).bytes;
+    fs::write(lib.join("one_kick.wav"), &bytes).expect("write");
+    let run = |args: &[&str]| {
+        let out = sonar()
+            .args(args)
+            .env("SONAR_HOME", &home)
+            .output()
+            .expect("spawn");
+        assert!(out.status.success(), "{args:?}: {out:?}");
+        String::from_utf8_lossy(&out.stdout).into_owned()
+    };
+    run(&["scan", lib.to_str().expect("utf-8")]);
+    run(&["index"]);
+    assert!(!run(&["search", "fresh"]).contains("fresh_snare.wav"));
+
+    let _child = KillOnDrop(
+        sonar()
+            .args(["watch", "--debounce-ms", "100"])
+            .env("SONAR_HOME", &home)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn watch"),
+    );
+    fs::write(lib.join("fresh_snare.wav"), &bytes).expect("write");
+    let start = Instant::now();
+    while !run(&["search", "fresh"]).contains("fresh_snare.wav") {
+        assert!(
+            start.elapsed() < Duration::from_secs(30),
+            "the new file never became searchable"
+        );
+        std::thread::sleep(Duration::from_millis(200));
+    }
+}

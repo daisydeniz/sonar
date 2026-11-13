@@ -912,3 +912,47 @@ Accepted. `sonar_core::search::{hybrid, semantic}`; CLI `sonar search
 - **Later**: per-keystroke hybrid re-embeds the query (≈ 5 ms each); the
   app may debounce the semantic leg. Effective BPM/key are not text tokens,
   so "120 bpm" in a query only matches names.
+
+## ADR-030 — Engine facade (T5.5a)
+`sonar_core::engine::Engine` is the one long-lived object behind the FFI and
+the CLI (`scan`, `watch`, `analyze`, `search`); nothing outside it wires
+store, index, watcher and jobs by hand any more.
+- **Ownership**: per data directory it owns one `Store` connection (quick
+  queries), the `TextIndex`, `Synonyms`, an optional `WatchHandle`, at most
+  one `JobHandle`, a lazily loaded CLAP query side (`SemanticSearch`;
+  text-only with the reason as `fallback` when model/embeddings are
+  missing, reloaded after an embed batch or job end) and one `sonar-engine`
+  thread. Scans, watcher and jobs open their own connections.
+- **Threading**: `Engine: Send + Sync`, all methods `&self`; shared state
+  behind short mutexes never held across a blocking call; callbacks given
+  to the watcher/jobs capture only the bounded channel (256) to the engine
+  thread, never `Inner`. Drop: stop watcher, cancel job, join thread.
+- **Index sync, no rebuilds**: full rebuild only for a missing / unreadable /
+  other-version index at open (`EngineOptions::rebuild_index`; CLI commands
+  that merely maintain an index pass `false` and leave a missing one to the
+  first search). Otherwise `TextIndex::refresh_files` with only touched ids:
+  `ScanReport::touched` (new) for `Engine::scan_library` (before it
+  returns), `WatchEvent::Scanned::touched` (new, not serialized) and the new
+  `JobEvent::Committed { stage, file_ids }` (one per committed batch) via
+  the channel; the engine thread coalesces what is queued into one refresh.
+  So a `Scanned` event implies a fresh index and `wait_indexing` returning
+  implies every committed batch is searchable (the end notice is ordered
+  after the commits; a job that failed without one is found by a 250 ms
+  poll that reads "finished" before draining the channel).
+- **Search**: `Engine::search(SearchRequest)` (mode, filters, sort,
+  `offset`/`limit`, prefix, facets) over `search::hybrid`. Latest query
+  wins: each call swaps in a fresh cancel flag and sets the previous one;
+  `hybrid_search` checks it between legs and per kNN chunk, and a search
+  that was cancelled by the time it finishes returns `Error::Cancelled`,
+  never stale hits. The flag is engine-wide (one search box per engine);
+  `cancel_search` cancels the newest. Tantivy text queries are not
+  interruptible (milliseconds), only discarded.
+- **Watch -> analysis**: `start_indexing` *enables* indexing and starts a
+  job; while enabled and idle, a scan (watcher or manual) that adds,
+  changes or restores files starts a job; if one is running a rerun follows
+  when it ends (the stage cursor is forward-only, so late files would
+  otherwise be missed). `cancel_indexing` disables. Without
+  `start_indexing` the watcher only keeps rows and index fresh (`sonar
+  watch`). `remove_library` (new `Store::remove_library`, cascade) is a
+  user action; vectors of removed files are reconciled by the next job.
+- **Later**: `similar` and user-data setters (T5.5b) on the engine.

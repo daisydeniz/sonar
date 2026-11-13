@@ -36,6 +36,15 @@ pub enum JobEvent {
         /// Files left pending (I/O error, changed meanwhile) so far.
         skipped: u64,
     },
+    /// A batch was committed: the files whose rows (and, for `Dsp`/`Embed`,
+    /// vectors) changed. Sent before the matching `Progress`. Hosts use it
+    /// to refresh derived data such as the text index (T5.5a).
+    Committed {
+        /// The stage.
+        stage: Stage,
+        /// `files.id` of every file in the batch.
+        file_ids: Vec<i64>,
+    },
     /// A requested stage cannot run in this build or on this machine (the
     /// `Embed` stage without model files) and was skipped; no file was
     /// marked.

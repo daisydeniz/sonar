@@ -303,6 +303,7 @@ impl Runner<'_> {
         self.emit(&WatchEvent::Scanned {
             library_id: id,
             summary: ScanSummary::of(report),
+            touched: report.touched.clone(),
         });
     }
 }

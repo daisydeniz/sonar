@@ -158,6 +158,10 @@ pub enum WatchEvent {
         library_id: i64,
         /// What the scan did.
         summary: ScanSummary,
+        /// Ids of the rows the scan touched (for index refresh); not part
+        /// of the JSON form.
+        #[serde(skip)]
+        touched: Vec<i64>,
     },
     /// The library root became unavailable; rows are kept.
     Offline {

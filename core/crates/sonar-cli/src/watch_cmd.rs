@@ -2,24 +2,42 @@
 //! process is killed.
 
 use std::io::Write;
+use std::sync::Arc;
 use std::time::Duration;
 
 use anyhow::{Context, Result};
+use sonar_core::engine::{Engine, EngineEvent, EngineOptions};
 use sonar_core::paths;
-use sonar_core::watch::{self, WatchEvent, WatchOptions};
+use sonar_core::watch::{WatchEvent, WatchOptions};
 
 /// Starts the watcher and blocks forever (Ctrl-C / SIGTERM end the process;
 /// the store is WAL, so an abrupt end loses nothing committed).
 pub fn run(json: bool, debounce_ms: u64) -> Result<()> {
-    let db = paths::default_db_path().context("locating the Sonar store")?;
+    let home = paths::data_dir().context("locating the Sonar store")?;
     let options = WatchOptions {
         debounce: Duration::from_millis(debounce_ms),
         ..WatchOptions::default()
     };
-    let handle = watch::start(&db, options, move |event| print_event(event, json))
+    // Through the engine: an existing search index is refreshed for every
+    // scan's touched files (no analysis is queued, as before).
+    let engine = Engine::open_with(
+        &home,
+        EngineOptions {
+            on_event: Some(Arc::new(move |event: &EngineEvent| {
+                if let EngineEvent::Watch(event) = event {
+                    print_event(event, json);
+                }
+            })),
+            rebuild_index: false,
+            ..EngineOptions::default()
+        },
+    )
+    .context("opening the Sonar engine")?;
+    engine
+        .start_watching(options)
         .context("starting the watcher")?;
-    eprintln!("watching libraries in {} (Ctrl-C to stop)", db.display());
-    while handle.is_running() {
+    eprintln!("watching libraries in {} (Ctrl-C to stop)", home.display());
+    while engine.is_watching() {
         std::thread::park_timeout(Duration::from_secs(1));
     }
     anyhow::bail!("the watcher stopped unexpectedly")
@@ -42,6 +60,7 @@ fn text(event: &WatchEvent) -> String {
         WatchEvent::Scanned {
             library_id,
             summary: s,
+            ..
         } => format!(
             "scanned library {library_id}: added {}, changed {}, moved {}, removed {}, restored {}, errors {} ({} ms)",
             s.added, s.changed, s.moved, s.removed, s.restored, s.errors, s.duration_ms

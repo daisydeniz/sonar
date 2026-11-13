@@ -45,8 +45,10 @@ const RESTORE_SQL: &str = "UPDATE files SET error = NULL, status = CASE \
 /// been transient); successful stage rows stay.
 const RESTORE_RETRY_SQL: &str = "DELETE FROM file_stages WHERE file_id = ?1 AND outcome = 'error'";
 
-/// Applies `ops` for `library_id` and marks the library online.
-pub(crate) fn apply(conn: &mut Connection, library_id: i64, ops: &[Op]) -> Result<()> {
+/// Applies `ops` for `library_id` and marks the library online. Returns the
+/// ids of the rows the ops touched (new rows included), in op order.
+pub(crate) fn apply(conn: &mut Connection, library_id: i64, ops: &[Op]) -> Result<Vec<i64>> {
+    let mut touched = Vec::with_capacity(ops.len());
     let tx = conn.transaction_with_behavior(TransactionBehavior::Immediate)?;
     tx.execute(
         "UPDATE libraries SET online = 1 WHERE id = ?1",
@@ -66,6 +68,7 @@ pub(crate) fn apply(conn: &mut Connection, library_id: i64, ops: &[Op]) -> Resul
                      VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 )?
                 .execute(params![library_id, rel_path, size, mtime, hash, status, error])?;
+                touched.push(tx.last_insert_rowid());
             }
             Op::Update {
                 id,
@@ -73,6 +76,7 @@ pub(crate) fn apply(conn: &mut Connection, library_id: i64, ops: &[Op]) -> Resul
                 mtime,
                 identity,
             } => {
+                touched.push(*id);
                 let (hash, status, error) = identity_columns(identity);
                 tx.prepare_cached(
                     "UPDATE files SET size = ?2, mtime = ?3, quick_hash = ?4, status = ?5, \
@@ -88,6 +92,7 @@ pub(crate) fn apply(conn: &mut Connection, library_id: i64, ops: &[Op]) -> Resul
                     .execute([id])?;
             }
             Op::Restore { id } => {
+                touched.push(*id);
                 tx.prepare_cached(RESTORE_RETRY_SQL)?.execute([id])?;
                 tx.prepare_cached(RESTORE_SQL)?.execute([id])?;
             }
@@ -97,6 +102,7 @@ pub(crate) fn apply(conn: &mut Connection, library_id: i64, ops: &[Op]) -> Resul
                 mtime,
                 restore,
             } => {
+                touched.push(*id);
                 tx.prepare_cached("UPDATE files SET rel_path = ?2, mtime = ?3 WHERE id = ?1")?
                     .execute(params![id, rel_path, mtime])?;
                 if *restore {
@@ -105,13 +111,14 @@ pub(crate) fn apply(conn: &mut Connection, library_id: i64, ops: &[Op]) -> Resul
                 }
             }
             Op::Missing { id } => {
+                touched.push(*id);
                 tx.prepare_cached("UPDATE files SET status = 'missing' WHERE id = ?1")?
                     .execute([id])?;
             }
         }
     }
     tx.commit()?;
-    Ok(())
+    Ok(touched)
 }
 
 /// `(quick_hash, status, error)` columns for an identity.

@@ -148,6 +148,9 @@ pub struct ScanReport {
     pub counts: ScanCounts,
     /// Non-fatal problems, in discovery order.
     pub issues: Vec<ScanIssue>,
+    /// Ids of every row the scan added, changed, moved, restored or marked
+    /// missing: what the text index must refresh (empty when offline).
+    pub touched: Vec<i64>,
     /// Wall-clock time of the scan.
     pub duration: Duration,
 }
@@ -184,6 +187,7 @@ pub fn scan_library_with(
         offline: false,
         counts: ScanCounts::default(),
         issues: Vec::new(),
+        touched: Vec::new(),
         duration: Duration::ZERO,
     };
     let walked = match walk::walk(&root, cancel) {
@@ -213,7 +217,7 @@ pub fn scan_library_with(
         |rel, size, buf| quick_hash_with(&root.join(rel), size, buf),
     )
     .map_err(|reconcile::Cancelled| Error::Cancelled)?;
-    apply::apply(store.conn_mut(), library_id, &plan.ops)?;
+    report.touched = apply::apply(store.conn_mut(), library_id, &plan.ops)?;
 
     report.counts = plan.counts;
     report.issues.extend(plan.issues);

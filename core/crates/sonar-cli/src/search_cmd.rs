@@ -1,17 +1,14 @@
-//! `sonar index` (rebuild the text index) and `sonar search` (query it),
-//! plus the refresh `sonar scan` runs after scanning.
+//! `sonar index` (rebuild the text index) and `sonar search` (query it).
 
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::{Context, Result};
 use serde::Serialize;
-use sonar_core::embed::{store::dir_for_db, EmbedOptions};
+use sonar_core::engine::{Engine, EngineOptions, SearchRequest};
 use sonar_core::index::{OpenState, TextIndex};
-use sonar_core::search::{
-    embedded_file_ids, hybrid_search, FacetCount, Facets, HybridOptions, SearchMode, SearchOptions,
-    SemanticSearch, Synonyms,
-};
+use sonar_core::paths;
+use sonar_core::search::{FacetCount, Facets, SearchMode};
 use sonar_core::Store;
 
 use crate::search_args::FilterArgs;
@@ -84,36 +81,41 @@ pub fn index(json: bool) -> Result<()> {
 }
 
 /// `sonar search`: query the index (building it first if it is missing or
-/// from another version) and print rank, score, file id and path.
+/// from another version) and print rank, score, file id and path. Runs
+/// through the [`Engine`] (hybrid fusion, text-only fallback).
 pub fn run(args: &Args<'_>) -> Result<()> {
     let store = Store::open_default().context("opening the Sonar store")?;
-    let ix = open_index(&store)?;
-    let synonyms = match args.synonyms {
-        Some(path) => {
-            Synonyms::load(path).with_context(|| format!("reading synonyms {}", path.display()))?
-        }
-        None => Synonyms::load_default().context("reading synonyms")?,
-    };
-    let query = args.query.join(" ");
-    let opts = HybridOptions {
-        mode: args.mode.unwrap_or_default(),
-        search: SearchOptions {
-            limit: args.limit,
-            prefix: !args.no_prefix,
-            filters: args.filters.flags.filters(&store)?,
-            sort: args.filters.sort.unwrap_or_default(),
-            facets: args.filters.facets,
+    let home = paths::data_dir().context("locating the Sonar store")?;
+    let engine = Engine::open_with(
+        home,
+        EngineOptions {
+            synonyms_file: args.synonyms.map(Path::to_path_buf),
+            ..EngineOptions::default()
         },
-        cancel: None,
-    };
-    let semantic = if opts.mode == SearchMode::Text || query.trim().is_empty() {
-        None
-    } else {
-        load_semantic(&store, args.mode.is_some())
+    )
+    .context("opening the Sonar engine")?;
+    if let Some((reason, r)) = engine.startup_rebuild() {
+        eprintln!("building the search index ({reason})...");
+        eprintln!(
+            "indexed {} files in {:.2} s",
+            r.docs,
+            r.elapsed.as_secs_f64()
+        );
+    }
+    let query = args.query.join(" ");
+    let mode = args.mode.unwrap_or_default();
+    let request = SearchRequest {
+        query: query.clone(),
+        mode,
+        filters: args.filters.flags.filters(&store)?,
+        sort: args.filters.sort.unwrap_or_default(),
+        offset: 0,
+        limit: args.limit,
+        prefix: !args.no_prefix,
+        facets: args.filters.facets,
     };
     let started = Instant::now();
-    let results =
-        hybrid_search(&ix, &synonyms, semantic.as_ref(), &query, &opts).context("searching")?;
+    let results = engine.search(&request).context("searching")?;
     let took_ms = started.elapsed().as_secs_f64() * 1e3;
     let hits = results
         .hits
@@ -131,10 +133,14 @@ pub fn run(args: &Args<'_>) -> Result<()> {
         })
         .collect::<sonar_core::Result<Vec<_>>>()
         .context("looking up result paths")?;
-    // Without --mode, a missing model is the normal text-only setup.
-    let fallback = results
-        .fallback
-        .filter(|_| args.mode.is_some() || semantic.is_some());
+    // Without --mode, a missing model is the normal text-only setup; with
+    // it the user is told why CLAP did not run.
+    let clap_asked = mode != SearchMode::Text && !query.trim().is_empty();
+    let semantic = clap_asked && engine.semantic_available();
+    let fallback = results.fallback.filter(|_| args.mode.is_some() || semantic);
+    if let (Some(why), true) = (&fallback, args.mode.is_some() && !semantic && clap_asked) {
+        eprintln!("note: text search only: {why}");
+    }
     let report = Report {
         query: &query,
         mode: results.mode,
@@ -154,36 +160,6 @@ pub fn run(args: &Args<'_>) -> Result<()> {
         }
     }
     Ok(())
-}
-
-/// The CLAP text tower plus the current embeddings of the store's files,
-/// or `None`, with a note on stderr when the user asked for a CLAP mode
-/// (without `--mode`, no model or no embeddings is the normal text-only
-/// setup). The text tower is not loaded when no file has an embedding.
-fn load_semantic(store: &Store, explicit: bool) -> Option<SemanticSearch> {
-    let opts = EmbedOptions::default();
-    let loaded = (|| -> Result<SemanticSearch> {
-        if let Some(reason) = opts.unavailable_reason() {
-            anyhow::bail!(reason);
-        }
-        let db = store
-            .path()
-            .context("the store is in memory (no embeddings)")?;
-        let current = embedded_file_ids(store).context("reading embed results")?;
-        if current.is_empty() {
-            anyhow::bail!("no CLAP embeddings yet (run `sonar analyze --stages meta,dsp,embed`)");
-        }
-        SemanticSearch::load(&opts, &dir_for_db(db), Some(&current)).context("loading CLAP search")
-    })();
-    match loaded {
-        Ok(s) => Some(s),
-        Err(e) => {
-            if explicit {
-                eprintln!("note: text search only: {e:#}");
-            }
-            None
-        }
-    }
 }
 
 /// Opens the default text index, building it from `store` first if it is
@@ -255,26 +231,5 @@ fn print_text(r: &Report<'_>) {
             r.total,
             r.semantic_candidates
         ),
-    }
-}
-
-/// After `sonar scan`: rebuild the search index if one exists, so the next
-/// `sonar search` sees renames and new files. Failures only warn (the scan
-/// itself succeeded); a missing index is built by `sonar search` later.
-pub fn refresh_after_scan(store: &Store) {
-    let Ok(dir) = TextIndex::default_dir() else {
-        return;
-    };
-    if !dir.exists() {
-        return;
-    }
-    let result = TextIndex::open(&dir).and_then(|(ix, _)| ix.rebuild(store));
-    match result {
-        Ok(r) => println!(
-            "search index: {} files ({:.2} s)",
-            r.docs,
-            r.elapsed.as_secs_f64()
-        ),
-        Err(e) => eprintln!("warning: search index not updated: {e} (run `sonar index`)"),
     }
 }

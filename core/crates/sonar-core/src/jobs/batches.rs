@@ -217,6 +217,12 @@ pub(super) fn run_stage(
         ));
         timing.commit_secs += t.elapsed().as_secs_f64();
         timing.batches += 1;
+        if opts.on_event.is_some() {
+            shared.emit(JobEvent::Committed {
+                stage,
+                file_ids: results.iter().map(|(claim, _)| claim.id).collect(),
+            });
+        }
 
         sum.ok += c.ok;
         sum.partial += c.partial;

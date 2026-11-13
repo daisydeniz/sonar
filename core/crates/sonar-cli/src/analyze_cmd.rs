@@ -6,7 +6,8 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use sonar_core::embed::EmbedOptions;
-use sonar_core::jobs::{self, JobEvent, JobOptions, JobSummary, Stage};
+use sonar_core::engine::{Engine, EngineOptions};
+use sonar_core::jobs::{JobEvent, JobOptions, JobSummary, Stage};
 use sonar_core::paths;
 
 /// Minimum time between progress lines on stderr.
@@ -25,7 +26,7 @@ pub struct Args {
 /// Runs the job, prints throttled progress to stderr and the summary to
 /// stdout. File-level errors are data, not failures.
 pub fn run(args: Args) -> Result<()> {
-    let db = paths::default_db_path().context("locating the Sonar store")?;
+    let home = paths::data_dir().context("locating the Sonar store")?;
     let last = Mutex::new(Instant::now() - PROGRESS_INTERVAL);
     let tty = std::io::stderr().is_terminal();
     let on_event = Arc::new(move |e: &JobEvent| report(e, &last, tty));
@@ -38,10 +39,21 @@ pub fn run(args: Args) -> Result<()> {
         debug_file_delay: Duration::from_millis(args.debug_delay_ms),
         ..JobOptions::default()
     };
-    let summary = jobs::start(&db, opts)
-        .context("starting the job")?
-        .wait()
-        .context("running the job")?;
+    // Through the engine, so an existing search index follows the committed
+    // batches (a missing one is not built here).
+    let engine = Engine::open_with(
+        home,
+        EngineOptions {
+            rebuild_index: false,
+            ..EngineOptions::default()
+        },
+    )
+    .context("opening the Sonar engine")?;
+    engine.start_indexing(opts).context("starting the job")?;
+    let summary = engine
+        .wait_indexing(None)
+        .context("running the job")?
+        .context("the job produced no summary")?;
     if args.json {
         println!("{}", serde_json::to_string_pretty(&summary)?);
     } else {

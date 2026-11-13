@@ -46,7 +46,9 @@ pitch, onset, tempo, key, envelope), `features` (aspect vectors),
 end and `scripts/fetch-models.sh` → `models/`: ADR-026), `text`
 (tokenizer, synonyms), `index` (Tantivy + vector store), `search` (query
 model, hybrid ranking), `dupes`, `jobs` (pipeline, priorities, cancellation,
-progress), `eval`.
+progress), `engine` (long-lived facade over all of the above for the FFI
+and CLI: libraries, indexing, watcher, incremental index sync, cancellable
+search; ADR-030), `eval`.
 
 Decode gapless: AAC/M4A priming and padding come from the edit list
 (`elst`, ISO/IEC 14496-12 / ffmpeg semantics: `segment_duration` honoured,
@@ -175,7 +177,9 @@ weights} }`.
    re-rank only for default-weight, unfiltered queries if libraries pass
    ~1.5M files.
 Latency budget p95 < 50 ms at 500k docs. Queries are cancellable; the UI
-always shows the latest query only.
+always shows the latest query only: `Engine::search` is latest-query-wins
+(a newer search flags the older one, which returns `Cancelled`, never stale
+hits; ADR-030).
 
 ## 7. FFI surface (sketch)
 `open(home)`, `add_library(path)`, `remove_library`, `start_indexing`,

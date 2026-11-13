@@ -23,8 +23,9 @@ mod watch_cmd;
 
 use anyhow::{Context, Result};
 use clap::Parser;
+use sonar_core::engine::{Engine, EngineOptions};
 use sonar_core::fixtures::{self, FixtureOptions};
-use sonar_core::{scan, Store};
+use sonar_core::{paths, scan, Store};
 use std::io::IsTerminal;
 use std::path::Path;
 use tracing_subscriber::EnvFilter;
@@ -128,35 +129,47 @@ fn main() -> Result<()> {
 
 /// `sonar scan [DIR]`: add DIR as a library if needed and scan it, or
 /// rescan every library. Prints one report per library.
+///
+/// Runs through the [`Engine`], which refreshes an existing search index
+/// incrementally (only the touched files); a missing index is left for
+/// `sonar search` to build.
 fn scan(dir: Option<&Path>) -> Result<()> {
-    let mut store = Store::open_default().context("opening the Sonar store")?;
-    let ids = match dir {
-        Some(dir) => match store.add_library(dir) {
-            Ok(lib) => vec![lib.id],
-            // A registered root that is gone (e.g. unmounted drive) is
-            // scanned anyway, so the user gets its `[offline]` report.
-            Err(add_err) => match store.library_by_root(dir).context("looking up library")? {
-                Some(lib) => vec![lib.id],
-                None => {
-                    return Err(add_err)
-                        .with_context(|| format!("adding library {}", dir.display()))
-                }
-            },
+    let engine = Engine::open_with(
+        paths::data_dir().context("locating the Sonar store")?,
+        EngineOptions {
+            rebuild_index: false,
+            ..EngineOptions::default()
         },
+    )
+    .context("opening the Sonar engine")?;
+    match dir {
+        // A registered root that is gone (e.g. unmounted drive) is scanned
+        // anyway, so the user gets its `[offline]` report.
+        Some(dir) => {
+            let (_, report) = engine
+                .add_library(dir)
+                .with_context(|| format!("adding library {}", dir.display()))?;
+            print_report(&report);
+        }
         None => {
-            let libs = store.libraries().context("listing libraries")?;
+            let libs = engine.libraries().context("listing libraries")?;
             if libs.is_empty() {
                 println!("no libraries yet: run `sonar scan <dir>`");
             }
-            libs.into_iter().map(|l| l.id).collect()
+            for lib in libs {
+                let report = engine
+                    .scan_library(lib.id)
+                    .with_context(|| format!("scanning library {}", lib.id))?;
+                print_report(&report);
+            }
         }
-    };
-    for id in ids {
-        let report =
-            scan::scan_library(&mut store, id).with_context(|| format!("scanning library {id}"))?;
-        print_report(&report);
     }
-    search_cmd::refresh_after_scan(&store);
+    if engine.text_index_ready() {
+        println!(
+            "search index: {} files (refreshed incrementally)",
+            engine.text_index_docs()
+        );
+    }
     Ok(())
 }
 
