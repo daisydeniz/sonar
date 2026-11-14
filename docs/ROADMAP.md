@@ -78,9 +78,9 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T6.6 (swift-ui) Similarity UI: "Find similar", aspect sliders, drop external file to search. (269bfd6)
 - [x] T6.7 (swift-ui) Drag & drop out to DAW/Finder (file URLs), multi-select. (2c00c44)
 - [x] T6.8 (swift-ui) Organize: favorites, collections, tags, overrides for BPM/key/category, hide. (8191ddb)
-- [ ] T6.9 (swift-ui) Duplicates view (exact + near via aspect vectors).
+- [x] T6.9 (swift-ui) Duplicates view (exact + near via aspect vectors). (9d07448)
   - [x] T6.9a (search-ranking) (split from T6.9: the core has no duplicate finder and FFI v1 left out `duplicates`) Core `dupes` module + `sonar dupes` CLI + FFI `duplicates()`: exact groups (same size + quick_hash, confirmed by a full content hash cached in `files.content_hash`) and near-duplicate groups via aspect-vector distance with a calibrated threshold (re-encodes, format/rate/bit-depth/gain variants of the same sound), candidates blocked by duration so no all-pairs scan; cancellable; missing/offline files excluded. AC: fixture tests (identical copies → exact group; format/rate/gain variants → near group; different sounds never grouped); threshold calibration numbers in an ADR; 500k synthetic timing recorded in STATUS; FFI XCTest/Rust test green in check.sh. (0a6fe92)
-  - [ ] T6.9b (swift-ui) Duplicates view in the app over FFI `duplicates()`: sidebar entry, groups list (exact / near), per-file path/size/format, preview + reveal, hide or "keep one" via existing user-data setters (no file deletion). AC: XCTests over a fixture library.
+  - [x] T6.9b (swift-ui) Duplicates view in the app over FFI `duplicates()`: sidebar entry, groups list (exact / near), per-file path/size/format, preview + reveal, hide or "keep one" via existing user-data setters (no file deletion). AC: XCTests over a fixture library. (9d07448)
 
 ## M7 — Polish & release
 - [ ] T7.1 (reviewer) Full perf + robustness pass (1M synthetic files, corrupt files, offline drives). Fix findings.
