@@ -1122,3 +1122,37 @@ Accepted. `sonar_core::dupes::find_duplicates`, `Engine::duplicates(_latest)`,
 - **Limit**: thresholds assume library stats over a varied library; in a
   tiny homogeneous library (a few near-identical files) z-scores degenerate
   and near groups can be missed (Later).
+
+## ADR-037 — Release pipeline, universal build, Sparkle (T7.3)
+Accepted. `scripts/release.sh` (no network upload, output in gitignored `dist/`):
+core (`SONAR_CORE_PROFILE=release`, `SONAR_CORE_ARCHS=universal` in
+`build-core.sh`: aarch64+x86_64 `lipo`ed into one xcframework slice) →
+`xcodebuild build` Release `ARCHS="arm64 x86_64"` → codesign inside-out
+(Sparkle XPC services, Autoupdate, Updater.app, framework, app; hardened
+runtime, `app/Release.entitlements` = empty, never `--deep` for signing) →
+notarize app (zip) + staple → `Sonar-<version>.dmg` (hdiutil UDZO, app +
+`/Applications` link) signed, notarized, stapled → verify (`lipo`,
+`codesign --verify --deep --strict`, `hdiutil verify` + read-only mount) →
+Sparkle `appcast.xml` in `dist/updates/`.
+- **Universal works**: the FFI crate does not link ONNX Runtime (`embed`
+  feature is off in `sonar-ffi`), so there is no x86_64 binary dependency
+  today. When CLAP/`ort` enters the app, `ort`'s prebuilt ONNX Runtime must
+  be checked for x86_64 first; fallback `--arch arm64`. Dev/`check.sh`
+  builds stay arm64 (fast). x86_64 slice is built but not run-tested here
+  (no Intel hardware).
+- **Env vars (all optional, graceful skip with a warning)**:
+  `SONAR_SIGN_IDENTITY`; notarization `SONAR_NOTARY_PROFILE` or
+  `SONAR_NOTARY_KEY_ID`+`_ISSUER`+`_KEY_PATH`; Sparkle `SONAR_SPARKLE_FEED_URL`,
+  `SONAR_SPARKLE_PUBLIC_KEY`, `SONAR_SPARKLE_PRIVATE_KEY` or `_PRIVATE_KEY_FILE`,
+  `SONAR_SPARKLE_DOWNLOAD_URL_PREFIX`. `--dry-run` ignores them all. No
+  secret is ever written to disk or the repo.
+- **Sparkle 2.10.1** (SPM, exact pin; MIT-style, bundled parts permissive).
+  `SUFeedURL`/`SUPublicEDKey` come from build settings (empty in dev).
+  `AppUpdater` starts `SPUStandardUpdaterController` only if both are
+  non-empty and not under XCTest; otherwise "Check for Updates…" (app menu)
+  is disabled. `generate_appcast --ed-key-file -` reads the key from stdin.
+  First SPM resolve needs network (also for `check.sh`; cached afterwards).
+- **Founder must provide (T7.4)**: Apple Developer ID Application
+  certificate in the keychain, a notarytool profile or API key, a Sparkle
+  keypair (`generate_keys` from the Sparkle artifact; public key → env, private
+  key stays in keychain/env), a host URL for DMG + appcast, and uploads (manual).

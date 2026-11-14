@@ -21,3 +21,4 @@ logs/
 .DS_Store
 # Founder's local sample packs (copyrighted audio, never in git)
 Samples/
+dist/

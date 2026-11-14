@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Entitlements applied by scripts/release.sh (hardened runtime, no sandbox).
+     Deliberately empty: Sonar needs no exception entitlements today (no JIT,
+     no unsigned memory, no DYLD vars; user folders are read unsandboxed).
+     Add keys here only with a reason, e.g. com.apple.security.cs.allow-jit
+     if a future ONNX Runtime build needs it. -->
+<plist version="1.0">
+<dict/>
+</plist>

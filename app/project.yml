@@ -16,10 +16,15 @@ settings:
     SWIFT_VERSION: "6.0"
     SWIFT_STRICT_CONCURRENCY: complete
     MACOSX_DEPLOYMENT_TARGET: "14.0"
-    # The Rust core xcframework is arm64-only for now (scripts/build-core.sh).
-    # Project level so the test bundle matches; drop when a universal core
-    # (lipo arm64 + x86_64) exists.
+    # Dev/check builds are arm64 only (matches the arm64 core xcframework that
+    # scripts/build-core.sh builds by default). scripts/release.sh overrides
+    # ARCHS="arm64 x86_64" on the xcodebuild command line together with a
+    # universal core (SONAR_CORE_ARCHS=universal).
     ARCHS: arm64
+    # Sparkle updates (ADR-037). Empty in dev builds: the updater stays inert.
+    # scripts/release.sh passes them from SONAR_SPARKLE_FEED_URL / _PUBLIC_KEY.
+    SONAR_SPARKLE_FEED_URL: ""
+    SONAR_SPARKLE_PUBLIC_KEY: ""
     # Ad-hoc signing: builds without an Apple developer account.
     # Release signing/notarization is configured by the release pipeline.
     CODE_SIGN_IDENTITY: "-"
@@ -27,6 +32,12 @@ settings:
     DEVELOPMENT_TEAM: ""
     ENABLE_USER_SCRIPT_SANDBOXING: YES
     DEAD_CODE_STRIPPING: YES
+
+packages:
+  # Sparkle 2 (MIT) auto-update framework, pinned exactly (ADR-037).
+  Sparkle:
+    url: https://github.com/sparkle-project/Sparkle
+    exactVersion: 2.10.1
 
 targets:
   Sonar:
@@ -43,6 +54,7 @@ targets:
       - framework: Generated/SonarCore.xcframework
         embed: false
         link: true
+      - package: Sparkle
     info:
       path: Sonar/Info.plist
       properties:
@@ -54,6 +66,8 @@ targets:
         LSApplicationCategoryType: public.app-category.music
         NSHumanReadableCopyright: "Copyright © 2026 Sonar. All rights reserved."
         NSPrincipalClass: NSApplication
+        SUFeedURL: $(SONAR_SPARKLE_FEED_URL)
+        SUPublicEDKey: $(SONAR_SPARKLE_PUBLIC_KEY)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.sonar.Sonar

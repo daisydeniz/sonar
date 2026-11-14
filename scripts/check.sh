@@ -8,6 +8,9 @@ step() { printf '\n▶ %s\n' "$*"; }
 # shellcheck source=lib/env.sh
 source "$ROOT/scripts/lib/env.sh"
 
+step "shell syntax"; for f in "$ROOT"/scripts/*.sh "$ROOT"/scripts/lib/*.sh; do bash -n "$f"; done
+if command -v shellcheck >/dev/null; then shellcheck -x -S warning "$ROOT/scripts/release.sh"; fi
+
 cd "$ROOT/core"
 step "rustfmt";  cargo fmt --all --check
 step "clippy";   cargo clippy --workspace --all-targets -- -D warnings

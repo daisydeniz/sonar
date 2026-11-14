@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct SonarApp: App {
     @State private var model = AppModel()
+    @State private var updater = AppUpdater(start: !SonarApp.isTesting)
 
     /// Unit tests host the app; they build their own models, so the app
     /// must not open the user's real library then.
@@ -17,6 +18,10 @@ struct SonarApp: App {
                 .task { if !Self.isTesting { await model.start() } }
         }
         .commands {
+            CommandGroup(after: .appInfo) {
+                Button("Check for Updates…") { updater.checkForUpdates() }
+                    .disabled(!updater.isEnabled)
+            }
             CommandGroup(replacing: .textEditing) {
                 Button("Find Samples") { model.keyboard.focusSearch() }
                     .keyboardShortcut("f", modifiers: .command)

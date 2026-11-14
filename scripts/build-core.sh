@@ -18,9 +18,10 @@
 #       fast (workspace deps are already opt-level 2 in dev); the release
 #       pipeline must set `release` (thin LTO, codegen-units=1).
 #
-# Architectures: arm64 only (aarch64-apple-darwin), matching `ARCHS: arm64`
-# in app/project.yml. x86_64 is optional and not built yet; adding it means a
-# second cargo target + `lipo -create` before -create-xcframework.
+#   SONAR_CORE_ARCHS=arm64|universal  (default: arm64, matching `ARCHS: arm64`
+#       in app/project.yml). universal builds aarch64 + x86_64 and lipos them
+#       into one fat libsonar_ffi.a (macos-arm64_x86_64 slice); used by
+#       scripts/release.sh (ADR-037).
 #
 # Idempotent and incremental: cargo only rebuilds what changed, and the
 # outputs in app/Generated/ are only replaced when their content changed, so
@@ -33,7 +34,13 @@ source "$ROOT/scripts/lib/env.sh"
 # Output paths below assume the default target dir and an explicit --target.
 unset CARGO_TARGET_DIR CARGO_BUILD_TARGET
 
-TARGET="aarch64-apple-darwin"
+ARCHS_MODE="${SONAR_CORE_ARCHS:-arm64}"
+case "$ARCHS_MODE" in
+  arm64)     TARGETS=(aarch64-apple-darwin) ;;
+  universal) TARGETS=(aarch64-apple-darwin x86_64-apple-darwin) ;;
+  *) echo "build-core: SONAR_CORE_ARCHS must be arm64 or universal (got '$ARCHS_MODE')" >&2; exit 2 ;;
+esac
+TARGET="aarch64-apple-darwin"  # bindings are generated from this slice
 PROFILE="${SONAR_CORE_PROFILE:-debug}"
 case "$PROFILE" in
   debug)   CARGO_PROFILE_ARGS=() ;;
@@ -45,7 +52,7 @@ CORE="$ROOT/core"
 OUT="$ROOT/app/Generated"
 XCFRAMEWORK="$OUT/SonarCore.xcframework"
 SWIFT_OUT="$OUT/SonarCore.swift"
-LIB="$CORE/target/$TARGET/$PROFILE/libsonar_ffi.a"
+LIB="$CORE/target/$TARGET/$PROFILE/libsonar_ffi.a"  # lib handed to the xcframework
 
 # The static lib must match the app's deployment target (app/project.yml),
 # otherwise the linker warns about objects built for a newer macOS.
@@ -53,16 +60,16 @@ export MACOSX_DEPLOYMENT_TARGET="14.0"
 
 cd "$CORE"  # rust-toolchain.toml applies from here
 
-if ! rustup target list --installed | grep -qx "$TARGET"; then
-  rustup target add "$TARGET"
-fi
-
-cargo build -q -p sonar-ffi --lib --target "$TARGET" "${CARGO_PROFILE_ARGS[@]+"${CARGO_PROFILE_ARGS[@]}"}"
+for t in "${TARGETS[@]}"; do
+  if ! rustup target list --installed | grep -qx "$t"; then
+    rustup target add "$t"
+  fi
+  cargo build -q -p sonar-ffi --lib --target "$t" "${CARGO_PROFILE_ARGS[@]+"${CARGO_PROFILE_ARGS[@]}"}"
+  [[ -f "$CORE/target/$t/$PROFILE/libsonar_ffi.a" ]] || { echo "build-core: missing lib for $t" >&2; exit 1; }
+done
 # Host build of the generator (matches the workspace uniffi version).
 cargo build -q -p uniffi-bindgen
 BINDGEN="$CORE/target/debug/uniffi-bindgen"
-
-[[ -f "$LIB" ]] || { echo "build-core: missing $LIB" >&2; exit 1; }
 
 STAGE="$(mktemp -d "${TMPDIR:-/tmp}/sonar-build-core.XXXXXX")"
 trap 'rm -rf "$STAGE"' EXIT
@@ -77,8 +84,15 @@ cp "$STAGE/bindings/SonarCoreFFI.h" "$STAGE/headers/"
 # Swift only discovers the C module of an xcframework via `module.modulemap`.
 cp "$STAGE/bindings/SonarCoreFFI.modulemap" "$STAGE/headers/module.modulemap"
 
+XC_LIB="$LIB"
+if [[ "$ARCHS_MODE" == universal ]]; then
+  XC_LIB="$STAGE/libsonar_ffi.a"
+  lipo -create "$CORE/target/aarch64-apple-darwin/$PROFILE/libsonar_ffi.a" \
+    "$CORE/target/x86_64-apple-darwin/$PROFILE/libsonar_ffi.a" -output "$XC_LIB"
+fi
+
 xcodebuild -create-xcframework \
-  -library "$LIB" \
+  -library "$XC_LIB" \
   -headers "$STAGE/headers" \
   -output "$STAGE/SonarCore.xcframework" >/dev/null
 
@@ -93,4 +107,4 @@ if ! cmp -s "$STAGE/bindings/SonarCore.swift" "$SWIFT_OUT"; then
   cp "$STAGE/bindings/SonarCore.swift" "$SWIFT_OUT"
 fi
 
-echo "build-core: $PROFILE $TARGET -> ${XCFRAMEWORK#"$ROOT/"}, ${SWIFT_OUT#"$ROOT/"}"
+echo "build-core: $PROFILE $ARCHS_MODE -> ${XCFRAMEWORK#"$ROOT/"}, ${SWIFT_OUT#"$ROOT/"}"

@@ -85,7 +85,7 @@ Owner tags map to subagents in `.claude/agents/`.
 ## M7 — Polish & release
 - [x] T7.1 (reviewer) Full perf + robustness pass (1M synthetic files, corrupt files, offline drives). Fix findings. (2e763a9)
 - [x] T7.2 (swift-ui) Onboarding (pick folders), settings, empty states, error states. (ea23ab6)
-- [ ] T7.3 (architect) Release pipeline script: universal build, codesign, notarize, DMG, Sparkle updates (keys via env). 
+- [x] T7.3 (architect) Release pipeline script: universal build, codesign, notarize, DMG, Sparkle updates (keys via env). (HASH)
 - [ ] T7.4 [HUMAN] Apple Developer ID, notarization credentials, Paddle/Lemon Squeezy account, pricing.
 - [ ] T7.5 (swift-ui) Licensing: trial + license key validation (offline-friendly) behind a provider-agnostic interface.
 
@@ -256,3 +256,6 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T7.2) `AppModel.swift` is 404 lines and `engineState`/`loadingRefreshes`/`isStarted` became module-settable for extensions; split AppModel state further.
 - (from T7.2) Add/remove/search/pager errors still use the modal alert (only engine events go to the banner); third-party notices in About were written by hand, generate them from `cargo deny`/`cargo about`.
 - (from T7.2) No tests for the empty-collection / empty-duplicates / no-similar states, rescan from Settings, or offline dimming.
+- (from T7.3) Signed/notarized path (Developer ID, notarytool, stapler, appcast) is written to Apple/Sparkle docs but never run; do a real release smoke run once T7.4 credentials exist.
+- (from T7.3) x86_64 slice is built but never run on an Intel Mac; re-check `ort` x86_64 ONNX Runtime before CLAP is linked into the app.
+- (from T7.3) No Sparkle release-notes (`sparkle:releaseNotesLink`) in the appcast; `shellcheck` not installed, so check.sh only runs `bash -n` on release.sh.

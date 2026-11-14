@@ -191,8 +191,11 @@ cancellation and PCM format are in ADR-032. `duplicates(query)` /
 
 ## 8. macOS app (`app/`)
 - Project generated with **XcodeGen** (`app/project.yml`) — never hand-edit
-  `.xcodeproj`. Target macOS 14+, Apple Silicon first (universal build later).
+  `.xcodeproj`. Target macOS 14+; dev builds arm64, release builds universal (arm64 + x86_64).
 - Not sandboxed (direct distribution, hardened runtime, notarized).
+- Release: `scripts/release.sh` (universal build, codesign, notarize, DMG,
+  Sparkle appcast; credentials via `SONAR_*` env vars, ad-hoc without them;
+  ADR-037). Output in `dist/`.
 - Structure: `App/` (entry, windows), `Features/` (Library, Search, Results,
   Preview, Similar, Organize, Duplicates, Settings), `Services/`
   (CoreBridge, AudioPreview, Bookmarks), `UI/` (shared components).
