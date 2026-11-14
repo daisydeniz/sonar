@@ -11,6 +11,7 @@ struct SidebarView: View {
             Section("Library") {
                 Label("All Samples", systemImage: "waveform").tag(SidebarItem.allSamples)
                 Label("Favorites", systemImage: "heart").tag(SidebarItem.favorites)
+                Label("Duplicates", systemImage: "square.on.square").tag(SidebarItem.duplicates)
             }
             Section("Libraries") {
                 ForEach(model.libraries, id: \.id) { library in

@@ -243,3 +243,6 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T6.9a review) No unit test for `scan::lock` acquire returning `None` when cancelled while waiting.
 - (from T6.9a review) Exact pass looks up `file_path` once per uncached candidate; batch it if first-run cost on large libraries matters.
 - (from T6.9a) Near matching depends on library z-score stats; in a tiny library of near-identical files the stats degenerate and near groups can be missed.
+- (from T6.9b review) Hiding from the inspector/keyboard while in the Duplicates view doesn't refresh the group rows' "Hidden" label (and the shortcut reads pager rows); call `refreshDuplicateRows()` from `setHidden` when the Duplicates view is active.
+- (from T6.9b review) `DuplicatesTests` cancel test may never cancel mid-run (`Task.yield()`); near-group test only checks groups exist, not which files (core tests cover it); `realpath` buffer leak in test.
+- (from T6.9b) Tests other than Duplicates/AppModel still use the real `EnginePlayer`; AVAudioEngine can abort in the headless test host if they start playback.

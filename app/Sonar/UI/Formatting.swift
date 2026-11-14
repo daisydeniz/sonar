@@ -15,6 +15,11 @@ enum Format {
         return bpm == bpm.rounded() ? String(Int(bpm)) : String(format: "%.1f", bpm)
     }
 
+    /// "1.2 MB" for a byte count.
+    static func bytes(_ n: UInt64) -> String {
+        ByteCountFormatter.string(fromByteCount: Int64(clamping: n), countStyle: .file)
+    }
+
     /// Value or "-".
     static func text(_ s: String?) -> String {
         guard let s, !s.isEmpty else { return "-" }

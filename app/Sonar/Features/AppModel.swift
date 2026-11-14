@@ -7,6 +7,8 @@ enum SidebarItem: Hashable, Sendable {
     case favorites
     case library(Int64)
     case collection(Int64)
+    /// Duplicate finder (T6.9b): its own view, not a result list.
+    case duplicates
 }
 
 /// Whether the engine is available.
@@ -40,6 +42,8 @@ final class AppModel {
     let similarity = SimilarityModel()
     /// Organize state (hidden switch, prompts, override error); see `Features/Organize`.
     let organizeState = OrganizeState()
+    /// Duplicates view state; see `Features/Duplicates`.
+    let duplicates = DuplicatesModel()
     private(set) var progress = IndexingProgress(
         enabled: false, running: false, paused: false, stage: nil, total: 0, done: 0, errors: 0)
     /// Last user-visible error (add/remove/search failures); nil when none.
@@ -76,8 +80,10 @@ final class AppModel {
     }
     /// Filters do not apply to a collection's own contents.
     var showsFilterBar: Bool {
-        if case .collection = sidebarSelection { return false }
-        return true
+        switch sidebarSelection {
+        case .collection, .duplicates: return false
+        default: return true
+        }
     }
 
     /// Clears every filter chip and re-queries.
@@ -104,9 +110,10 @@ final class AppModel {
 
     /// Table selection changed (nil = nothing selected): updates the preview
     /// (auto-play + pre-decode of the cached neighbours, nearest first).
-    func select(_ row: FileRow?) {
+    /// `neighbours` overrides the pager lookup (Duplicates view: the group).
+    func select(_ row: FileRow?, neighbours explicit: [FileRow]? = nil) {
         selectedRow = row
-        preview.select(row, neighbours: neighbours(of: row))
+        preview.select(row, neighbours: explicit ?? neighbours(of: row))
         waveform.load(fileId: row?.fileId)
     }
 
@@ -277,7 +284,7 @@ final class AppModel {
     /// and applies the result unless a newer request superseded it.
     func refreshResults(keepScroll: Bool = true) async {
         if similarity.isActive { return await refreshSimilar(keepScroll: keepScroll) }
-        guard let bridge else { return }
+        guard let bridge, sidebarSelection != .duplicates else { return }
         generation += 1
         let mine = generation
         let selection = sidebarSelection
@@ -293,6 +300,8 @@ final class AppModel {
                 let rows = try await bridge.collectionRows(id: id)
                 guard mine == generation else { return }  // a newer request exists
                 loader = ArrayResultLoader(rows: rows)
+            case .duplicates:
+                return
             case .allSamples, .favorites, .library:
                 var filters = SearchFilters()
                 if selection == .favorites { filters.favoritesOnly = true }

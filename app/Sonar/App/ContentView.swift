@@ -64,6 +64,8 @@ struct ContentView: View {
             ContentUnavailableView(
                 "Could not open Sonar's library", systemImage: "exclamationmark.triangle",
                 description: Text(message))
+        case .ready where model.sidebarSelection == .duplicates:
+            DuplicatesView(model: model)
         case .ready:
             VStack(spacing: 0) {
                 if model.showsFilterBar {

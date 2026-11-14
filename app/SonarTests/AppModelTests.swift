@@ -43,7 +43,8 @@ final class AppModelTests: XCTestCase {
         let fixtures = try fixturesDir()
         let homePath = makeHome().path
         let engine = try await Task.detached { try SonarEngine.open(home: homePath) }.value
-        let model = AppModel(engine: engine, activePollMs: 20, idlePollMs: 50)
+        let model = AppModel(
+            engine: engine, preview: AudioPreview(player: FakePlayer()), activePollMs: 20, idlePollMs: 50)
         defer { model.stop() }
 
         // open
