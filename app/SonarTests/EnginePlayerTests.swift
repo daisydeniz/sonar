@@ -101,12 +101,15 @@ final class EnginePlayerTests: XCTestCase {
         var finished = 0
         player.onFinished = { finished += 1 }
         try player.play(tone(format(44100, 2)), loop: true, gainDb: nil, pitchCents: 0)
+        let nodesWithOneChain = try XCTUnwrap(engine).attachedNodes.count
         try player.play(tone(format(48000, 2)), loop: true, gainDb: nil, pitchCents: 0)
         XCTAssertEqual(player.chainCount, 2)
         NotificationCenter.default.post(name: .AVAudioEngineConfigurationChange, object: engine)
         XCTAssertEqual(finished, 1)
         try player.play(tone(format(96000, 1)), loop: true, gainDb: 6, pitchCents: -200)
         XCTAssertEqual(player.chainCount, 1)
+        // The old chains' nodes are really gone from the engine.
+        XCTAssertEqual(engine?.attachedNodes.count, nodesWithOneChain)
         XCTAssertGreaterThan(try renderPeak(), 0.1)
     }
 
@@ -126,7 +129,10 @@ final class EnginePlayerTests: XCTestCase {
             } catch {
                 throw XCTSkip("no audio output available: \(error)")
             }
-            try await Task.sleep(nanoseconds: 30_000_000)
+            // The first render cycle can take a while on a busy machine.
+            for _ in 0..<25 where player.playbackTime() == nil {
+                try await Task.sleep(nanoseconds: 20_000_000)
+            }
             XCTAssertNotNil(player.playbackTime(), "\(format) is not playing")
         }
         player.stop()
