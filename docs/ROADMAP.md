@@ -83,7 +83,7 @@ Owner tags map to subagents in `.claude/agents/`.
   - [x] T6.9b (swift-ui) Duplicates view in the app over FFI `duplicates()`: sidebar entry, groups list (exact / near), per-file path/size/format, preview + reveal, hide or "keep one" via existing user-data setters (no file deletion). AC: XCTests over a fixture library. (9d07448)
 
 ## M7 — Polish & release
-- [x] T7.1 (reviewer) Full perf + robustness pass (1M synthetic files, corrupt files, offline drives). Fix findings.
+- [x] T7.1 (reviewer) Full perf + robustness pass (1M synthetic files, corrupt files, offline drives). Fix findings. (2e763a9)
 - [ ] T7.2 (swift-ui) Onboarding (pick folders), settings, empty states, error states.
 - [ ] T7.3 (architect) Release pipeline script: universal build, codesign, notarize, DMG, Sparkle updates (keys via env). 
 - [ ] T7.4 [HUMAN] Apple Developer ID, notarization credentials, Paddle/Lemon Squeezy account, pricing.
