@@ -85,7 +85,7 @@ Owner tags map to subagents in `.claude/agents/`.
 ## M7 — Polish & release
 - [x] T7.1 (reviewer) Full perf + robustness pass (1M synthetic files, corrupt files, offline drives). Fix findings. (2e763a9)
 - [x] T7.2 (swift-ui) Onboarding (pick folders), settings, empty states, error states. (ea23ab6)
-- [x] T7.3 (architect) Release pipeline script: universal build, codesign, notarize, DMG, Sparkle updates (keys via env). (HASH)
+- [x] T7.3 (architect) Release pipeline script: universal build, codesign, notarize, DMG, Sparkle updates (keys via env). (24aa955)
 - [ ] T7.4 [HUMAN] Apple Developer ID, notarization credentials, Paddle/Lemon Squeezy account, pricing.
 - [ ] T7.5 (swift-ui) Licensing: trial + license key validation (offline-friendly) behind a provider-agnostic interface.
 
