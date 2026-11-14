@@ -84,7 +84,7 @@ Owner tags map to subagents in `.claude/agents/`.
 
 ## M7 — Polish & release
 - [x] T7.1 (reviewer) Full perf + robustness pass (1M synthetic files, corrupt files, offline drives). Fix findings. (2e763a9)
-- [ ] T7.2 (swift-ui) Onboarding (pick folders), settings, empty states, error states.
+- [x] T7.2 (swift-ui) Onboarding (pick folders), settings, empty states, error states. (ea23ab6)
 - [ ] T7.3 (architect) Release pipeline script: universal build, codesign, notarize, DMG, Sparkle updates (keys via env). 
 - [ ] T7.4 [HUMAN] Apple Developer ID, notarization credentials, Paddle/Lemon Squeezy account, pricing.
 - [ ] T7.5 (swift-ui) Licensing: trial + license key validation (offline-friendly) behind a provider-agnostic interface.
@@ -154,7 +154,7 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T4.3) Similar latency measured on M4 Pro only (4-thread p95 25.7 ms as proxy); re-run `sonar bench similar` on a base M1/M2.
 - (from T4.3) `bench/search_corpus.rs` is 403 lines (just over the ~400 guideline); split when next touched.
 - (from T4.4 review) Parity test: eval similarity ranking (`eval::similarity::ranking`, default config) == `similar::rank` on the fixture library, so the re-implemented formula cannot drift.
-- (from T5.1) Ship the Apache-2.0 text + "LAION CLAP, converted to ONNX and int8-quantized" attribution in the app's About/licenses screen (ADR-026).
+- (from T5.1) Ship the full Apache-2.0 license text in the app bundle (T7.2 About tab has the attribution line only).
 - (from T5.1) CoreML EP with static shapes + a compiled-model cache next to the CPU sessions (79 clips/s fp32, but 33 s compile per load uncached).
 - (from T5.1) Memory per CLAP session not measured; consider shared prepacked weights across the N single-thread sessions.
 - (from T5.1) Re-compare `laion/larger_clap_general` once golden NL queries exist (same quality on silver, ~2× slower).
@@ -206,7 +206,6 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T5.6 review) Deep paging re-runs the search for `offset + limit` hits, and a superseded call can still return rows fetched after the cancel check; for T6.2 consider an ids-only full-result call + `rows(fileIds:)`, and tag UI requests with a generation number.
 - (from T6.1 review) `AppModelTests` checks `paused` only if the fixture job is still running, so on a fast machine the pause path may not be exercised; pause before any await or use a larger library.
 - (from T6.1 review) The `.failed` engine state is not tested through `AppModel`; inject an opener closure and assert it.
-- (from T6.1 review) Each watcher `EngineEvent.error` becomes a modal alert; repeated retry errors (SQLITE_BUSY) could spam it. Use a non-modal status message.
 - (from T6.2 review) `ResultsPager.reset` returns false and leaves `resetting = true` if page 0 is `Cancelled` `maxRetries` times in the current generation (not reachable today; similarity search will share the cancel flag): clear the flag and throw so `AppModel` reports it.
 - (from T6.2 review) Header sort arrow is not synced from `AppModel.sortKey` when the table is recreated, and collections show an arrow though `collectionRows` has no core sort (add sort to `collectionRows` or disable sorting there).
 - (from T6.2 review) After a reset that drops the selected file from page 0, the inspector keeps the old snapshot and `selectedID` stays set; decide: clear the selection or re-highlight when scrolled to.
@@ -254,3 +253,6 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T7.1) Stale mount point holding only dot-files is not treated as offline (`scan/mod.rs:209`); rows drop out of search until remount.
 - (from T7.1) Files with a read error (EIO, bad sector) stay pending forever and are retried every job; flag them after N failures.
 - (from T7.1 review) No test for the watcher `WatchEvent::Online` → queue work path (only `scan_library` is tested).
+- (from T7.2) `AppModel.swift` is 404 lines and `engineState`/`loadingRefreshes`/`isStarted` became module-settable for extensions; split AppModel state further.
+- (from T7.2) Add/remove/search/pager errors still use the modal alert (only engine events go to the banner); third-party notices in About were written by hand, generate them from `cargo deny`/`cargo about`.
+- (from T7.2) No tests for the empty-collection / empty-duplicates / no-similar states, rescan from Settings, or offline dimming.
