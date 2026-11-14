@@ -23,6 +23,18 @@ final class AppSettings {
         includeEmbeddings = defaults.object(forKey: Self.embeddingsKey) as? Bool ?? true
     }
 
+    /// `dataFolder`, or its nearest existing parent (the folder may not exist
+    /// yet when the engine failed on first launch).
+    nonisolated static func revealableDataFolder(
+        environment: [String: String] = ProcessInfo.processInfo.environment
+    ) -> URL {
+        var url = dataFolder(environment: environment)
+        while !FileManager.default.fileExists(atPath: url.path), url.path != "/" {
+            url = url.deletingLastPathComponent()
+        }
+        return url
+    }
+
     /// Where the core keeps its data: `SONAR_HOME`, else
     /// `~/Library/Application Support/Sonar` (same rule as the core).
     nonisolated static func dataFolder(

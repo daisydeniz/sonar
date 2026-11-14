@@ -7,6 +7,14 @@ extension AppModel {
         engineState == .ready && sidebarLoaded && libraries.isEmpty
     }
 
+    /// Re-runs `start()` after the engine failed to open (error screen).
+    func retryOpen() async {
+        guard case .failed = engineState else { return }
+        engineState = .opening
+        isStarted = false
+        await start()
+    }
+
     /// Adds several folders one after another (onboarding, drops, panel).
     func addLibraries(paths: [String]) async {
         for path in paths { await addLibrary(path: path) }

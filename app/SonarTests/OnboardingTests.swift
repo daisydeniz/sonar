@@ -105,10 +105,22 @@ final class OnboardingTests: XCTestCase {
         XCTAssertFalse(model.isLoadingResults)
         XCTAssertEqual(model.emptyState, .noResults)
 
+        // While a refresh is in flight, no empty state (the task runs up to
+        // its first suspension, inside the core call, on this yield).
+        let inFlight = Task { @MainActor in await model.refreshResults(keepScroll: false) }
+        await Task.yield()
+        XCTAssertEqual(model.loadingRefreshes, 1, "refresh must be in flight")
+        XCTAssertTrue(model.isLoadingResults)
+        XCTAssertNil(model.emptyState)
+        await inFlight.value
+        XCTAssertEqual(model.emptyState, .noResults)
+
         model.clearSearchAndFilters()
         XCTAssertEqual(model.searchText, "")
         XCTAssertFalse(model.filters.isActive)
-        await model.refreshResults(keepScroll: false)
+        XCTAssertNil(model.emptyState, "clearing counts as loading at once")
+        await model.settle()
+        XCTAssertFalse(model.isLoadingResults)
         XCTAssertNil(model.emptyState)
 
         model.sidebarSelection = .favorites

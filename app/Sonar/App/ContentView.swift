@@ -56,7 +56,14 @@ struct ContentView: View {
         }
     }
 
-    @ViewBuilder private var detail: some View {
+    private var detail: some View {
+        VStack(spacing: 0) {
+            StatusBannerView(banner: model.banner)
+            detailContent
+        }
+    }
+
+    @ViewBuilder private var detailContent: some View {
         switch model.engineState {
         case .opening:
             ProgressView("Opening library…").frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -68,7 +75,6 @@ struct ContentView: View {
             DuplicatesView(model: model)
         case .ready:
             VStack(spacing: 0) {
-                StatusBannerView(banner: model.banner)
                 if model.showsFilterBar {
                     FilterBarView(model: model)
                     Divider()

@@ -39,5 +39,11 @@ extension AppModel {
     func clearSearchAndFilters() {
         searchText = ""
         filters = FilterState()
+        // Count as loading right away so no empty state flashes before the refresh starts.
+        loadingRefreshes += 1
+        track {
+            await self.refreshResults(keepScroll: false)
+            self.loadingRefreshes -= 1
+        }
     }
 }

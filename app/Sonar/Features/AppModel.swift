@@ -29,7 +29,7 @@ enum EngineState: Equatable, Sendable {
 @Observable
 final class AppModel {
     // MARK: Rendered state
-    private(set) var engineState: EngineState = .opening
+    var engineState: EngineState = .opening  // set by `retryOpen` (extension)
     private(set) var libraries: [LibraryInfo] = []
     private(set) var collections: [CollectionInfo] = []
     /// Lazily paged results behind the table (latest-wins via its generations).
@@ -48,11 +48,9 @@ final class AppModel {
     let settings: AppSettings
     /// Non-modal, dismissible engine/watcher error message (coalesced).
     let banner = StatusBanner()
-    /// Result refreshes in flight; empty states wait for 0 (T7.2).
-    private(set) var loadingRefreshes = 0
-    /// The first sidebar load finished (so "no libraries" is real).
+    /// Refreshes in flight / first sidebar and results loads done (T7.2 empty states).
+    var loadingRefreshes = 0
     private(set) var sidebarLoaded = false
-    /// The first results refresh finished.
     private(set) var resultsLoadedOnce = false
     private(set) var progress = IndexingProgress(
         enabled: false, running: false, paused: false, stage: nil, total: 0, done: 0, errors: 0)
@@ -77,7 +75,7 @@ final class AppModel {
     @ObservationIgnored private var lastAppliedDescending = false
     @ObservationIgnored private var pollTask: Task<Void, Never>?
     @ObservationIgnored private var wasRunning = false
-    @ObservationIgnored private var isStarted = false
+    @ObservationIgnored var isStarted = false
     @ObservationIgnored private let activePollNs: UInt64
     @ObservationIgnored private let idlePollNs: UInt64
     @ObservationIgnored private let opener: @Sendable () async throws -> CoreBridge
@@ -205,14 +203,6 @@ final class AppModel {
         startPolling()
     }
 
-    /// Re-runs `start()` after the engine failed to open (error screen).
-    func retryOpen() async {
-        guard case .failed = engineState else { return }
-        engineState = .opening
-        isStarted = false
-        await start()
-    }
-
     /// Stops the polling loop.
     func stop() {
         pollTask?.cancel()
@@ -224,9 +214,9 @@ final class AppModel {
     /// Reloads libraries and collections.
     func reloadSidebar() async {
         guard let bridge else { return }
-        defer { sidebarLoaded = true }
         do {
             libraries = try await bridge.libraries()
+            sidebarLoaded = true
             collections = try await bridge.collections()
             organizeState.tags = try await bridge.allTags()  // suggestions, loaded with the sidebar
         } catch {

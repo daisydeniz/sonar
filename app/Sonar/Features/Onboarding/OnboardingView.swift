@@ -39,7 +39,11 @@ struct OnboardingView: View {
                 for provider in providers {
                     if let url = await Self.loadURL(provider), Self.isFolder(url) { paths.append(url.path) }
                 }
-                await model.addLibraries(paths: paths)
+                if paths.isEmpty {
+                    model.banner.post("Drop folders, not files, to add libraries.")
+                } else {
+                    await model.addLibraries(paths: paths)
+                }
             }
             return true
         }
@@ -72,7 +76,7 @@ struct EngineFailedView: View {
             Button("Try Again") { Task { await model.retryOpen() } }
                 .buttonStyle(.borderedProminent)
             Button("Reveal Data Folder") {
-                NSWorkspace.shared.activateFileViewerSelecting([AppSettings.dataFolder()])
+                NSWorkspace.shared.activateFileViewerSelecting([AppSettings.revealableDataFolder()])
             }
         }
     }
