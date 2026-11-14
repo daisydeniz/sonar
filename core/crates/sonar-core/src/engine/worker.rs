@@ -8,6 +8,7 @@ use std::time::Duration;
 
 use super::events::EngineEvent;
 use super::Inner;
+use crate::quiet_panic;
 use crate::watch::WatchEvent;
 use crate::Store;
 
@@ -56,41 +57,65 @@ pub(super) fn run(inner: &Arc<Inner>, rx: &Receiver<Msg>) {
                 Err(_) => break,
             }
         };
-        // Seen before draining: everything the job sent is then in hand.
-        let finished = inner.job_finished();
-        let mut ids: Vec<i64> = std::mem::take(&mut retry.ids);
-        let mut watched = Vec::new();
-        let mut ended = None;
-        for msg in first.into_iter().chain(rx.try_iter()) {
-            match msg {
-                Msg::Refresh(v) => ids.extend(v),
-                Msg::Watched(mut event) => {
-                    // The ids are consumed here; queued events do not carry them.
-                    if let WatchEvent::Scanned { touched, .. } = &mut event {
-                        ids.extend(std::mem::take(touched));
-                    }
-                    watched.push(event);
-                }
-                Msg::JobEnded(gen) => ended = Some(gen),
-                Msg::Wake => {}
-                Msg::Shutdown => shutdown = true,
-            }
+        // A panic in one round must not kill the engine thread: log it and
+        // carry on with the next round.
+        let round = quiet_panic::guarded(|| {
+            handle_round(inner, rx, store.as_ref(), first, &mut retry, &mut shutdown);
+        });
+        if let Err(message) = round {
+            tracing::error!("engine worker round panicked: {message}");
         }
-        retry.record(refresh(inner, store.as_ref(), ids));
-        for event in watched {
-            let new_work = matches!(
-                &event,
-                WatchEvent::Scanned { summary, .. }
-                    if summary.added + summary.changed + summary.restored > 0
-            );
-            inner.events.push(EngineEvent::Watch(event));
-            if new_work {
-                inner.queue_new_work();
-            }
-        }
-        inner.reap_job(ended, finished);
     }
     inner.finish_job(rx);
+}
+
+/// One loop iteration: drain the queue, refresh the index, forward watcher
+/// events, collect a finished job.
+fn handle_round(
+    inner: &Arc<Inner>,
+    rx: &Receiver<Msg>,
+    store: Option<&Store>,
+    first: Option<Msg>,
+    retry: &mut Retry,
+    shutdown: &mut bool,
+) {
+    // Seen before draining: everything the job sent is then in hand.
+    let finished = inner.job_finished();
+    let mut ids: Vec<i64> = std::mem::take(&mut retry.ids);
+    let mut watched = Vec::new();
+    let mut ended = None;
+    for msg in first.into_iter().chain(rx.try_iter()) {
+        match msg {
+            Msg::Refresh(v) => ids.extend(v),
+            Msg::Watched(mut event) => {
+                // The ids are consumed here; queued events do not carry them.
+                if let WatchEvent::Scanned { touched, .. } = &mut event {
+                    ids.extend(std::mem::take(touched));
+                }
+                watched.push(event);
+            }
+            Msg::JobEnded(gen) => ended = Some(gen),
+            Msg::Wake => {}
+            Msg::Shutdown => *shutdown = true,
+        }
+    }
+    retry.record(refresh(inner, store, ids));
+    for event in watched {
+        // `Online`: files whose read failed while the drive was away are
+        // still pending and the queue skips offline libraries.
+        let new_work = match &event {
+            WatchEvent::Scanned { summary, .. } => {
+                summary.added + summary.changed + summary.restored > 0
+            }
+            WatchEvent::Online { .. } => true,
+            _ => false,
+        };
+        inner.events.push(EngineEvent::Watch(event));
+        if new_work {
+            inner.queue_new_work();
+        }
+    }
+    inner.reap_job(ended, finished);
 }
 
 /// Rounds a failing refresh is retried before its ids are dropped (the

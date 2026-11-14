@@ -83,7 +83,7 @@ Owner tags map to subagents in `.claude/agents/`.
   - [x] T6.9b (swift-ui) Duplicates view in the app over FFI `duplicates()`: sidebar entry, groups list (exact / near), per-file path/size/format, preview + reveal, hide or "keep one" via existing user-data setters (no file deletion). AC: XCTests over a fixture library. (9d07448)
 
 ## M7 — Polish & release
-- [ ] T7.1 (reviewer) Full perf + robustness pass (1M synthetic files, corrupt files, offline drives). Fix findings.
+- [x] T7.1 (reviewer) Full perf + robustness pass (1M synthetic files, corrupt files, offline drives). Fix findings.
 - [ ] T7.2 (swift-ui) Onboarding (pick folders), settings, empty states, error states.
 - [ ] T7.3 (architect) Release pipeline script: universal build, codesign, notarize, DMG, Sparkle updates (keys via env). 
 - [ ] T7.4 [HUMAN] Apple Developer ID, notarization credentials, Paddle/Lemon Squeezy account, pricing.
@@ -246,3 +246,11 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T6.9b review) Hiding from the inspector/keyboard while in the Duplicates view doesn't refresh the group rows' "Hidden" label (and the shortcut reads pager rows); call `refreshDuplicateRows()` from `setHidden` when the Duplicates view is active.
 - (from T6.9b review) `DuplicatesTests` cancel test may never cancel mid-run (`Task.yield()`); near-group test only checks groups exist, not which files (core tests cover it); `realpath` buffer leak in test.
 - (from T6.9b) Tests other than Duplicates/AppModel still use the real `EnginePlayer`; AVAudioEngine can abort in the headless test host if they start playback.
+- (from T7.1) Search at 1M docs misses 50 ms (budget is stated at 500k): as-you-type p95 59 ms, browse-all 54–59 ms; 1M index has only 2 segments (try ~1 per core), compare with the K-th threshold before reading the sort column, cache browse-all facets (`search/collect.rs:197-215`).
+- (from T7.1) Not measured: peak RSS of benches, deep paging (offset ~900k of a 1M result) through store/FFI, the 1M-row 120 fps result list (Swift).
+- (from T7.1) Waveform of long files decodes up to 64Mi frames (~400 MB), can't be cancelled and shows only the start; streaming peak pass + cancel flag (`engine/audio.rs:77`).
+- (from T7.1) An unresponsive SMB server (not unmounted) blocks root checks, scans, jobs and app quit (`Engine::drop`); root check with a timeout on its own thread.
+- (from T7.1) Duplicates skip offline libraries (ADR-036); near groups and cached exact hashes could include them.
+- (from T7.1) Stale mount point holding only dot-files is not treated as offline (`scan/mod.rs:209`); rows drop out of search until remount.
+- (from T7.1) Files with a read error (EIO, bad sector) stay pending forever and are retried every job; flag them after N failures.
+- (from T7.1 review) No test for the watcher `WatchEvent::Online` → queue work path (only `scan_library` is tested).

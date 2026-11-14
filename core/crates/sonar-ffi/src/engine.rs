@@ -18,7 +18,7 @@ use sonar_core::watch::WatchOptions;
 
 use crate::convert::{self, count};
 use crate::dupes_types::{self, DuplicatesQuery, DuplicatesResult};
-use crate::error::{guard, guard_ffi, FfiError};
+use crate::error::{guard, guard_ffi, guard_or, FfiError};
 use crate::facet_types::SearchFacets;
 use crate::similar_types::{self, SimilarHit, SimilarPage, SimilarQuery};
 use crate::types::{
@@ -90,7 +90,7 @@ impl SonarEngine {
     /// Stops watching. May block until a running scan aborts: call it off
     /// the main actor.
     pub fn stop_watching(&self) {
-        self.engine.stop_watching();
+        guard_or(|| (), || self.engine.stop_watching());
     }
 
     // ---- indexing -------------------------------------------------------
@@ -115,31 +115,44 @@ impl SonarEngine {
 
     /// Pauses the running job (files in flight finish first).
     pub fn pause_indexing(&self) {
-        self.engine.pause_indexing();
+        guard_or(|| (), || self.engine.pause_indexing());
     }
 
     /// Continues a paused job.
     pub fn resume_indexing(&self) {
-        self.engine.resume_indexing();
+        guard_or(|| (), || self.engine.resume_indexing());
     }
 
     /// Stops the job and turns automatic indexing off.
     pub fn cancel_indexing(&self) {
-        self.engine.cancel_indexing();
+        guard_or(|| (), || self.engine.cancel_indexing());
     }
 
     /// Current indexing state; cheap, poll it (e.g. every 250 ms).
     pub fn indexing_progress(&self) -> IndexingProgress {
-        convert::progress(&self.engine.indexing_status())
+        guard_or(
+            || IndexingProgress {
+                enabled: false,
+                running: false,
+                paused: false,
+                stage: None,
+                total: 0,
+                done: 0,
+                errors: 0,
+            },
+            || convert::progress(&self.engine.indexing_status()),
+        )
     }
 
     /// Drains background events (oldest first, at most 1024 are kept).
     pub fn poll_events(&self) -> Vec<EngineEvent> {
-        self.engine
-            .poll_events()
-            .into_iter()
-            .filter_map(convert::event)
-            .collect()
+        guard_or(Vec::new, || {
+            self.engine
+                .poll_events()
+                .into_iter()
+                .filter_map(convert::event)
+                .collect()
+        })
     }
 
     // ---- search ---------------------------------------------------------
@@ -168,7 +181,7 @@ impl SonarEngine {
 
     /// Cancels the search in flight (it throws `FfiError.Cancelled`).
     pub fn cancel_search(&self) {
-        self.engine.cancel_search();
+        guard_or(|| (), || self.engine.cancel_search());
     }
 
     /// Files that sound like `file_id`, nearest first. Needs the file to be
@@ -229,7 +242,7 @@ impl SonarEngine {
 
     /// Cancels the running `duplicates` call (it throws `Cancelled`).
     pub fn cancel_duplicates(&self) {
-        self.engine.cancel_duplicates();
+        guard_or(|| (), || self.engine.cancel_duplicates());
     }
 
     /// The row of one file, `nil` if unknown. `row`/`rows` wait on the

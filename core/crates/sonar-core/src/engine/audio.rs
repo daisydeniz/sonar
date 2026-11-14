@@ -45,9 +45,15 @@ pub fn waveform_peaks(samples: &[f32], buckets: usize) -> Vec<(f32, f32)> {
             let end = ((i as u128 + 1) * len as u128 / buckets as u128) as usize;
             let end = end.max(start + 1).min(len);
             let start = start.min(end - 1);
-            samples[start..end]
+            let (lo, hi) = samples[start..end]
                 .iter()
-                .fold((f32::MAX, f32::MIN), |(lo, hi), &s| (lo.min(s), hi.max(s)))
+                .fold((f32::MAX, f32::MIN), |(lo, hi), &s| (lo.min(s), hi.max(s)));
+            // An all-NaN bucket leaves the sentinels: draw it as silence.
+            if lo > hi {
+                (0.0, 0.0)
+            } else {
+                (lo, hi)
+            }
         })
         .collect()
 }
@@ -127,6 +133,12 @@ mod tests {
             .all(|&(lo, hi)| lo == hi && lo.abs() == 0.5));
         assert_eq!(waveform_peaks(&[], 3), vec![(0.0, 0.0); 3]);
         assert!(waveform_peaks(&[1.0], 0).is_empty());
+    }
+
+    #[test]
+    fn all_nan_bucket_is_silence_not_sentinels() {
+        let p = waveform_peaks(&[f32::NAN, f32::NAN, 0.5, -0.5], 2);
+        assert_eq!(p, vec![(0.0, 0.0), (-0.5, 0.5)]);
     }
 
     #[test]

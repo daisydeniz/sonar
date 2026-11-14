@@ -72,12 +72,15 @@ impl Engine {
     /// [`Error::LibraryNotFound`], [`Error::Sqlite`], [`Error::Index`].
     pub fn scan_library(&self, library_id: i64) -> Result<ScanReport> {
         let mut store = Store::open(&self.inner.db_path)?;
+        let was_offline = store.library(library_id)?.is_some_and(|l| !l.online);
         let report = scan::scan_library(&mut store, library_id)?;
         if !report.touched.is_empty() && self.inner.index_ready.load(Ordering::SeqCst) {
             self.inner.sync_index(&store, &report.touched)?;
         }
         let c = &report.counts;
-        if c.added + c.changed + c.restored > 0 {
+        // A library back from offline has pending files the queue skipped.
+        let came_online = was_offline && !report.offline;
+        if c.added + c.changed + c.restored > 0 || came_online {
             self.inner.queue_new_work();
         }
         Ok(report)

@@ -89,7 +89,7 @@ pub(super) fn find(store: &Store, entries: &[Entry], cancel: Option<&AtomicBool>
             let e = &entries[*i];
             match hash_file(path, e.size, e.mtime, cancel) {
                 Ok(h) => Ok((*i, h)),
-                Err(err) if err.kind() == io::ErrorKind::Interrupted => Err(Error::Cancelled),
+                Err(_) if is_cancelled(cancel) => Err(Error::Cancelled),
                 Err(err) => {
                     tracing::debug!(path = %path.display(), error = %err, "dupes: not hashed");
                     Ok((*i, None))

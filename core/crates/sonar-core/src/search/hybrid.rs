@@ -148,12 +148,14 @@ impl SemanticSearch {
     /// Text embedding of `text`.
     ///
     /// # Errors
-    /// The encoder's error; [`Error::Internal`] if a previous query
-    /// panicked inside the encoder.
+    /// The encoder's error.
     pub fn embed(&self, text: &str) -> Result<Embedding> {
-        let mut enc = self.encoder.lock().map_err(|_| Error::Internal {
-            reason: "text encoder poisoned by an earlier panic".into(),
-        })?;
+        // A panic in an earlier query must not disable semantic search for good.
+        // Reusing the encoder is safe: the ONNX session keeps no per-query state.
+        let mut enc = self
+            .encoder
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         enc.embed_query(text)
     }
 }

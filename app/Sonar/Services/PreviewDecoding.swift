@@ -60,7 +60,10 @@ enum PreviewDecoder {
         // TimePitch/EQ chain is not guaranteed to accept surround formats,
         // and an AVFoundation exception cannot be caught in Swift).
         guard format.channelCount <= 2 else { throw PreviewDecodeError.empty }
-        let frames = AVAudioFrameCount(min(file.length, Int64(format.sampleRate * maxSeconds)))
+        // A corrupt header can claim absurd rates/lengths: reject, never trap.
+        guard (1_000...768_000).contains(format.sampleRate) else { throw PreviewDecodeError.empty }
+        let frames = AVAudioFrameCount(
+            clamping: min(file.length, Int64(format.sampleRate * maxSeconds)))
         guard frames > 0,
             let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: frames)
         else { throw PreviewDecodeError.empty }

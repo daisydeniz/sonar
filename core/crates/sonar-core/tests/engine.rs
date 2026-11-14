@@ -280,3 +280,46 @@ fn user_data_set_through_the_engine_is_in_the_next_search() {
     assert_eq!(engine.collections().expect("list")[0].files, 2);
     assert_eq!(engine.text_index_docs(), 2, "never rebuilt or duplicated");
 }
+
+/// T7.1: files that stayed pending while their drive was away are analyzed
+/// once the library is back online, even though that rescan finds nothing
+/// new (zero added/changed/restored).
+#[test]
+fn analysis_resumes_when_an_offline_library_comes_back() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let base = fs::canonicalize(tmp.path()).expect("canonicalize");
+    let fx_dir = base.join("fixtures");
+    let opts = FixtureOptions {
+        include_long: false,
+        ..FixtureOptions::default()
+    };
+    let fx = fixtures::generate(&fx_dir, &opts).expect("fixtures");
+    let lib = base.join("lib");
+    fs::create_dir(&lib).expect("mkdir lib");
+    copy_loop(&fx, &fx_dir, 85.0, &lib.join("groove.wav"));
+
+    let engine = Engine::open(base.join("home")).expect("open engine");
+    let (library, report) = engine.add_library(&lib).expect("add library");
+    assert_eq!(report.counts.added, 1);
+
+    // The drive goes away before anything was analyzed.
+    let away = base.join("lib_away");
+    fs::rename(&lib, &away).expect("unmount");
+    assert!(engine.scan_library(library.id).expect("scan").offline);
+    assert!(engine.start_indexing(JobOptions::default()).expect("start"));
+    engine
+        .wait_indexing(Some(STEP_TIMEOUT))
+        .expect("indexing")
+        .expect("idle job finished");
+    assert!(hits(&engine, "", bpm_between(80.0, 90.0)).is_empty());
+
+    // Remount: the rescan reports no new files, yet a job must run.
+    fs::rename(&away, &lib).expect("remount");
+    let report = engine.scan_library(library.id).expect("rescan");
+    assert!(!report.offline);
+    let c = &report.counts;
+    assert_eq!(c.added + c.changed + c.restored, 0);
+    wait_until("the pending file analyzed after remount", || {
+        hits(&engine, "", bpm_between(80.0, 90.0)) == ["groove.wav"]
+    });
+}

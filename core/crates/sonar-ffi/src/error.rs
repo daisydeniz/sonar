@@ -86,6 +86,12 @@ pub fn guard_ffi<T>(f: impl FnOnce() -> Result<T, FfiError>) -> Result<T, FfiErr
     })
 }
 
+/// Runs infallible `f`; a panic yields `fallback()` instead of unwinding
+/// into Swift.
+pub fn guard_or<T>(fallback: impl FnOnce() -> T, f: impl FnOnce() -> T) -> T {
+    catch_unwind(AssertUnwindSafe(f)).unwrap_or_else(|_| fallback())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
