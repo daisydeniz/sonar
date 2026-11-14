@@ -50,10 +50,21 @@ final class EnginePlayer: PreviewPlayer {
     private var playingDuration: TimeInterval = 0
 
     /// Builds the graph for `format`, reconnecting when the clip format changes.
+    ///
+    /// Rewiring a *running* engine to a new format (other sample rate or
+    /// channel count) makes AVAudioEngine re-initialize the live chain
+    /// half-connected, which raises an Objective-C exception (-10868,
+    /// format not supported). Swift cannot catch it; AppKit swallows it and
+    /// the app later crashes elsewhere. So: stop, disconnect, reconnect —
+    /// `play` restarts the engine.
     private func prepare(for format: AVAudioFormat) {
         let engine = self.engine ?? makeEngine()
         guard connectedFormat != format else { return }
         player.stop()
+        if engine.isRunning { engine.stop() }
+        engine.disconnectNodeOutput(player)
+        engine.disconnectNodeOutput(timePitch)
+        engine.disconnectNodeOutput(gain)
         engine.connect(player, to: timePitch, format: format)
         engine.connect(timePitch, to: gain, format: format)
         engine.connect(gain, to: engine.mainMixerNode, format: format)
