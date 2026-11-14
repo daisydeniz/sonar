@@ -134,12 +134,19 @@ final class AppModel {
     }
 
     /// A header click: the core re-sorts, the table restarts at the top.
+    /// In similarity mode the nearest files are reordered by the column.
     func setSort(_ key: SortKey, descending: Bool) async {
-        // Similarity results stay in distance order.
-        guard !similarity.isActive, key != sortKey || descending != sortDescending else { return }
+        guard key != sortKey || descending != sortDescending else { return }
         sortKey = key
         sortDescending = descending
         await refreshResults(keepScroll: false)
+    }
+
+    /// Back to the default order without re-querying (the caller refreshes):
+    /// a new similarity search starts nearest-first.
+    func resetSort() {
+        sortKey = .relevance
+        sortDescending = false
     }
 
     /// `engine` is injectable (tests pass one opened on a temp home); `nil`
@@ -250,19 +257,26 @@ final class AppModel {
         await refreshResults()
     }
 
-    /// Favourite on/off for files, then refresh.
+    /// Favourite on/off for files. The cached rows are edited in place, so
+    /// the table only redraws their hearts. The query is re-run only when
+    /// un-favouriting inside a favourites-only view (the rows leave it).
     func setFavorite(fileIds: [Int64], on: Bool) async {
         guard let bridge else { return }
         do {
             try await bridge.setFavorite(fileIds: fileIds, on: on)
-            if var row = selectedRow, fileIds.contains(row.fileId) {
-                row.favorite = on
-                selectedRow = row
-            }
         } catch {
             errorMessage = Self.describe(error)
+            return
         }
-        await refreshResults()
+        if var row = selectedRow, fileIds.contains(row.fileId) {
+            row.favorite = on
+            selectedRow = row
+        }
+        if !on, sidebarSelection == .favorites || filters.favoritesOnly {
+            await refreshResults()
+        } else {
+            pager.setFavorite(fileIds: Set(fileIds), on: on)
+        }
     }
 
     // MARK: Results

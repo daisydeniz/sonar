@@ -122,6 +122,7 @@ struct ContentView: View {
             ResultsTableView(
                 pager: model.pager,
                 libraryNames: Dictionary(uniqueKeysWithValues: model.libraries.map { ($0.id, URL(fileURLWithPath: $0.rootPath).lastPathComponent) }),
+                sortKey: model.sortKey, sortDescending: model.sortDescending,
                 onSelect: { model.select($0) },
                 onSort: { key, descending in Task { await model.setSort(key, descending: descending) } },
                 onSelectionChange: { model.selectedFileIDs = $0 },
@@ -133,6 +134,7 @@ struct ContentView: View {
                     return model.keyboard.handle(key, selected: model.selectedRow, selection: key == .returnKey ? model.selectedRows : [])
                 },
                 onFindSimilar: { model.findSimilar(to: $0) },
+                onToggleFavorite: { row in Task { await model.toggleFavorite(rows: [row]) } },
                 menuEntries: { model.rowMenuEntries(for: $0) },
                 register: { controller in
                     model.keyboard.focusResults = { [weak controller] in controller?.focusTable() ?? false }

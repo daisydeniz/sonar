@@ -51,6 +51,7 @@ mod dupes;
 mod events;
 mod indexing;
 mod libraries;
+mod row_sort;
 mod rows;
 mod search;
 mod user_data;
@@ -71,6 +72,7 @@ use std::time::{Duration, Instant};
 pub use audio::{waveform_peaks, PreviewPcm, MAX_PEAK_BUCKETS, MAX_PREVIEW_SECS};
 pub use events::{EngineEvent, EventListener, EVENT_QUEUE_CAPACITY};
 pub use indexing::IndexingStatus;
+pub use row_sort::sort_by_row;
 pub use rows::FileRow;
 pub use search::SearchRequest;
 

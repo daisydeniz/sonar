@@ -65,6 +65,37 @@ final class OrganizeTests: XCTestCase {
         XCTAssertEqual(model.resultCount, 0)
     }
 
+    /// Favouriting edits the cached rows in place: no query, no table reset
+    /// (the reset was a visible blink), only the changed rows are redrawn.
+    func testFavoriteUpdatesRowsInPlaceWithoutReset() async throws {
+        let model = try await indexedModel()
+        let before = model.facets?.favorites ?? 0
+        var resets = 0
+        var changed = IndexSet()
+        model.pager.onChange = {
+            switch $0 {
+            case .reset: resets += 1
+            case .rowsChanged(let rows): changed.formUnion(rows)
+            default: break
+            }
+        }
+        let target = try XCTUnwrap(rows(model).dropFirst().first)
+        await model.toggleFavorite(rows: [target])
+        XCTAssertEqual(resets, 0)
+        XCTAssertEqual(changed, IndexSet(integer: 1))
+        XCTAssertEqual(model.pager.peek(1)?.favorite, true)
+        XCTAssertEqual(model.facets?.favorites, before + 1)
+        // The heart cell of that row is filled.
+        let controller = ResultsTableController(pager: model.pager)
+        let column = try XCTUnwrap(controller.tableView.tableColumns.first)
+        XCTAssertEqual(column.identifier.rawValue, ResultsTableController.favoriteColumnID)
+        let cell = controller.tableView(controller.tableView, viewFor: column, row: 1) as? FavoriteCellView
+        XCTAssertEqual(cell?.isFavorite, true)
+        // The core has it too.
+        await model.refreshResults()
+        XCTAssertEqual(model.pager.cachedRow(fileId: target.fileId)?.favorite, true)
+    }
+
     func testHidingTheFocusedRowClearsModelAndTableSelection() async throws {
         let model = try await indexedModel()
         let controller = ResultsTableController(pager: model.pager)

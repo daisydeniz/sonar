@@ -9,7 +9,7 @@ use sonar_core::similar::{
 use crate::convert;
 use crate::engine::MAX_PAGE;
 use crate::error::{guard, FfiError};
-use crate::types::{FileRow, SearchFilters};
+use crate::types::{FileRow, SearchFilters, SortKey};
 
 /// What "find similar" starts from.
 #[derive(Debug, Clone, uniffi::Enum)]
@@ -58,6 +58,14 @@ pub struct SimilarQuery {
     /// Hits wanted; cut to 1000.
     #[uniffi(default = 100)]
     pub limit: u32,
+    /// Order of the returned neighbours: `nil` (or relevance) = nearest
+    /// first; a field orders the same `limit` nearest files by it (unknown
+    /// values last, ties nearest first).
+    #[uniffi(default = None)]
+    pub sort: Option<SortKey>,
+    /// Largest or last first (ignored for nearest-first).
+    #[uniffi(default = false)]
+    pub descending: bool,
 }
 
 /// One neighbour's distances (smaller = more similar; 0 = identical,

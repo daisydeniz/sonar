@@ -212,12 +212,34 @@ final class SimilarityTests: XCTestCase {
         XCTAssertNil(model.selectedRow)
     }
 
-    func testSortIgnoredInSimilarityMode() async throws {
-        let model = fakeModel { _ in fakePage([1]) }
+    func testHeaderSortReordersSimilarityResultsInTheCore() async throws {
+        let log = QueryLog()
+        let model = fakeModel { q in
+            await log.add(q)
+            return fakePage([1, 2])
+        }
+        // A sort left over from browsing does not apply to a new similarity search.
+        await model.setSort(.name, descending: false)
         model.findSimilar(to: fakeRow(1))
         await model.settle()
-        await model.setSort(.name, descending: false)
         XCTAssertEqual(model.sortKey, .relevance)
+        await model.setSort(.bpm, descending: true)
+        let queries = await log.queries
+        XCTAssertEqual(queries.map(\.sort), [nil, .bpm])
+        XCTAssertEqual(queries.map(\.descending), [false, true])
+        XCTAssertEqual(model.resultCount, 2)
+    }
+
+    func testShowSortSetsTheHeaderIndicatorWithoutCallingBack() {
+        let controller = ResultsTableController(pager: ResultsPager())
+        var calls = 0
+        controller.onSort = { _, _ in calls += 1 }
+        controller.showSort(.bpm, descending: true)
+        XCTAssertEqual(controller.tableView.sortDescriptors.first?.key, "bpm")
+        XCTAssertEqual(controller.tableView.sortDescriptors.first?.ascending, false)
+        controller.showSort(.relevance, descending: false)
+        XCTAssertTrue(controller.tableView.sortDescriptors.isEmpty)
+        XCTAssertEqual(calls, 0)
     }
 
     func testErrorsMapToInlineMessages() {

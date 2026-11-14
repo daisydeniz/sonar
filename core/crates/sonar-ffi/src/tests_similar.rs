@@ -14,6 +14,8 @@ fn query(seed: SimilarSeed) -> SimilarQuery {
         weights: None,
         filters: None,
         limit: 100,
+        sort: None,
+        descending: false,
     }
 }
 
@@ -75,6 +77,29 @@ fn file_and_external_seeds_with_weights_and_filters() {
         .expect("similar");
     assert!(!page.rows.is_empty() && page.rows.len() <= 10);
     assert_eq!(page.rows.len(), page.hits.len());
+    // A field sort reorders the same nearest files; hits stay aligned.
+    let sorted = engine
+        .similar_to(SimilarQuery {
+            limit: 10,
+            sort: Some(SortKey::Duration),
+            descending: true,
+            ..query(SimilarSeed::File {
+                file_id: seed.file_id,
+            })
+        })
+        .expect("similar sorted");
+    let ids = |p: &SimilarPage| p.rows.iter().map(|r| r.file_id).collect::<Vec<_>>();
+    let mut expected = page.rows.clone();
+    expected.sort_by_key(|r| std::cmp::Reverse(r.duration_ms)); // stable: ties nearest first
+    assert_eq!(
+        ids(&sorted),
+        expected.iter().map(|r| r.file_id).collect::<Vec<_>>()
+    );
+    assert_ne!(ids(&sorted), ids(&page), "fixtures differ in duration");
+    assert_eq!(
+        ids(&sorted),
+        sorted.hits.iter().map(|h| h.file_id).collect::<Vec<_>>()
+    );
     assert!(page.candidates >= page.rows.len() as u64);
     assert!(page.rows.iter().all(|r| r.file_id != seed.file_id));
     for (r, h) in page.rows.iter().zip(&page.hits) {

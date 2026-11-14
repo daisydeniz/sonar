@@ -47,11 +47,16 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         let id: String
         let title: String
         let width: CGFloat
-        let sortKey: SortKey
+        /// nil: the column cannot be sorted.
+        let sortKey: SortKey?
         let monospaced: Bool
     }
 
+    /// The heart column (click toggles the row's favourite).
+    static let favoriteColumnID = "favorite"
+
     static let columns: [Column] = [
+        Column(id: favoriteColumnID, title: "♥", width: 26, sortKey: nil, monospaced: false),
         Column(id: "name", title: "Name", width: 260, sortKey: .name, monospaced: false),
         Column(id: "category", title: "Category", width: 90, sortKey: .category, monospaced: false),
         Column(id: "kind", title: "Kind", width: 70, sortKey: .kind, monospaced: false),
@@ -85,6 +90,8 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
     }
     /// Context menu "Find Similar" on a row.
     var onFindSimilar: ((FileRow) -> Void)?
+    /// The heart of a row was clicked.
+    var onToggleFavorite: ((FileRow) -> Void)?
     /// Organize items for the right-clicked rows (the model decides).
     var menuEntries: (([FileRow]) -> [RowMenuEntry])?
     /// Library names for the Library column.
@@ -98,6 +105,7 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
     /// reset can re-highlight them).
     private(set) var selectedIDs: [Int64] = []
     private var suppressSelection = false
+    private var suppressSort = false
 
     init(pager: ResultsPager) {
         self.pager = pager
@@ -107,7 +115,15 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
             column.title = spec.title
             column.width = spec.width
             column.minWidth = 40
-            column.sortDescriptorPrototype = NSSortDescriptor(key: spec.id, ascending: true)
+            if spec.id == Self.favoriteColumnID {
+                column.minWidth = spec.width
+                column.maxWidth = spec.width
+                column.headerCell.alignment = .center
+                column.headerToolTip = "Favorite"
+            }
+            if spec.sortKey != nil {
+                column.sortDescriptorPrototype = NSSortDescriptor(key: spec.id, ascending: true)
+            }
             tableView.addTableColumn(column)
         }
         tableView.rowHeight = Self.rowHeight
@@ -145,6 +161,17 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         return true
     }
 
+    /// Makes the header indicator match the model's sort (it changes
+    /// without a header click when a similarity search starts). No `onSort`.
+    func showSort(_ key: SortKey, descending: Bool) {
+        let column = key == .relevance ? nil : Self.columns.first { $0.sortKey == key }
+        let current = tableView.sortDescriptors.first
+        if current?.key == column?.id, column == nil || current?.ascending == !descending { return }
+        suppressSort = true
+        defer { suppressSort = false }
+        tableView.sortDescriptors = column.map { [NSSortDescriptor(key: $0.id, ascending: !descending)] } ?? []
+    }
+
     // MARK: Pager changes
 
     private func pagerChanged(_ change: ResultsPager.Change) {
@@ -174,6 +201,12 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
                 selectedID = row.fileId
                 onSelect?(row)
             }
+        case .rowsChanged(let rows):
+            // In-place edit (favourite): redraw those rows only; scroll
+            // position and selection are untouched.
+            tableView.reloadData(
+                forRowIndexes: rows.filteredIndexSet { $0 < tableView.numberOfRows },
+                columnIndexes: IndexSet(integersIn: 0..<tableView.numberOfColumns))
         }
     }
 
@@ -237,6 +270,12 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         (sender.representedObject as? MenuAction)?.run()
     }
 
+    /// Heart click: toggles that row only (the selection does not change).
+    @objc private func favoriteClicked(_ sender: NSView) {
+        let row = tableView.row(for: sender)
+        if row >= 0, let file = pager.peek(row) { onToggleFavorite?(file) }
+    }
+
     @objc private func findSimilarClicked() {
         let row = tableView.clickedRow
         if row >= 0, let file = pager.peek(row) { onFindSimilar?(file) }
@@ -247,10 +286,10 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
     func numberOfRows(in tableView: NSTableView) -> Int { pager.count }
 
     func tableView(_ tableView: NSTableView, sortDescriptorsDidChange old: [NSSortDescriptor]) {
-        guard let d = tableView.sortDescriptors.first, let key = d.key,
-            let spec = Self.columns.first(where: { $0.id == key })
+        guard !suppressSort, let d = tableView.sortDescriptors.first, let key = d.key,
+            let sortKey = Self.columns.first(where: { $0.id == key })?.sortKey
         else { return }
-        onSort?(spec.sortKey, !d.ascending)
+        onSort?(sortKey, !d.ascending)
     }
 
     // MARK: NSTableViewDelegate
@@ -258,6 +297,12 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard let tableColumn else { return nil }
         let id = tableColumn.identifier
+        if id.rawValue == Self.favoriteColumnID {
+            let cell = (tableView.makeView(withIdentifier: id, owner: nil) as? FavoriteCellView)
+                ?? FavoriteCellView(identifier: id, target: self, action: #selector(favoriteClicked(_:)))
+            cell.show(pager.row(at: row))
+            return cell
+        }
         let cell = (tableView.makeView(withIdentifier: id, owner: nil) as? NSTableCellView)
             ?? makeCell(identifier: id)
         let field = cell.textField

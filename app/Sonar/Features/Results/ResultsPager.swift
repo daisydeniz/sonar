@@ -42,6 +42,8 @@ final class ResultsPager {
         case countChanged
         /// Rows in this range were loaded (reload them if visible).
         case pagesLoaded(Range<Int>)
+        /// Cached rows were edited in place (reload just these rows).
+        case rowsChanged(IndexSet)
     }
 
     static let defaultPageSize = 200
@@ -59,7 +61,7 @@ final class ResultsPager {
     @ObservationIgnored var onError: ((Error) -> Void)?
 
     private final class Page {
-        let rows: [FileRow]
+        var rows: [FileRow]
         var lastUse: Int
         init(rows: [FileRow], lastUse: Int) { self.rows = rows; self.lastUse = lastUse }
     }
@@ -120,6 +122,27 @@ final class ResultsPager {
     /// A cached row with this file id.
     func cachedRow(fileId id: Int64) -> FileRow? {
         index(ofFileId: id).flatMap { peek($0) }
+    }
+
+    // MARK: In-place edits
+
+    /// Marks cached rows as favourite / not, in place: the table redraws only
+    /// those rows (no query, no reload) and the favourites facet follows.
+    func setFavorite(fileIds: Set<Int64>, on: Bool) {
+        var changed = IndexSet()
+        for (p, page) in cache {
+            for i in page.rows.indices where fileIds.contains(page.rows[i].fileId) && page.rows[i].favorite != on {
+                page.rows[i].favorite = on
+                changed.insert(p * pageSize + i)
+            }
+        }
+        guard !changed.isEmpty else { return }
+        if var f = facets {
+            let n = UInt64(changed.count)
+            f.favorites = on ? f.favorites + n : f.favorites - min(n, f.favorites)
+            facets = f
+        }
+        onChange?(.rowsChanged(changed))
     }
 
     // MARK: Reset

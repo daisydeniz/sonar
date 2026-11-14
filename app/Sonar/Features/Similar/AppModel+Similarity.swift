@@ -23,6 +23,7 @@ extension AppModel {
 
     private func startSimilarity(_ target: SimilarityTarget) {
         similarity.begin(target)
+        resetSort()  // nearest first; a header click reorders them
         scheduleRefresh()
     }
 
@@ -88,7 +89,8 @@ extension AppModel {
             if case .library(let id) = sidebarSelection { base.libraryIds = [id] }
             let query = SimilarQuery(
                 seed: target.seed, weights: try similarity.sliders.weights(),
-                filters: filters.apply(to: base), limit: Self.similarLimit)
+                filters: filters.apply(to: base), limit: Self.similarLimit,
+                sort: sortKey == .relevance ? nil : sortKey, descending: sortDescending)
             let page = try await Self.searchRetryingCancelled(query, search) { mine == self.generation }
             guard mine == generation else { return }
             guard let page else {

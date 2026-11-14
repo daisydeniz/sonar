@@ -208,21 +208,31 @@ impl SonarEngine {
     /// (external file), `Internal` (no analysis has run yet: "no vector
     /// store yet").
     pub fn similar_to(&self, query: SimilarQuery) -> Result<SimilarPage, FfiError> {
+        let sort = sonar_core::search::Sort {
+            field: query.sort.map_or_else(Default::default, Into::into),
+            descending: query.descending,
+        };
         let (seed, opts) = similar_types::query(query)?;
         let found = guard(|| self.engine.similar_latest(&seed, &opts))?;
         let ids: Vec<i64> = found.hits.iter().map(|h| h.file_id).collect();
         let rows = guard(|| self.engine.rows(&ids))?;
         // Keep rows and hits aligned even if a file vanished meanwhile.
+        let pairs: Vec<_> = rows
+            .into_iter()
+            .filter_map(|row| {
+                let hit = found.hits.iter().find(|h| h.file_id == row.file_id)?;
+                Some((row, SimilarHit::from(hit)))
+            })
+            .collect();
+        let pairs = sonar_core::engine::sort_by_row(pairs, sort, |(row, _)| row);
         let mut page = SimilarPage {
-            rows: Vec::with_capacity(rows.len()),
-            hits: Vec::with_capacity(rows.len()),
+            rows: Vec::with_capacity(pairs.len()),
+            hits: Vec::with_capacity(pairs.len()),
             candidates: count(found.candidates),
         };
-        for row in rows {
-            if let Some(hit) = found.hits.iter().find(|h| h.file_id == row.file_id) {
-                page.hits.push(SimilarHit::from(hit));
-                page.rows.push(FileRow::from(row));
-            }
+        for (row, hit) in pairs {
+            page.hits.push(hit);
+            page.rows.push(FileRow::from(row));
         }
         Ok(page)
     }
