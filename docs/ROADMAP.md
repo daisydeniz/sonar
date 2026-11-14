@@ -87,7 +87,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T7.2 (swift-ui) Onboarding (pick folders), settings, empty states, error states. (ea23ab6)
 - [x] T7.3 (architect) Release pipeline script: universal build, codesign, notarize, DMG, Sparkle updates (keys via env). (24aa955)
 - [ ] T7.4 [HUMAN] Apple Developer ID, notarization credentials, Paddle/Lemon Squeezy account, pricing.
-- [x] T7.5 (swift-ui) Licensing: trial + license key validation (offline-friendly) behind a provider-agnostic interface.
+- [x] T7.5 (swift-ui) Licensing: trial + license key validation (offline-friendly) behind a provider-agnostic interface. (df36e60)
 
 ## M8 — Founder acceptance (end of MVP)
 - [ ] T8.1 [HUMAN] Founder tests the app end to end on his library: scan, search, similarity, preview feel, drag & drop into Ableton Live. Findings become new tasks.
