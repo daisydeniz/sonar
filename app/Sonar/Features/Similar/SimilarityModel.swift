@@ -149,7 +149,7 @@ final class SimilarityModel {
         case .Audio(let m), .Io(let m):
             if case .external = target { return "Couldn't read that audio file: \(m)" }
             return m
-        case .Internal(let m): return m
+        case .Internal(let m), .License(let m): return m
         case .Cancelled: return "Cancelled"
         }
     }

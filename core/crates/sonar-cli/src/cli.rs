@@ -380,6 +380,15 @@ pub enum Command {
     /// `sonar override bpm --set 128 12 13`.
     Override(crate::user_args::OverrideArgs),
 
+    /// Licensing: trial status, activate/deactivate a license key, and (for
+    /// the founder / a fulfilment server) generate signing keys and issue
+    /// keys. Everything is offline.
+    License {
+        /// License action.
+        #[command(subcommand)]
+        command: crate::license_cmd::LicenseCommand,
+    },
+
     /// Inspect the SQLite store (location: $SONAR_HOME/sonar.db, else
     /// ~/Library/Application Support/Sonar/sonar.db).
     Store {

@@ -1156,3 +1156,30 @@ Sparkle `appcast.xml` in `dist/updates/`.
   certificate in the keychain, a notarytool profile or API key, a Sparkle
   keypair (`generate_keys` from the Sparkle artifact; public key → env, private
   key stays in keychain/env), a host URL for DMG + appcast, and uploads (manual).
+
+## ADR-038 — Licensing: 14-day trial, offline signed keys (T7.5)
+Accepted. `sonar_core::license` (CLI `sonar license ...`, FFI free functions
+`licenseStatus` / `activateLicense` / `deactivateLicense` that work even when
+the engine fails to open).
+- **Key** = `SONAR1-<b64url(payload json)>.<b64url(Ed25519 signature)>`;
+  payload `{v:1, product:"sonar", licensee, license_id, issued, kind:
+  perpetual|subscription, expires?}`. Verified fully offline; whitespace in a
+  pasted key is ignored; no input can panic (fuzz-ish test).
+- **Provider-agnostic**: `LicenseVerifier` trait (`inspect`, `verify`);
+  `SignedKeyVerifier` is the only implementation. Paddle / Lemon Squeezy only
+  fulfil: their webhook runs `sonar license issue` (or a small server using
+  `license::issue`) and mails the key. An online verifier can implement the
+  same trait later; the app never depends on a provider.
+- **Public key**: build-time `SONAR_LICENSE_PUBLIC_KEY` (`option_env!`, cargo
+  tracks it). Without it the committed DEV key is trusted (its secret is in
+  `sonar-core/dev/`, so anyone can mint keys: dev only; `uses_dev_key()` /
+  `LicenseState.devKey`). `scripts/release.sh` refuses a real build without it.
+- **Trial/state**: `<data dir>/license.json` (trial start on first status call,
+  `last_seen`, activated key); 14 days; effective now = `max(now, last_seen)`
+  (clock rollback adds no days); atomic temp+rename writes. A corrupt file
+  never errors: the trial counts from the file's mtime (key lost, re-enter it).
+  A stored key that no longer verifies falls back to the trial dates.
+- **App gate** (UI decides): `TrialExpired` / `LicenseExpired` show a blocking
+  gate view (Enter License / Buy / Quit); library data is never touched.
+- **Threat model**: honest users. Deleting `license.json` or patching the app
+  defeats it; accepted, this is not DRM.

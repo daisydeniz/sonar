@@ -21,6 +21,7 @@ mod dupes_types;
 mod engine;
 mod error;
 mod facet_types;
+mod license;
 mod similar_types;
 mod types;
 
@@ -35,6 +36,9 @@ pub use dupes_types::{DuplicateGroup, DuplicateKind, DuplicatesQuery, Duplicates
 pub use engine::SonarEngine;
 pub use error::FfiError;
 pub use facet_types::{FacetCount, LibraryFacet, SearchFacets};
+pub use license::{
+    activate_license, deactivate_license, license_status, LicenseState, LicenseStateKind,
+};
 pub use similar_types::{
     aspect_weights_from_sliders, AspectWeights, SimilarHit, SimilarPage, SimilarQuery, SimilarSeed,
 };

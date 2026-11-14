@@ -18,4 +18,6 @@ uniffi.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+# Dev license signing key for the licensing tests (never in a shipped build).
+sonar-core = { path = "../sonar-core", features = ["dev-keys"] }
 tempfile.workspace = true

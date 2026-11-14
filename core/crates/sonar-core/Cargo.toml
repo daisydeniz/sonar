@@ -14,6 +14,9 @@ default = []
 # (skipped). `sonar-cli` enables it; `sonar-ffi` does not (ONNX Runtime is a
 # static library the app link step would have to know about; T5.6).
 embed = ["dep:ort", "dep:tokenizers"]
+# Exposes the DEV license signing key (`license::dev`) to other crates' tests.
+# Never enabled in a shipped build (T7.5, ADR-038).
+dev-keys = []
 
 [dependencies]
 memmap2.workspace = true
@@ -32,6 +35,12 @@ thiserror.workspace = true
 tracing.workspace = true
 twox-hash.workspace = true
 unicode-normalization.workspace = true
+# License keys (T7.5, ADR-038). ed25519-dalek is BSD-3-Clause, base64 and
+# getrandom are MIT OR Apache-2.0. No `rand_core` feature: key generation
+# draws its 32 seed bytes from the OS through `getrandom`.
+ed25519-dalek = { version = "2", default-features = false, features = ["std"] }
+base64 = "0.23"
+getrandom = "0.3"
 
 [dev-dependencies]
 hound.workspace = true

@@ -25,6 +25,9 @@ settings:
     # scripts/release.sh passes them from SONAR_SPARKLE_FEED_URL / _PUBLIC_KEY.
     SONAR_SPARKLE_FEED_URL: ""
     SONAR_SPARKLE_PUBLIC_KEY: ""
+    # Purchase page (https) for the expired-license gate. Empty hides the Buy
+    # button; scripts/release.sh passes $SONAR_PURCHASE_URL through.
+    SONAR_PURCHASE_URL: ""
     # Ad-hoc signing: builds without an Apple developer account.
     # Release signing/notarization is configured by the release pipeline.
     CODE_SIGN_IDENTITY: "-"
@@ -68,6 +71,7 @@ targets:
         NSPrincipalClass: NSApplication
         SUFeedURL: $(SONAR_SPARKLE_FEED_URL)
         SUPublicEDKey: $(SONAR_SPARKLE_PUBLIC_KEY)
+        SonarPurchaseURL: $(SONAR_PURCHASE_URL)
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.sonar.Sonar

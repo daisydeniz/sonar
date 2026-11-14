@@ -225,6 +225,11 @@ pub enum Error {
         /// What is wrong.
         reason: String,
     },
+
+    /// A licensing problem (invalid or expired key, license file I/O). The
+    /// message is written for the end user.
+    #[error(transparent)]
+    License(#[from] crate::license::LicenseError),
 }
 
 impl From<rusqlite::Error> for Error {

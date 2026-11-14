@@ -26,6 +26,18 @@
 #   SONAR_SPARKLE_PRIVATE_KEY_FILE  path to a file holding it
 #   SONAR_SPARKLE_DOWNLOAD_URL_PREFIX  URL dir the DMG will be hosted at
 #                             (default: directory of the feed URL)
+#
+# Required for a real build (not --dry-run / --skip-build), ADR-038:
+#   SONAR_LICENSE_PUBLIC_KEY  base64 Ed25519 public key license keys are
+#                             verified against, baked into the core at build
+#                             time (`sonar license keygen --out <secret file>`
+#                             prints it; keep the secret file private). Without
+#                             it the core trusts the committed DEV key, whose
+#                             secret is public: anyone could mint keys. Cargo
+#                             rebuilds the core when this value changes.
+# Optional:
+#   SONAR_PURCHASE_URL        https store page for the "Buy" button on the
+#                             expired-license gate (empty: button hidden).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -59,6 +71,35 @@ for tool in xcodegen xcodebuild codesign hdiutil lipo ditto; do
   }
 done
 
+say() { printf '\n▶ %s\n' "$*"; }
+warn() { printf 'WARNING: %s\n' "$*" >&2; }
+
+DEV_LICENSE_PUBLIC_KEY="ZUD3tqPTmjS5M6GHhTPlsBA20oooXz7cRHn6IIJHrQU"  # sonar-core license/keys.rs
+if [[ "$SKIP_BUILD" == 1 && "$DRY" == 0 ]]; then
+  warn "--skip-build: re-using dist/build as is; make sure it was built with the production SONAR_LICENSE_PUBLIC_KEY."
+fi
+if [[ "$SKIP_BUILD" == 0 ]]; then
+  if [[ -n "${SONAR_LICENSE_PUBLIC_KEY:-}" ]]; then
+    # Ed25519 public key = 32 bytes = 43 base64 chars (either alphabet, `=`
+    # optional). A bad value would make every license check error (and the
+    # app fail open).
+    if [[ ! "$SONAR_LICENSE_PUBLIC_KEY" =~ ^[A-Za-z0-9_+/-]{43}=?$ ]]; then
+      echo "release: SONAR_LICENSE_PUBLIC_KEY is not a 32-byte base64 Ed25519 key (use the public_key printed by 'sonar license keygen')." >&2
+      exit 1
+    fi
+    if [[ "$SONAR_LICENSE_PUBLIC_KEY" == "$DEV_LICENSE_PUBLIC_KEY" && "$DRY" == 0 ]]; then
+      echo "release: SONAR_LICENSE_PUBLIC_KEY is the DEV key; a release needs the production key." >&2
+      exit 1
+    fi
+    export SONAR_LICENSE_PUBLIC_KEY   # picked up by build-core.sh -> cargo (option_env!)
+  elif [[ "$DRY" == 1 ]]; then
+    warn "SONAR_LICENSE_PUBLIC_KEY not set: building with the DEV license key (anyone can mint keys). Fine for a dry run, never ship it."
+  else
+    echo "release: SONAR_LICENSE_PUBLIC_KEY is not set. A release must be built with the production license public key (sonar license keygen --out <file>; see --help). Use --dry-run for a local build with the dev key." >&2
+    exit 1
+  fi
+fi
+
 yml() { sed -n "s/^ *$1: *\"\{0,1\}\([^\"]*\)\"\{0,1\} *\$/\1/p" "$ROOT/app/project.yml" | head -n1; }
 VERSION="${VERSION:-$(yml MARKETING_VERSION)}"
 BUILD="${BUILD:-$(yml CURRENT_PROJECT_VERSION)}"
@@ -72,8 +113,6 @@ DMG="$DIST/Sonar-$VERSION.dmg"
 ENTITLEMENTS="$ROOT/app/Release.entitlements"
 mkdir -p "$DIST" "$WORK"
 
-say() { printf '\n▶ %s\n' "$*"; }
-warn() { printf 'WARNING: %s\n' "$*" >&2; }
 SKIPPED=()
 
 # ---- credential detection (all gracefully optional) ------------------------
@@ -123,6 +162,7 @@ if [[ "$SKIP_BUILD" == 0 ]]; then
     ARCHS="$XC_ARCHS" ONLY_ACTIVE_ARCH=NO \
     MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$BUILD" \
     SONAR_SPARKLE_FEED_URL="$FEED_URL" SONAR_SPARKLE_PUBLIC_KEY="$PUB_KEY" \
+    SONAR_PURCHASE_URL="${SONAR_PURCHASE_URL:-}" \
     CODE_SIGN_IDENTITY="-" CODE_SIGNING_ALLOWED=YES \
     -quiet build
   ditto "$DERIVED/Build/Products/Release/Sonar.app" "$APP"

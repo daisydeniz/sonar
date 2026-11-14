@@ -17,6 +17,7 @@ pub mod fixtures;
 pub mod index;
 pub mod jobs;
 pub mod key;
+pub mod license;
 pub mod meta;
 pub mod paths;
 pub mod preview;

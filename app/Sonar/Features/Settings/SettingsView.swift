@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 struct SettingsView: View {
     let model: AppModel
+    let license: LicenseManager
 
     var body: some View {
         TabView {
@@ -13,6 +14,8 @@ struct SettingsView: View {
                 .tabItem { Label("Preview", systemImage: "speaker.wave.2") }
             IndexingSettingsView(model: model)
                 .tabItem { Label("Indexing", systemImage: "gearshape.2") }
+            LicenseSettingsView(license: license)
+                .tabItem { Label("License", systemImage: "key") }
             AboutSettingsView()
                 .tabItem { Label("About", systemImage: "info.circle") }
         }

@@ -14,6 +14,7 @@ mod dupes_cmd;
 mod embed_cmd;
 mod eval_cmd;
 mod key_cmd;
+mod license_cmd;
 mod meta_cmd;
 mod search_args;
 mod search_cmd;
@@ -137,6 +138,7 @@ fn main() -> Result<()> {
         Command::Tag { command } => user_cmd::tag(&command)?,
         Command::Collection { command } => user_cmd::collection(&command)?,
         Command::Override(args) => user_cmd::override_field(&args)?,
+        Command::License { command } => license_cmd::run(&command)?,
         Command::Store {
             command: StoreCommand::Info,
         } => store_info()?,

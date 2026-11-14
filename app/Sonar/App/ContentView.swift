@@ -4,11 +4,28 @@ import SwiftUI
 @MainActor
 struct ContentView: View {
     @Bindable var model: AppModel
+    let license: LicenseManager
     @State private var showInspector = true
     @State private var searchMonitor = SearchKeyMonitor()
     @State private var dropTargeted = false
 
     var body: some View {
+        Group {
+            if license.showsGate {
+                LicenseGateView(license: license)
+            } else {
+                mainContent
+            }
+        }
+        .sheet(isPresented: Bindable(license).showsEnterSheet) {
+            EnterLicenseView(license: license) { license.showsEnterSheet = false }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            Task { await license.refresh() }
+        }
+    }
+
+    private var mainContent: some View {
         NavigationSplitView {
             SidebarView(model: model)
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220)
@@ -42,6 +59,7 @@ struct ContentView: View {
         .onAppear { searchMonitor.install(actions: model.keyboard) }
         .onDisappear { searchMonitor.remove() }
         .toolbar {
+            ToolbarItem { TrialBadgeView(license: license) }
             ToolbarItem { IndexingStatusView(model: model) }
             ToolbarItem {
                 Button { showInspector.toggle() } label: { Label("Inspector", systemImage: "sidebar.trailing") }

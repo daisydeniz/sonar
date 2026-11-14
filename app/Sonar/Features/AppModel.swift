@@ -389,7 +389,7 @@ final class AppModel {
     static func describe(_ error: Error) -> String {
         if let e = error as? FfiError {
             switch e {
-            case .NotFound(let m), .InvalidInput(let m), .Io(let m), .Audio(let m), .Internal(let m):
+            case .NotFound(let m), .InvalidInput(let m), .Io(let m), .Audio(let m), .Internal(let m), .License(let m):
                 return m
             case .Cancelled:
                 return "Cancelled"

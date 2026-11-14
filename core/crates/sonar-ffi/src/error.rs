@@ -39,6 +39,13 @@ pub enum FfiError {
         /// Human-readable detail.
         message: String,
     },
+    /// A license key is invalid, for another product, or expired; `message`
+    /// is user-readable and can be shown as is. Nothing was changed.
+    #[error("license: {message}")]
+    License {
+        /// What is wrong, phrased for the end user.
+        message: String,
+    },
     /// Database, index or internal failure (including a caught panic).
     #[error("internal error: {message}")]
     Internal {
@@ -61,6 +68,8 @@ impl From<Error> for FfiError {
             }
             Error::Io { .. } | Error::NonUtf8Path { .. } | Error::NoDataDir => Self::Io { message },
             Error::Decode { .. } | Error::UnsupportedFormat { .. } => Self::Audio { message },
+            Error::License(ref l) if l.is_key_problem() => Self::License { message },
+            Error::License(sonar_core::license::LicenseError::Io { .. }) => Self::Io { message },
             _ => Self::Internal { message },
         }
     }

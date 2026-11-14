@@ -4,6 +4,7 @@ import SwiftUI
 @main
 struct SonarApp: App {
     @State private var model = AppModel()
+    @State private var license = LicenseManager()
     @State private var updater = AppUpdater(start: !SonarApp.isTesting)
 
     /// Unit tests host the app; they build their own models, so the app
@@ -13,14 +14,16 @@ struct SonarApp: App {
     var body: some Scene {
         // Single main window: one engine and one poll loop per app.
         Window(AppInfo.name, id: "main") {
-            ContentView(model: model)
+            ContentView(model: model, license: license)
                 .frame(minWidth: 900, minHeight: 480)
                 .task { if !Self.isTesting { await model.start() } }
+                .task { if !Self.isTesting { await license.refresh() } }
         }
         .commands {
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") { updater.checkForUpdates() }
                     .disabled(!updater.isEnabled)
+                Button("Enter License…") { license.showsEnterSheet = true }
             }
             CommandGroup(replacing: .textEditing) {
                 Button("Find Samples") { model.keyboard.focusSearch() }
@@ -51,6 +54,6 @@ struct SonarApp: App {
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             }
         }
-        Settings { SettingsView(model: model) }
+        Settings { SettingsView(model: model, license: license) }
     }
 }

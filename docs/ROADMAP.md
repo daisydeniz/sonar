@@ -87,7 +87,7 @@ Owner tags map to subagents in `.claude/agents/`.
 - [x] T7.2 (swift-ui) Onboarding (pick folders), settings, empty states, error states. (ea23ab6)
 - [x] T7.3 (architect) Release pipeline script: universal build, codesign, notarize, DMG, Sparkle updates (keys via env). (24aa955)
 - [ ] T7.4 [HUMAN] Apple Developer ID, notarization credentials, Paddle/Lemon Squeezy account, pricing.
-- [ ] T7.5 (swift-ui) Licensing: trial + license key validation (offline-friendly) behind a provider-agnostic interface.
+- [x] T7.5 (swift-ui) Licensing: trial + license key validation (offline-friendly) behind a provider-agnostic interface.
 
 ## M8 — Founder acceptance (end of MVP)
 - [ ] T8.1 [HUMAN] Founder tests the app end to end on his library: scan, search, similarity, preview feel, drag & drop into Ableton Live. Findings become new tasks.
@@ -259,3 +259,5 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T7.3) Signed/notarized path (Developer ID, notarytool, stapler, appcast) is written to Apple/Sparkle docs but never run; do a real release smoke run once T7.4 credentials exist.
 - (from T7.3) x86_64 slice is built but never run on an Intel Mac; re-check `ort` x86_64 ONNX Runtime before CLAP is linked into the app.
 - (from T7.3) No Sparkle release-notes (`sparkle:releaseNotesLink`) in the appcast; `shellcheck` not installed, so check.sh only runs `bash -n` on release.sh.
+- (from T7.5) The license gate hides the main UI only: the engine still opens/scans in the background, and menu commands (Open Folder, Find…) plus Settings stay reachable while gated; disable them (`.disabled(license.showsGate)`) if the honest-user model needs tightening.
+- (from T7.5) A malformed build-time license public key (`BadSigningKey`) makes the app fail open; release.sh validates the key, but the FFI could map it to a gated state instead.
