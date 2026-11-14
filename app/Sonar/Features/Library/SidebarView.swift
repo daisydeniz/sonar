@@ -15,9 +15,11 @@ struct SidebarView: View {
             }
             Section("Libraries") {
                 ForEach(model.libraries, id: \.id) { library in
-                    Label(Self.title(library), systemImage: library.online ? "folder" : "folder.badge.questionmark")
+                    Label(Self.title(library), systemImage: library.online ? "folder" : "externaldrive.badge.exclamationmark")
+                        .opacity(library.online ? 1 : 0.5)
                         .tag(SidebarItem.library(library.id))
-                        .help(library.rootPath)
+                        .help(library.online ? library.rootPath : "Offline: \(library.rootPath) is not available")
+                        .accessibilityLabel(library.online ? Self.title(library) : "\(Self.title(library)), offline")
                         .contextMenu {
                             Button("Remove Library…", role: .destructive) { pendingRemoval = library }
                         }
@@ -70,9 +72,8 @@ struct SidebarView: View {
     }
 
     private func addLibrary() {
-        if let path = FolderPicker.pickFolder() {
-            Task { await model.addLibrary(path: path) }
-        }
+        let paths = FolderPicker.pickFolders()
+        if !paths.isEmpty { Task { await model.addLibraries(paths: paths) } }
     }
 
     private static func title(_ library: LibraryInfo) -> String {

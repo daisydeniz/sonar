@@ -38,7 +38,8 @@ struct WaveformView: View {
         case .loading:
             ProgressView().controlSize(.small)
         case .failed:
-            Text("No waveform").font(.caption).foregroundStyle(.secondary)
+            Label("Can't read this file. It may be missing, moved or unreadable.", systemImage: "exclamationmark.triangle")
+                .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(6)
         case .empty, .ready:
             EmptyView()
         }

@@ -44,6 +44,16 @@ final class AppModel {
     let organizeState = OrganizeState()
     /// Duplicates view state; see `Features/Duplicates`.
     let duplicates = DuplicatesModel()
+    /// Persisted app settings (indexing options); see `Features/Settings`.
+    let settings: AppSettings
+    /// Non-modal, dismissible engine/watcher error message (coalesced).
+    let banner = StatusBanner()
+    /// Result refreshes in flight; empty states wait for 0 (T7.2).
+    private(set) var loadingRefreshes = 0
+    /// The first sidebar load finished (so "no libraries" is real).
+    private(set) var sidebarLoaded = false
+    /// The first results refresh finished.
+    private(set) var resultsLoadedOnce = false
     private(set) var progress = IndexingProgress(
         enabled: false, running: false, paused: false, stage: nil, total: 0, done: 0, errors: 0)
     /// Last user-visible error (add/remove/search failures); nil when none.
@@ -70,6 +80,7 @@ final class AppModel {
     @ObservationIgnored private var isStarted = false
     @ObservationIgnored private let activePollNs: UInt64
     @ObservationIgnored private let idlePollNs: UInt64
+    @ObservationIgnored private let opener: @Sendable () async throws -> CoreBridge
 
     /// Facet counts of the current query (nil for collections / semantic mode).
     var facets: SearchFacets? { pager.facets }
@@ -137,8 +148,11 @@ final class AppModel {
     /// opens the default home in `start()`.
     init(
         engine: SonarEngine? = nil, preview: AudioPreview = AudioPreview(), activePollMs: UInt64 = 250,
-        idlePollMs: UInt64 = 1000
+        idlePollMs: UInt64 = 1000, settings: AppSettings = AppSettings(),
+        opener: @escaping @Sendable () async throws -> CoreBridge = { try await CoreBridge.openDefault() }
     ) {
+        self.settings = settings
+        self.opener = opener
         self.preview = preview
         bridge = engine.map(CoreBridge.init(engine:))
         if let engine {
@@ -162,7 +176,7 @@ final class AppModel {
         isStarted = true
         do {
             if bridge == nil {
-                bridge = try await CoreBridge.openDefault()
+                bridge = try await opener()
                 if let engine = bridge?.engine {
                     preview.decoder = CoreDecoder(engine: engine)
                     waveform.provider = CoreWaveformProvider(engine: engine)
@@ -182,13 +196,21 @@ final class AppModel {
         preview.warmUp()
         if !libraries.isEmpty {
             do {
-                try bridge?.startIndexing(includeEmbeddings: true)
+                try bridge?.startIndexing(includeEmbeddings: settings.includeEmbeddings)
             } catch {
                 errorMessage = Self.describe(error)
             }
         }
         await refreshResults()
         startPolling()
+    }
+
+    /// Re-runs `start()` after the engine failed to open (error screen).
+    func retryOpen() async {
+        guard case .failed = engineState else { return }
+        engineState = .opening
+        isStarted = false
+        await start()
     }
 
     /// Stops the polling loop.
@@ -202,6 +224,7 @@ final class AppModel {
     /// Reloads libraries and collections.
     func reloadSidebar() async {
         guard let bridge else { return }
+        defer { sidebarLoaded = true }
         do {
             libraries = try await bridge.libraries()
             collections = try await bridge.collections()
@@ -215,7 +238,7 @@ final class AppModel {
     func addLibrary(path: String) async {
         guard let bridge else { return }
         do {
-            _ = try await bridge.addLibrary(path: path, includeEmbeddings: true)
+            _ = try await bridge.addLibrary(path: path, includeEmbeddings: settings.includeEmbeddings)
         } catch {
             errorMessage = Self.describe(error)
         }
@@ -285,6 +308,11 @@ final class AppModel {
     func refreshResults(keepScroll: Bool = true) async {
         if similarity.isActive { return await refreshSimilar(keepScroll: keepScroll) }
         guard let bridge, sidebarSelection != .duplicates else { return }
+        loadingRefreshes += 1
+        defer {
+            loadingRefreshes -= 1
+            resultsLoadedOnce = true
+        }
         generation += 1
         let mine = generation
         let selection = sidebarSelection
@@ -358,16 +386,7 @@ final class AppModel {
         guard let bridge else { return }
         progress = bridge.indexingProgress()
         var refresh = wasRunning && !progress.running
-        for event in bridge.pollEvents() {
-            switch event {
-            case .libraryScanned, .libraryOffline, .libraryOnline, .indexRefreshed, .indexingFinished:
-                refresh = true
-            case .error(let message):
-                errorMessage = message
-            case .indexingStarted:
-                break
-            }
-        }
+        for event in bridge.pollEvents() where apply(event) { refresh = true }
         wasRunning = progress.running
         if refresh {
             track {

@@ -13,6 +13,7 @@ import Observation
 @Observable
 final class AudioPreview {
     static let autoPlayKey = "preview.autoPlay"
+    static let normalizeKey = "preview.normalizeLoudness"
     static let pitchRange = -12...12
     /// Neighbour rows pre-decoded on each side of the selection.
     static let neighbourReach = 2
@@ -28,6 +29,11 @@ final class AudioPreview {
     private(set) var pitchSemitones = 0
     var autoPlay: Bool {
         didSet { defaults.set(autoPlay, forKey: Self.autoPlayKey) }
+    }
+
+    /// Apply the core's loudness-normalization gain (ADR-034). Default on.
+    var normalizeLoudness: Bool {
+        didSet { defaults.set(normalizeLoudness, forKey: Self.normalizeKey) }
     }
 
     @ObservationIgnored var decoder: PreviewDecoding?
@@ -54,6 +60,7 @@ final class AudioPreview {
         self.defaults = defaults
         self.maxConcurrentPrefetch = maxConcurrentPrefetch
         autoPlay = defaults.object(forKey: Self.autoPlayKey) as? Bool ?? true
+        normalizeLoudness = defaults.object(forKey: Self.normalizeKey) as? Bool ?? true
         player.onFinished = { [weak self] in self?.isPlaying = false }
     }
 
@@ -165,7 +172,7 @@ final class AudioPreview {
         currentClip = clip
         do {
             try player.play(
-                clip, loop: loop, gainDb: row.previewGainDb, pitchCents: Float(pitchSemitones * 100),
+                clip, loop: loop, gainDb: normalizeLoudness ? row.previewGainDb : nil, pitchCents: Float(pitchSemitones * 100),
                 startAt: startAt)
             isPlaying = true
         } catch {

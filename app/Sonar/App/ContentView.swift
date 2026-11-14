@@ -61,13 +61,14 @@ struct ContentView: View {
         case .opening:
             ProgressView("Opening library…").frame(maxWidth: .infinity, maxHeight: .infinity)
         case .failed(let message):
-            ContentUnavailableView(
-                "Could not open Sonar's library", systemImage: "exclamationmark.triangle",
-                description: Text(message))
+            EngineFailedView(model: model, message: message)
+        case .ready where model.showsOnboarding:
+            OnboardingView(model: model)
         case .ready where model.sidebarSelection == .duplicates:
             DuplicatesView(model: model)
         case .ready:
             VStack(spacing: 0) {
+                StatusBannerView(banner: model.banner)
                 if model.showsFilterBar {
                     FilterBarView(model: model)
                     Divider()
@@ -89,23 +90,10 @@ struct ContentView: View {
     }
 
     @ViewBuilder private var results: some View {
-        if model.resultCount == 0, model.similarity.isActive {
-            if model.similarity.isLoading {
-                ProgressView("Finding similar samples…").frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                ContentUnavailableView(
-                    "No similar samples", systemImage: "waveform.badge.magnifyingglass",
-                    description: Text(model.similarity.message == nil
-                        ? "Nothing matches. Try clearing the filters or raising a slider."
-                        : "See the message above."))
-            }
-        } else if model.resultCount == 0 {
-            ContentUnavailableView(
-                model.libraries.isEmpty ? "No libraries yet" : "No results",
-                systemImage: model.libraries.isEmpty ? "folder.badge.plus" : "magnifyingglass",
-                description: Text(model.libraries.isEmpty
-                    ? "Add a folder of samples with File > Add Library…"
-                    : "Try a different search or clear the filters."))
+        if model.resultCount == 0, model.similarity.isActive, model.similarity.isLoading {
+            ProgressView("Finding similar samples…").frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if let kind = model.emptyState {
+            ResultsEmptyStateView(model: model, kind: kind)
         } else {
             ResultsTableView(
                 pager: model.pager,

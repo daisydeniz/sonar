@@ -40,12 +40,12 @@ struct SonarApp: App {
             }
             CommandGroup(after: .newItem) {
                 Button("Add Library…") {
-                    if let path = FolderPicker.pickFolder() {
-                        Task { await model.addLibrary(path: path) }
-                    }
+                    let paths = FolderPicker.pickFolders()
+                    if !paths.isEmpty { Task { await model.addLibraries(paths: paths) } }
                 }
                 .keyboardShortcut("o", modifiers: [.command, .shift])
             }
         }
+        Settings { SettingsView(model: model) }
     }
 }

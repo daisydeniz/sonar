@@ -14,16 +14,16 @@ struct DuplicatesView: View {
             case .idle, .loading:
                 ProgressView("Looking for duplicates…").frame(maxWidth: .infinity, maxHeight: .infinity)
             case .failed(let message):
-                ContentUnavailableView(
-                    "Could not search for duplicates", systemImage: "exclamationmark.triangle",
-                    description: Text(message))
+                EmptyStateView(
+                    symbol: "exclamationmark.triangle", title: "Could not search for duplicates",
+                    message: message)
             case .loaded:
                 if dupes.groups.isEmpty {
-                    ContentUnavailableView(
-                        "No duplicates", systemImage: "checkmark.circle",
-                        description: Text(dupes.nearFiles == 0
+                    EmptyStateView(
+                        symbol: "checkmark.circle", title: "No duplicates",
+                        message: dupes.nearFiles == 0
                             ? "No identical files. Near duplicates are found once indexing has finished."
-                            : "No identical or near-identical samples found."))
+                            : "No identical or near-identical samples found.")
                 } else {
                     list(dupes)
                 }
