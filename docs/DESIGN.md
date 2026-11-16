@@ -92,7 +92,8 @@ right-aligned in columns. No other font family, no italic, no extra weights.
   wells), `large` 10 (cards, drop overlay).
 - **Sizes**: table row 24 · table header 22 · bar height 36 · player dock 104 ·
   waveform in dock fills its height minus 2×8 · icon in rows/bars 12–13 pt
-  (`.imageScale(.small)`), transport button 28.
+  (`.imageScale(.small)`), transport button 28, category dot 6
+  (`Theme.Size.categoryDot`).
 - **Hairlines** are 1 physical pixel (`Theme.hairlineWidth`).
 
 ### 2.4 Motion
@@ -155,8 +156,9 @@ system control when one exists; write a component only for the things below.
   Unfocused table: `selectionInactive`.
 - Columns: favorite (heart; outline only on hover or when set) · Name
   (`row`, primary, middle truncation) · Category (dot in category hue + name)
-  · Kind (symbol + text, secondary) · BPM, Key, Duration (`rowNumeric`,
-  right-aligned; missing value = nothing, not "-") · Library (secondary).
+  · Kind (symbol + text, secondary) · BPM, Duration (`rowNumeric`,
+  right-aligned) · Key (`row`, left-aligned) · Library (secondary). A
+  missing value shows nothing, not "-".
 - Hidden files: whole row at tertiary. Loading rows: a short neutral skeleton
   bar in the Name column, not the word "Loading…".
 

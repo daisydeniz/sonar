@@ -95,18 +95,20 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 if model.showsFilterBar {
                     FilterBarView(model: model)
-                    Divider()
+                    Hairline()
                 }
                 if model.similarity.isActive {
                     SimilarityBarView(model: model)
-                    Divider()
+                    Hairline()
                 }
                 results
             }
+            .background(Theme.Color.surfaceContent)
             .onDrop(of: [.fileURL], delegate: SimilarityDropDelegate(model: model, isTargeted: $dropTargeted))
             .overlay {
                 if dropTargeted {
-                    RoundedRectangle(cornerRadius: 6).stroke(Color.accentColor, lineWidth: 3).padding(2)
+                    RoundedRectangle(cornerRadius: Theme.Radius.large)
+                        .stroke(Theme.Color.accent, lineWidth: Theme.Space.s2).padding(Theme.Space.s2)
                         .allowsHitTesting(false)
                 }
             }

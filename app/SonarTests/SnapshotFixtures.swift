@@ -111,3 +111,12 @@ struct SnapshotLicenseService: LicenseService {
     func activate(key: String) async throws -> LicenseState { throw Unavailable() }
     func deactivate() async throws -> LicenseState { throw Unavailable() }
 }
+
+/// Page 0 loads, every other page never arrives (skeleton rows stay).
+struct StalledPageLoader: ResultPageLoader {
+    let rows: [FileRow]
+    func loadPage(offset: Int, limit: Int) async throws -> PageResult {
+        if offset > 0 { try await Task.sleep(for: .seconds(3600)) }
+        return PageResult(rows: Array(rows.prefix(limit)), total: rows.count, hasMore: true, facets: nil)
+    }
+}

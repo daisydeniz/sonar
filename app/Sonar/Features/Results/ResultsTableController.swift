@@ -56,17 +56,17 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
     static let favoriteColumnID = "favorite"
 
     static let columns: [Column] = [
-        Column(id: favoriteColumnID, title: "♥", width: 26, sortKey: nil, monospaced: false),
+        Column(id: favoriteColumnID, title: "", width: 26, sortKey: nil, monospaced: false),
         Column(id: "name", title: "Name", width: 260, sortKey: .name, monospaced: false),
         Column(id: "category", title: "Category", width: 90, sortKey: .category, monospaced: false),
-        Column(id: "kind", title: "Kind", width: 70, sortKey: .kind, monospaced: false),
+        Column(id: "kind", title: "Kind", width: 96, sortKey: .kind, monospaced: false),
         Column(id: "bpm", title: "BPM", width: 56, sortKey: .bpm, monospaced: true),
         Column(id: "key", title: "Key", width: 56, sortKey: .key, monospaced: false),
         Column(id: "duration", title: "Duration", width: 80, sortKey: .duration, monospaced: true),
         Column(id: "library", title: "Library", width: 140, sortKey: .library, monospaced: false),
     ]
 
-    static let rowHeight: CGFloat = 22
+    static let rowHeight = Theme.Size.rowHeight
     /// Drag source masks: copy only, never move/delete the user's samples.
     static let externalDragMask: NSDragOperation = [.copy, .generic]
     static let localDragMask: NSDragOperation = .copy
@@ -112,13 +112,15 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         super.init()
         for spec in Self.columns {
             let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier(spec.id))
-            column.title = spec.title
+            let header = ResultsHeaderCell(textCell: spec.title)
+            header.columnID = spec.id
+            header.alignment = spec.monospaced ? .right : .left
+            column.headerCell = header
             column.width = spec.width
             column.minWidth = 40
             if spec.id == Self.favoriteColumnID {
                 column.minWidth = spec.width
                 column.maxWidth = spec.width
-                column.headerCell.alignment = .center
                 column.headerToolTip = "Favorite"
             }
             if spec.sortKey != nil {
@@ -131,7 +133,13 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         tableView.style = .fullWidth
         tableView.allowsMultipleSelection = true
         tableView.allowsColumnReordering = true
-        tableView.usesAlternatingRowBackgroundColors = true
+        tableView.usesAlternatingRowBackgroundColors = false
+        tableView.gridStyleMask = []
+        tableView.intercellSpacing = .zero
+        tableView.backgroundColor = Theme.NS.surfaceContent
+        tableView.focusRingType = .none
+        tableView.headerView = ResultsHeaderView(
+            frame: NSRect(x: 0, y: 0, width: 0, height: Theme.Size.headerHeight))
         tableView.dataSource = self
         tableView.delegate = self
         tableView.setAccessibilityLabel("Search results")
@@ -144,6 +152,9 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         menu.delegate = self
         tableView.menu = menu
         scrollView.documentView = tableView
+        scrollView.drawsBackground = true
+        scrollView.backgroundColor = Theme.NS.surfaceContent
+        scrollView.borderType = .noBorder
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = true
         pager.onChange = { [weak self] in self?.pagerChanged($0) }
@@ -303,18 +314,21 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
             cell.show(pager.row(at: row))
             return cell
         }
-        let cell = (tableView.makeView(withIdentifier: id, owner: nil) as? NSTableCellView)
-            ?? makeCell(identifier: id)
-        let field = cell.textField
+        let cell = (tableView.makeView(withIdentifier: id, owner: nil) as? ResultCellView) ?? makeCell(identifier: id)
         if let file = pager.row(at: row) {
-            field?.stringValue = text(for: file, column: id.rawValue)
-            // Hidden files (shown via "Show Hidden Samples") are dimmed.
-            field?.textColor = file.hidden ? .tertiaryLabelColor : .labelColor
+            cell.configure(file, libraryName: libraryNames[file.libraryId])
         } else {
-            field?.stringValue = id.rawValue == "name" ? "Loading…" : ""
-            field?.textColor = .tertiaryLabelColor
+            cell.showLoading()
         }
         return cell
+    }
+
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+        (tableView.makeView(withIdentifier: ResultsRowView.identifier, owner: nil) as? ResultsRowView) ?? {
+            let view = ResultsRowView()
+            view.identifier = ResultsRowView.identifier
+            return view
+        }()
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {
@@ -364,36 +378,15 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
 
     // MARK: Cells
 
-    private func makeCell(identifier: NSUserInterfaceItemIdentifier) -> NSTableCellView {
-        let field = NSTextField(labelWithString: "")
-        field.lineBreakMode = .byTruncatingTail
-        field.translatesAutoresizingMaskIntoConstraints = false
-        let monospaced = Self.columns.first { $0.id == identifier.rawValue }?.monospaced ?? false
-        field.font = monospaced
-            ? .monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
-            : .systemFont(ofSize: NSFont.systemFontSize)
-        let cell = NSTableCellView()
-        cell.identifier = identifier
-        cell.textField = field
-        cell.addSubview(field)
-        NSLayoutConstraint.activate([
-            field.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 4),
-            field.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -4),
-            field.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
-        ])
-        return cell
-    }
-
-    private func text(for row: FileRow, column: String) -> String {
-        switch column {
-        case "name": return row.name
-        case "category": return Format.text(row.category)
-        case "kind": return Format.text(row.kind)
-        case "bpm": return Format.bpm(row.bpm)
-        case "key": return Format.text(row.key)
-        case "duration": return Format.duration(ms: row.durationMs)
-        case "library": return Format.text(libraryNames[row.libraryId])
-        default: return ""
+    private func makeCell(identifier id: NSUserInterfaceItemIdentifier) -> ResultCellView {
+        switch id.rawValue {
+        case "category": return CategoryCellView(identifier: id)
+        case "kind": return KindCellView(identifier: id)
+        case "bpm": return ValueCellView(identifier: id, value: .bpm)
+        case "key": return ValueCellView(identifier: id, value: .key)
+        case "duration": return ValueCellView(identifier: id, value: .duration)
+        case "library": return ValueCellView(identifier: id, value: .library)
+        default: return NameCellView(identifier: id)
         }
     }
 }

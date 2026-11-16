@@ -10,8 +10,10 @@ import XCTest
 /// Rendering: the SwiftUI view is hosted in an `NSHostingView` inside a
 /// borderless window placed off screen and captured through the window
 /// server (`cacheDisplay` is only the fallback). Limitations: the window is
-/// never key, so focus-dependent styles (focused selection, prominent
-/// buttons) show their inactive look; no real title bar or toolbar (the
+/// never key, so focus-dependent styles (prominent buttons) show their
+/// inactive look; the table's selection style is forced through
+/// `ResultsRowView.emphasisOverride` (focused for `main`, inactive for
+/// `main-unfocused`) instead of stealing keyboard focus; no real title bar or toolbar (the
 /// window is borderless), so toolbar items and the search field are not in
 /// the pictures; sidebar, filter bar, table, inspector and banners are.
 @MainActor
@@ -55,7 +57,25 @@ final class UISnapshotTests: XCTestCase {
     func testMain() async throws {
         let dir = try outputDir()
         let model = try await populated()
-        try snapshot("main", contentView(model), dir: dir)
+        try snapshot("main", contentView(model), dir: dir, emphasis: true, selectRow: 2)
+    }
+
+    func testMainUnfocused() async throws {
+        let dir = try outputDir()
+        let model = try await populated()
+        try snapshot("main-unfocused", contentView(model), dir: dir, emphasis: false, selectRow: 2)
+    }
+
+    /// Table with rows whose page is not loaded: skeleton bars in Name.
+    func testTableLoading() async throws {
+        let dir = try outputDir()
+        let pager = ResultsPager(pageSize: 20)
+        _ = try await pager.reset(loader: StalledPageLoader(rows: SnapshotFixtures.rows()))
+        let table = ResultsTableView(
+            pager: pager, libraryNames: [1: "KSHMR Vol 1", 2: "Drum Hits"], sortKey: .relevance, sortDescending: false,
+            onSelect: { _ in }, onSort: { _, _ in }, onSelectionChange: { _ in }, onKey: { _ in false },
+            onFindSimilar: { _ in }, onToggleFavorite: { _ in }, register: { _ in })
+        try snapshot("table-loading", table, dir: dir, emphasis: true, selectRow: 1)
     }
 
     func testMainSimilar() async throws {
@@ -105,7 +125,11 @@ final class UISnapshotTests: XCTestCase {
 
     // MARK: Rendering
 
-    private func snapshot<V: View>(_ name: String, _ view: V, dir: URL) throws {
+    private func snapshot<V: View>(
+        _ name: String, _ view: V, dir: URL, emphasis: Bool? = nil, selectRow: Int? = nil
+    ) throws {
+        ResultsRowView.emphasisOverride = emphasis
+        defer { ResultsRowView.emphasisOverride = nil }
         for (suffix, appearanceName) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
             let appearance = try XCTUnwrap(NSAppearance(named: appearanceName))
             let host = NSHostingView(rootView: view.frame(width: Self.size.width, height: Self.size.height))
@@ -122,9 +146,23 @@ final class UISnapshotTests: XCTestCase {
                 RunLoop.main.run(until: Date().addingTimeInterval(0.1))
                 host.layoutSubtreeIfNeeded()
             }
+            if let selectRow, let table = Self.findTable(in: host) {
+                table.selectRowIndexes(IndexSet(integer: selectRow), byExtendingSelection: false)
+                for _ in 0..<3 {
+                    RunLoop.main.run(until: Date().addingTimeInterval(0.1))
+                    host.layoutSubtreeIfNeeded()
+                }
+            }
             let png = try XCTUnwrap(Self.capture(window: window, host: host))
             try png.write(to: dir.appendingPathComponent("\(name)-\(suffix).png"))
         }
+    }
+
+    /// The results table inside a hosted SwiftUI view, if any.
+    private static func findTable(in view: NSView) -> KeyTableView? {
+        if let table = view as? KeyTableView { return table }
+        for sub in view.subviews { if let found = findTable(in: sub) { return found } }
+        return nil
     }
 
     /// Window-server capture of our own window (no Screen Recording

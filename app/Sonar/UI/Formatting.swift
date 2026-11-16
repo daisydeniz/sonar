@@ -25,4 +25,42 @@ enum Format {
         guard let s, !s.isEmpty else { return "-" }
         return s
     }
+
+    // MARK: Table cells (missing value = empty, never "-")
+
+    /// BPM for a table cell: empty when unknown.
+    static func cellBPM(_ bpm: Double?) -> String { bpm.map { Format.bpm($0) } ?? "" }
+
+    /// Duration for a table cell: empty when unknown.
+    static func cellDuration(ms: UInt64?) -> String { ms.map { Format.duration(ms: $0) } ?? "" }
+
+    /// Text for a table cell: empty when unknown.
+    static func cellText(_ s: String?) -> String { s ?? "" }
+
+    /// "kick" -> "Kick" (first letter capitalised); empty when unknown.
+    static func categoryTitle(_ category: String?) -> String {
+        guard let category, !category.isEmpty else { return "" }
+        if category == "fx" { return "FX" }
+        return category.prefix(1).uppercased() + category.dropFirst()
+    }
+
+    /// Display name of a core kind string: "loop" -> "Loop", "one_shot" ->
+    /// "One-shot"; empty when unknown. Core strings are not changed.
+    static func kindTitle(_ kind: String?) -> String {
+        switch kind {
+        case nil, "": return ""
+        case "loop": return "Loop"
+        case "one_shot": return "One-shot"
+        case let other?: return categoryTitle(other.replacingOccurrences(of: "_", with: " "))
+        }
+    }
+
+    /// SF Symbol of a core kind string, nil when unknown.
+    static func kindSymbol(_ kind: String?) -> String? {
+        switch kind {
+        case nil, "": return nil
+        case "loop": return "repeat"
+        default: return "waveform"
+        }
+    }
 }

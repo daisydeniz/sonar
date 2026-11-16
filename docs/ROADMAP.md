@@ -275,3 +275,5 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T7.5) A malformed build-time license public key (`BadSigningKey`) makes the app fail open; release.sh validates the key, but the FFI could map it to a gated state instead.
 - (from T9.1 review) Snapshot PNGs are slightly desaturated (display profile of the capture); convert the CGImage to sRGB before encoding.
 - (from T9.1 review) `scripts/design-lint.sh` misses conditional colour literals (`x ? .red : .secondary`) and `Font.system(size:)` without a leading dot.
+- (from T9.2 review) Literals the lint misses in the results cells: hidden-dot alpha 0.4, skeleton width multiplier 0.4, 18×18 heart button; move to tokens (`Theme.Opacity.disabled`, `Theme.Size.rowIcon`).
+- (from T9.2 review) A reused row view that is already under the pointer shows no hover heart until the mouse moves (`ResultsRowView.prepareForReuse`).
