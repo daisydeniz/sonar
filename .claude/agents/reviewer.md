@@ -21,9 +21,16 @@ Check
 6. Tests: meaningful assertions, fixture-based truth for DSP, no flaky
    timing tests.
 7. Docs: ROADMAP/STATUS/ADR updated where required.
+8. Design (only when the diff touches `app/Sonar`): read `docs/DESIGN.md`,
+   then open the PNGs the orchestrator names in `logs/ui/` (light and dark)
+   with the Read tool and go through the DESIGN.md §6 checklist. Check the
+   diff for literal colours/sizes and for custom components that duplicate a
+   system control or a `DesignSystem` component.
 
 BLOCKING only for: AC not met, a real bug (wrong result, data loss, crash,
-panic across FFI), license violation, missing/flaky tests for the AC.
+panic across FFI), license violation, missing/flaky tests for the AC, and
+for UI tasks: a DESIGN.md token-rule violation, or a screen that is broken or
+unreadable in light or dark.
 Everything else — style, extra perf beyond the budget, rare edge cases,
 "consider…" ideas — is a NIT. Don't ask for work beyond the task's AC.
 On a re-review (round 2), only verify the previous blockers; no new NITs.

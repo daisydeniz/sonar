@@ -1183,3 +1183,32 @@ the engine fails to open).
   gate view (Enter License / Buy / Quit); library data is never touched.
 - **Threat model**: honest users. Deleting `license.json` or patching the app
   defeats it; accepted, this is not DRM.
+
+## ADR-039 — Design system and UI redesign (T9.1)
+- **Why**: M0–M7 built the UI from acceptance criteria only; there was no
+  visual spec, no tokens and agents could not see the result. The founder
+  asked (2026-11-17) for a quality pro-audio look that follows the system
+  light/dark appearance.
+- **Decision**: `docs/DESIGN.md` is the single design spec. Standard macOS
+  chrome (sidebar, toolbar, inspector container, sheets) stays system-drawn
+  (HIG, Liquid Glass on macOS 26+); Sonar's identity lives in a flat,
+  token-driven content layer. Tokens: `Theme` in `app/Sonar/DesignSystem/` +
+  colour sets with light/dark values; teal accent; six category hues.
+  No in-app theme switch.
+- **Layout change**: transport and waveform move from the inspector to a
+  full-width **player dock** under the results (a wide waveform is far more
+  useful than a 280 pt one); the inspector becomes metadata/editing only.
+  Selected rows use an accent tint with normal text colour (white on the
+  accent fails contrast in dark mode). For the same reason there are two
+  accents: `accent` (content, bright teal in dark) and `controlAccent` (the
+  `AccentColor` asset the system fills buttons and menu highlights with;
+  dark value `#11827A` so the system's white text stays ≥ 4.5:1). The filter bar becomes one row with
+  popovers instead of five chip rows.
+- **Enforcement**: `scripts/design-lint.sh` (in `check.sh`) rejects literal
+  colours/paddings/radii/font sizes outside `DesignSystem/`; unmigrated files
+  sit in `scripts/design-lint-pending.txt`, which only shrinks.
+  `scripts/ui-snapshots.sh` renders the main screens in light and dark to
+  `logs/ui/*.png`; implementer, orchestrator and reviewer look at them.
+- **Not chosen**: third-party SwiftUI component kits (extra deps, fight the
+  system look); a fully custom dark-only skin (breaks light mode and system
+  chrome); web skills such as frontend-design (HTML/CSS only).

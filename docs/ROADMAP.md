@@ -92,6 +92,18 @@ Owner tags map to subagents in `.claude/agents/`.
 ## M8 — Founder acceptance (end of MVP)
 - [ ] T8.1 [HUMAN] Founder tests the app end to end on his library: scan, search, similarity, preview feel, drag & drop into Ableton Live. Findings become new tasks.
 
+## M9 — UI redesign (added by the founder, 2026-11-17: the MVP UI was built without a visual spec; pro-audio look, system light/dark — ADR-039, `docs/DESIGN.md`)
+Every T9 task: only `Theme` tokens, restyled files leave `scripts/design-lint-pending.txt`, `scripts/ui-snapshots.sh` PNGs (light + dark) checked by implementer, orchestrator and reviewer. Behaviour and keyboard shortcuts stay as they are unless the task says otherwise.
+- [ ] T9.1 (swift-ui) Design foundation: `docs/DESIGN.md`, `Theme` tokens + colour sets (light/dark), shared components (chip, readout, section label, empty state, hairline), `scripts/design-lint.sh` in check.sh, `scripts/ui-snapshots.sh` (main, similar, empty, onboarding, duplicates, components × light/dark), agent rules. AC: token tests green (incl. accent contrast ≥ 4.5:1 in both appearances); snapshots show real content in both appearances; check.sh green.
+- [ ] T9.2 (swift-ui) Results table per DESIGN §4.1: surface, header, 24 pt rows, tinted selection (focused/unfocused), category dot, kind symbol, right-aligned numerics, skeleton loading rows, favorite heart on hover; window surfaces and hairlines of the detail column. The snapshot window must show the focused selection (key window or a forced-emphasis seam; T9.1 review: it is never key today). AC: `main` snapshots match §4.1 in light and dark; `ResultsTablePerfTests` budget unchanged; existing table tests green.
+- [ ] T9.3 (swift-ui) Player dock per DESIGN §3/§4.3/§4.4: transport, wide waveform (played/unplayed, playhead) and readouts under the results; preview controls and waveform leave the inspector. AC: dock in `main` snapshots (selection and no-selection states); waveform zoom/pan/seek and preview tests green.
+- [ ] T9.4 (swift-ui) Inspector per DESIGN §3: header, actions, Analysis (overrides), Tags, File as label/value grids; multi-selection state; no grouped Form. AC: snapshots for single, multi and no selection; organize tests green.
+- [ ] T9.5 (swift-ui) Filter bar per DESIGN §3: one 36 pt row, Kind segmented, Category/Key/BPM/Duration/Tags popovers with facet counts, active chips with clear, Favorites toggle, result count. AC: snapshots with no filter, active filters and an open popover; `FilterSearchTests` green.
+- [ ] T9.6 (swift-ui) Similarity bar and drop overlay on tokens: target name, aspect weights compact in one row, reset/close. AC: `main-similar` snapshots; `SimilarityTests` green.
+- [ ] T9.7 (swift-ui) Sidebar, toolbar, indexing status and banner per DESIGN §3/§4.7 (section-header add buttons, badges, offline state, trial badge). AC: snapshots incl. indexing in progress, offline library and a banner.
+- [ ] T9.8 (swift-ui) Secondary screens on tokens and `EmptyStateView`: onboarding, empty/error states, duplicates, settings tabs, license gate/sheet. AC: snapshots of each in light and dark; `scripts/design-lint-pending.txt` is empty.
+- [ ] T9.9 (reviewer) Design pass over all snapshots against the DESIGN §6 checklist (alignment across bars, type steps, contrast, states); fix findings; delete the pending list and its handling if empty. AC: reviewer APPROVE on the full snapshot set.
+
 ## Future (do not start)
 v1.x: record-to-search, 2D map, tempo-synced preview, kit builder, `.als` project map.
 v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
@@ -261,3 +273,5 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T7.3) No Sparkle release-notes (`sparkle:releaseNotesLink`) in the appcast; `shellcheck` not installed, so check.sh only runs `bash -n` on release.sh.
 - (from T7.5) The license gate hides the main UI only: the engine still opens/scans in the background, and menu commands (Open Folder, Find…) plus Settings stay reachable while gated; disable them (`.disabled(license.showsGate)`) if the honest-user model needs tightening.
 - (from T7.5) A malformed build-time license public key (`BadSigningKey`) makes the app fail open; release.sh validates the key, but the FFI could map it to a gated state instead.
+- (from T9.1 review) Snapshot PNGs are slightly desaturated (display profile of the capture); convert the CGImage to sRGB before encoding.
+- (from T9.1 review) `scripts/design-lint.sh` misses conditional colour literals (`x ? .red : .secondary`) and `Font.system(size:)` without a leading dot.

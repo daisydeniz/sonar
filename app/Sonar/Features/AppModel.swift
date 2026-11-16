@@ -170,6 +170,16 @@ final class AppModel {
         pager.onError = { [weak self] in self?.errorMessage = Self.describe($0) }
     }
 
+    /// Test/snapshot seam (no production caller): puts the model into a
+    /// ready state with fixed sidebar data, without opening an engine.
+    func installStaticState(libraries: [LibraryInfo], collections: [CollectionInfo]) {
+        self.libraries = libraries
+        self.collections = collections
+        sidebarLoaded = true
+        resultsLoadedOnce = true
+        engineState = .ready
+    }
+
     // MARK: Lifecycle
 
     /// Opens the engine if needed, loads sidebar data and results, starts the

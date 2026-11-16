@@ -11,6 +11,8 @@ source "$ROOT/scripts/lib/env.sh"
 step "shell syntax"; for f in "$ROOT"/scripts/*.sh "$ROOT"/scripts/lib/*.sh; do bash -n "$f"; done
 if command -v shellcheck >/dev/null; then shellcheck -x -S warning "$ROOT/scripts/release.sh"; fi
 
+step "design-lint (Theme tokens only, docs/DESIGN.md)"; "$ROOT/scripts/design-lint.sh"
+
 cd "$ROOT/core"
 step "rustfmt";  cargo fmt --all --check
 step "clippy";   cargo clippy --workspace --all-targets -- -D warnings

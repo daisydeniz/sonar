@@ -12,6 +12,7 @@ approval; make reasonable decisions, record them (ADR / STATUS log), continue.
 2. `docs/ROADMAP.md` — the task queue and rules.
 3. `docs/PRODUCT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`,
    `docs/EVAL.md` — only the sections relevant to the current task.
+4. `docs/DESIGN.md` — **whole file, for every task that touches `app/`**.
 
 ## The loop (one task per session)
 0. Git start: if a `task/*` branch with unfinished work is checked out (an
@@ -40,6 +41,10 @@ approval; make reasonable decisions, record them (ADR / STATUS log), continue.
    and/or `$SONAR_GOLDEN_DIR` are set (the founder's real samples, read-only),
    also run `--silver` / `--golden` on them once `sonar eval` supports it and
    report those numbers next to the fixture numbers in the STATUS log entry.
+6b. For UI changes (anything under `app/Sonar` that is visible): run
+   `scripts/ui-snapshots.sh`, open the changed screens' PNGs in `logs/ui/`
+   (light and dark) yourself, and give the paths to the reviewer. Fix what
+   looks wrong before the review (see "Design").
 7. Update ROADMAP (check box + short commit hash), STATUS (Current, Log entry,
    Needs human), commit on the task branch. **Log entry: max ~5 lines** —
    what changed, key numbers, open follow-ups (by Later reference). Details
@@ -81,6 +86,22 @@ re-review finished phases. After the merge in step 8: `rm -f logs/handoff.md`.
 - **Performance budgets** in PRODUCT.md are requirements; add a benchmark
   when touching a hot path. Meeting the budget/AC is enough: do not optimize
   beyond it inside the MVP roadmap.
+
+## Design (UI work)
+- `docs/DESIGN.md` is the visual spec (ADR-039). UI code uses only `Theme`
+  tokens and the shared components in `app/Sonar/DesignSystem/`; a system
+  control is preferred over a custom one. No literal colours, paddings,
+  radii or font sizes in feature code: `scripts/design-lint.sh` (part of
+  `check.sh`) fails on them.
+- A task that restyles a file removes it from
+  `scripts/design-lint-pending.txt`. Never add files to that list.
+- Every screen works in light **and** dark and has empty / loading / error /
+  filled states. Agents verify by looking: `scripts/ui-snapshots.sh` →
+  `logs/ui/<screen>-<light|dark>.png` (add a screen there when a task
+  creates one).
+- A new style used twice becomes a token or component, and DESIGN.md is
+  updated in the same commit. Changing a token value or the layout in
+  DESIGN.md §3 needs an ADR line.
 
 ## Scope (usage budget is limited)
 - Do the task's AC, nothing more. Extra perf work, rare edge cases,
@@ -129,6 +150,8 @@ re-review finished phases. After the merge in step 8: `rm -f logs/handoff.md`.
 - `scripts/bootstrap.sh` — toolchain setup/check (macOS).
 - `scripts/check.sh` — all quality gates (fmt, clippy, tests, deny,
   fixtures eval, xcodebuild when `app/project.yml` exists).
+- `scripts/design-lint.sh` — design-token gate (`--all` ignores the pending list).
+- `scripts/ui-snapshots.sh` — light/dark PNGs of the main screens in `logs/ui/`.
 - `scripts/autopilot.sh` — runs the loop unattended (founder starts it).
 - `cd core && cargo run -p sonar-cli -- <cmd>` — CLI.
 
