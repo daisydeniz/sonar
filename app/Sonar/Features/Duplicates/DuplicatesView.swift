@@ -76,14 +76,14 @@ struct DuplicateGroupHeader: View {
 
     var body: some View {
         HStack {
-            Text(group.kind == .exact ? "Exact" : "Near").font(.caption.bold())
-                .padding(.horizontal, 6).padding(.vertical, 1)
-                .background(group.kind == .exact ? Color.red.opacity(0.2) : Color.orange.opacity(0.2), in: Capsule())
-            Text("\(group.members.count) files").font(.subheadline)
+            StatusBadge(
+                text: group.kind == .exact ? "Exact" : "Near",
+                color: group.kind == .exact ? Theme.Color.error : Theme.Color.warning)
+            Text("\(group.members.count) files").font(Theme.Font.body)
             Spacer()
-            Text("Frees \(Format.bytes(group.wastedBytes))").font(.caption).foregroundStyle(.secondary)
+            Text("Frees \(Format.bytes(group.wastedBytes))").font(Theme.Font.captionNumeric).foregroundStyle(.secondary)
         }
-        .padding(.top, 6)
+        .padding(.top, Theme.Space.s6)
         .accessibilityElement(children: .combine)
         .accessibilityLabel(
             "\(group.kind == .exact ? "Exact" : "Near") duplicate group, \(group.members.count) files, frees \(Format.bytes(group.wastedBytes))"
@@ -98,16 +98,17 @@ struct DuplicateRowView: View {
     let member: DuplicateMember
 
     var body: some View {
-        HStack(spacing: 8) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(member.row.name).lineLimit(1)
-                Text(member.row.path).font(.caption).foregroundStyle(.secondary)
+        HStack(spacing: Theme.Space.s8) {
+            VStack(alignment: .leading, spacing: Theme.Space.s2) {
+                Text(member.row.name).font(Theme.Font.row).lineLimit(1)
+                Text(member.row.path).font(Theme.Font.caption).foregroundStyle(.secondary)
                     .lineLimit(1).truncationMode(.middle)
             }
             Spacer()
-            if member.row.hidden { Text("Hidden").font(.caption).foregroundStyle(.secondary) }
-            Text(member.format).font(.caption).foregroundStyle(.secondary).frame(width: 44, alignment: .trailing)
-            Text(Format.bytes(member.size)).font(.caption).foregroundStyle(.secondary)
+            if member.row.hidden { Text("Hidden").font(Theme.Font.caption).foregroundStyle(.secondary) }
+            Text(member.format).font(Theme.Font.caption).foregroundStyle(.secondary)
+                .frame(width: 44, alignment: .trailing)
+            Text(Format.bytes(member.size)).font(Theme.Font.captionNumeric).foregroundStyle(.secondary)
                 .frame(width: 70, alignment: .trailing)
             Button { model.selectDuplicate(member, in: group) } label: { Image(systemName: "play.fill") }
                 .help("Preview").accessibilityLabel("Preview \(member.row.name)")

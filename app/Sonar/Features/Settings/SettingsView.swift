@@ -33,7 +33,7 @@ struct PreviewSettingsView: View {
             Toggle("Auto-play on selection", isOn: $preview.autoPlay)
             Toggle("Loudness-normalized preview", isOn: $preview.normalizeLoudness)
             Text("Normalized preview plays quiet and loud samples at a similar level. Files on disk are never changed.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(Theme.Font.caption).foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
     }
@@ -49,7 +49,7 @@ struct IndexingSettingsView: View {
         Form {
             Toggle("Natural-language analysis (CLAP)", isOn: Bindable(model.settings).includeEmbeddings)
             Text("Lets you search by description (\"warm analog bass\"). Takes more time while indexing. Applies the next time indexing starts.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(Theme.Font.caption).foregroundStyle(.secondary)
             LabeledContent("Status") {
                 Text(progress.running ? (progress.paused ? "Paused" : "Indexing \(progress.done)/\(progress.total)") : "Idle")
             }
@@ -79,15 +79,15 @@ struct AboutSettingsView: View {
             LabeledContent("Core", value: CoreInfo.version)
             Section("Third-party notices") {
                 ForEach(Self.notices, id: \.name) { notice in
-                    VStack(alignment: .leading, spacing: 2) {
+                    VStack(alignment: .leading, spacing: Theme.Space.s2) {
                         Text(notice.name)
-                        Text(notice.detail).font(.caption).foregroundStyle(.secondary)
+                        Text(notice.detail).font(Theme.Font.caption).foregroundStyle(.secondary)
                     }
                     .accessibilityElement(children: .combine)
                 }
             }
             Text("Sonar runs 100% locally. Your audio and index never leave your Mac.")
-                .font(.caption).foregroundStyle(.secondary)
+                .font(Theme.Font.caption).foregroundStyle(.secondary)
         }
         .formStyle(.grouped)
     }

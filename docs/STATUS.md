@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M9 UI redesign (founder request 2026-11-17, ADR-039, `docs/DESIGN.md`); M0–M7 done; T3.7, T7.4, T8.1 human
-- Next task: T9.8 secondary screens on tokens
+- Next task: T9.9 design pass over all snapshots
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
@@ -18,6 +18,7 @@ manual tests, labeled data. Keep each item one line with the task id.)_
 - T0.1 (optional) For `cargo` in a normal terminal / hand-started `claude`, add to ~/.zprofile: `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"` (scripts and autopilot already handle it). Optional: `brew install gh`.
 - T3.7 Golden set labeling: `sonar eval --init-golden <dir>` writes the labels.csv template; then set `SONAR_GOLDEN_DIR` (optional: `SONAR_SILVER_DIR` for name-labeled real files); optional `similar.jsonl` similarity judgements (format in EVAL.md) enable similarity tuning (T4.4)
 - T8.1 End-to-end test by the founder (after M7)
+- T9.8 Manual check: on the welcome screen and the trial-ended gate, Return triggers the primary button; drop folders on the welcome screen → overlay; Settings tabs (Libraries online/offline badges, License, About) look right in light/dark.
 - T9.6 Manual check: Find Similar on a sample (also with a waveform region) → 72 pt target well above the selected waveform, its play button plays the target (region only), Space stops it; Esc/× removes the well; drag a .wav from Finder → overlay readable.
 - T9.4 Manual check: select one sample → edit BPM/key/category/kind override and revert, add/remove a tag; ⌘/⇧-select several → fields show common values or "Mixed", an edit or tag applies to all, Reveal shows all in Finder.
 - T9.3c Manual check: select a sample, drag across the waveform, drag each edge; Space plays the region (loop on → loops it); right-click → Play Selection / Find Similar to Selection; ⌘⇧F with a region; Esc and click outside clear it.
@@ -44,6 +45,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-18 — T9.8: Onboarding, engine-failed, license gate/enter sheet, duplicates and all Settings tabs on tokens; onboarding/gate/engine-failed use `EmptyStateView` (now generic with an `extra` slot, `.contain` a11y, opt-in Return shortcut); new `StatusBadge` component (online/offline, exact/near), DESIGN §4.6/§4.10/§4.11. Lint pending list empty. 9 new snapshot screens (main-error, settings-*, license-gate, license-enter). check.sh green; reviewer APPROVE r1, 1 NIT fixed. Later: 3 T9.8 items.
 - 2026-11-18 — T9.7: Sidebar `.sidebar` list with `+` in Libraries/Collections section headers (fake Add rows gone), count badges, offline library dimmed with warning symbol; IndexingStatusView (progress bar + monospaced counter) and StatusBannerView (one 36 pt line on surfaceRaised, warning symbol, dismiss, no tint) on tokens and off the lint pending list (7 left); TrialBadgeView moved to its own file. Token `indexingProgressWidth`. Snapshots `main-indexing`, `main-indexing-paused`, `main-banner`. check.sh green; reviewer APPROVE r1, 1 NIT fixed. Later: 3 T9.7 items.
 - 2026-11-18 — T9.6: Similarity bar one 36 pt row (target name + seed range, compact aspect sliders, icon Reset/Close); compare mode: 72 pt target well (own play/stop, seed region drawn) above the "Selected:" waveform, only in similarity mode; drop overlay component (opaque surfaceContent + accentSoft, accent border, radius large). Tokens compareWellHeight/compareLabelHeight/aspectSliderWidth (DESIGN §2.3); SimilarityBarView off the lint pending list. Snapshots `main-similar`, `main-drop`. check.sh green (one e2e flake on a first run); reviewer CHANGES r1 (stale target-play flag on Space/seek, fixed + test), APPROVE r2. Later: 7 T9.6 items.
-- 2026-11-18 — T9.5: Filter bar per DESIGN §3: one 36 pt row — Kind segmented, Category/Key/BPM/Duration/Tags popovers with facet counts (`FilterPopovers.swift`), active chips (accentSoft, × clear) + Clear all, Favorites toggle, result count. Library chip dropped (sidebar filters libraries; row overflowed at 600 pt). 3 size tokens, chip × in DESIGN §4.2; FilterBarView off the lint pending list. Snapshots `main-filters`, `main-filter-popover`. check.sh green; reviewer APPROVE round 1. Later: 4 T9.5 items.

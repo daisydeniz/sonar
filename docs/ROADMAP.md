@@ -307,3 +307,6 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T9.7 review) Sidebar Favorites/library badge counts come from the current search's facets, so they change while typing; whole-library counts or a DESIGN §3 note.
 - (from T9.7 review) Banner has no 120 ms fade (DESIGN §2.4); add `.transition(.opacity)` with a motion token.
 - (from T9.7 review) Snapshot license has no trial, so the toolbar trial badge is never in a PNG; add a trial-state snapshot.
+- (from T9.8) License-gate snapshot lacks the Buy button (purchase URL nil under test); no snapshots for the Enter License error state or the duplicates error state (views reset/reload on appear).
+- (from T9.8) Duplicates section headers use the system header font; consider a `SectionLabel`-style header.
+- (from T9.8 review) Engine-failed message lost `.textSelection(.enabled)` in `EmptyStateView`; add a selectable-message option so users can copy the error.

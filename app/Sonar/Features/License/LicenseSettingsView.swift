@@ -17,13 +17,13 @@ struct LicenseSettingsView: View {
                 if let expires = state.expires { LabeledContent("Valid until", value: expires) }
                 if state.devKey {
                     Text("Development key: this build accepts the public development license key. Release builds do not.")
-                        .font(.caption).foregroundStyle(.secondary)
+                        .font(Theme.Font.caption).foregroundStyle(.secondary)
                 }
             } else {
                 LabeledContent("Status", value: "Unavailable")
             }
             if let error = license.deactivationError {
-                Text(error).foregroundStyle(.red).font(.callout)
+                Text(error).foregroundStyle(Theme.Color.error).font(Theme.Font.row)
             }
             HStack {
                 Button(isLicensed ? "Change License…" : "Enter License…") { showsSheet = true }

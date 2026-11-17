@@ -13,21 +13,27 @@ struct EnterLicenseView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Enter License").font(.title2.bold())
+        VStack(alignment: .leading, spacing: Theme.Space.s12) {
+            Text("Enter License").font(Theme.Font.title)
             Text("Paste the license key from your purchase e-mail.")
-                .foregroundStyle(.secondary)
+                .font(Theme.Font.body).foregroundStyle(.secondary)
             TextEditor(text: $key)
-                .font(.system(.body, design: .monospaced))
+                .font(Theme.Font.row.monospaced())
+                .scrollContentBackground(.hidden)
+                .padding(Theme.Space.s4)
                 .frame(height: 110)
-                .overlay(RoundedRectangle(cornerRadius: 6).stroke(.quaternary))
+                .background(Theme.Color.surfaceWell, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
+                .overlay {
+                    RoundedRectangle(cornerRadius: Theme.Radius.medium)
+                        .strokeBorder(Theme.Color.hairline, lineWidth: Theme.hairlineWidth)
+                }
                 .accessibilityLabel("License key")
             if let error = license.activationError {
-                Text(error).foregroundStyle(.red).font(.callout)
+                Text(error).foregroundStyle(Theme.Color.error).font(Theme.Font.row)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("license.error")
             }
-            HStack {
+            HStack(spacing: Theme.Space.s8) {
                 if license.isActivating { ProgressView().controlSize(.small) }
                 Spacer()
                 Button("Cancel", role: .cancel, action: dismiss).keyboardShortcut(.cancelAction)
@@ -38,7 +44,7 @@ struct EnterLicenseView: View {
                 .disabled(!canActivate)
             }
         }
-        .padding(20)
+        .padding(Theme.Space.s24)
         .frame(width: 440)
         .onAppear { license.clearActivationError() }
     }

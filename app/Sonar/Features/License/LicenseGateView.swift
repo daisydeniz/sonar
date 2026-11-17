@@ -21,24 +21,18 @@ struct LicenseGateView: View {
     }
 
     var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "lock.circle").font(.system(size: 48)).foregroundStyle(.secondary)
-                .accessibilityHidden(true)
-            Text(title).font(.title.bold())
-            Text(explanation).multilineTextAlignment(.center).foregroundStyle(.secondary)
-                .frame(maxWidth: 420)
-            HStack {
-                Button("Enter License…") { license.showsEnterSheet = true }
-                    .keyboardShortcut(.defaultAction)
-                if let purchaseURL {
-                    Button("Buy Sonar") { NSWorkspace.shared.open(purchaseURL) }
+        EmptyStateView(
+            symbol: "lock", title: title, message: explanation, actionTitle: "Enter License…",
+            action: { license.showsEnterSheet = true },
+            extra: {
+                HStack(spacing: Theme.Space.s8) {
+                    if let purchaseURL {
+                        Button("Buy Sonar") { NSWorkspace.shared.open(purchaseURL) }
+                    }
+                    Button("Quit") { NSApplication.shared.terminate(nil) }
                 }
-                Button("Quit") { NSApplication.shared.terminate(nil) }
             }
-            .padding(.top, 6)
-        }
-        .padding(40)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .accessibilityElement(children: .contain)
+        )
+        .defaultActionShortcut()
     }
 }

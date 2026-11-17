@@ -246,6 +246,84 @@ final class UISnapshotTests: XCTestCase {
         try snapshot("duplicates", contentView(model), dir: dir)
     }
 
+    func testEngineError() async throws {
+        let dir = try outputDir()
+        let model = makeModel()
+        model.engineState = .failed("The library database is locked by another process.")
+        try snapshot("main-error", contentView(model), dir: dir)
+    }
+
+    // MARK: Settings, license
+
+    private static let settingsSize = CGSize(width: 560, height: 380)
+
+    private func settingsSnapshot<V: View>(_ name: String, _ view: V, dir: URL) throws {
+        try snapshot(name, view.background(Color(nsColor: .windowBackgroundColor)), dir: dir, size: Self.settingsSize)
+    }
+
+    private func licensed(_ state: LicenseState) async -> LicenseManager {
+        let manager = LicenseManager(service: FakeLicenseService(current: state))
+        await manager.refresh()
+        return manager
+    }
+
+    func testSettingsLibraries() async throws {
+        let dir = try outputDir()
+        let model = try await populated()
+        try settingsSnapshot("settings-libraries", LibrariesSettingsView(model: model), dir: dir)
+    }
+
+    func testSettingsLibrariesEmpty() async throws {
+        let dir = try outputDir()
+        let model = makeModel()
+        model.installStaticState(libraries: [], collections: [])
+        try settingsSnapshot("settings-libraries-empty", LibrariesSettingsView(model: model), dir: dir)
+    }
+
+    func testSettingsPreview() async throws {
+        let dir = try outputDir()
+        try settingsSnapshot("settings-preview", PreviewSettingsView(preview: makeModel().preview), dir: dir)
+    }
+
+    func testSettingsIndexing() async throws {
+        let dir = try outputDir()
+        let model = makeModel()
+        model.installStaticState(
+            libraries: SnapshotFixtures.libraries, collections: [],
+            progress: IndexingProgress(
+                enabled: true, running: true, paused: false, stage: .dsp, total: 12_480, done: 4_213, errors: 0))
+        try settingsSnapshot("settings-indexing", IndexingSettingsView(model: model), dir: dir)
+    }
+
+    func testSettingsLicense() async throws {
+        let dir = try outputDir()
+        let state = LicenseState(
+            kind: .licensed, daysLeft: 0, endsAtUnix: nil, licensee: "Alex Producer", licenseId: "SON-2026-0042",
+            licenseKind: "subscription", expires: "2027-03-01", devKey: false)
+        let manager = await licensed(state)
+        try settingsSnapshot("settings-license", LicenseSettingsView(license: manager), dir: dir)
+    }
+
+    func testSettingsAbout() async throws {
+        let dir = try outputDir()
+        try settingsSnapshot("settings-about", AboutSettingsView(), dir: dir)
+    }
+
+    func testLicenseGate() async throws {
+        let dir = try outputDir()
+        let manager = await licensed(FakeLicenseService.state(.trialExpired))
+        let model = makeModel()
+        model.installStaticState(libraries: SnapshotFixtures.libraries, collections: [])
+        try snapshot("license-gate", ContentView(model: model, license: manager), dir: dir)
+    }
+
+    func testLicenseEnter() async throws {
+        let dir = try outputDir()
+        let manager = await licensed(FakeLicenseService.state(.trial, days: 3))
+        let sheet = EnterLicenseView(license: manager, dismiss: {}).background(Color(nsColor: .windowBackgroundColor))
+        try snapshot("license-enter", sheet, dir: dir, size: CGSize(width: 440, height: 260))
+    }
+
     func testComponents() async throws {
         let dir = try outputDir()
         try snapshot("components", ComponentsGallery(), dir: dir)
@@ -255,16 +333,17 @@ final class UISnapshotTests: XCTestCase {
 
     private func snapshot<V: View>(
         _ name: String, _ view: V, dir: URL, emphasis: Bool? = nil, selectRow: Int? = nil,
-        selectRows: IndexSet? = nil
+        selectRows: IndexSet? = nil, size: CGSize? = nil
     ) throws {
+        let size = size ?? Self.size
         let selection = selectRows ?? selectRow.map { IndexSet(integer: $0) }
         ResultsRowView.emphasisOverride = emphasis
         defer { ResultsRowView.emphasisOverride = nil }
         for (suffix, appearanceName) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
             let appearance = try XCTUnwrap(NSAppearance(named: appearanceName))
-            let host = NSHostingView(rootView: view.frame(width: Self.size.width, height: Self.size.height))
+            let host = NSHostingView(rootView: view.frame(width: size.width, height: size.height))
             let window = NSWindow(
-                contentRect: NSRect(origin: NSPoint(x: -6000, y: -6000), size: Self.size),
+                contentRect: NSRect(origin: NSPoint(x: -6000, y: -6000), size: size),
                 styleMask: [.borderless], backing: .buffered, defer: false)
             window.appearance = appearance
             window.contentView = host

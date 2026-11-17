@@ -230,7 +230,11 @@ flat centre line; error: caption text centred in the well.
 
 ### 4.6 Empty and error states
 Centred: SF Symbol 28 pt in tertiary, `title`, one `body` line in secondary,
-at most one primary action. Same component everywhere (`EmptyStateView`).
+at most one primary action. Same component everywhere (`EmptyStateView`):
+onboarding, the license gate, the engine-failed screen, empty libraries and
+duplicates all use it. Quieter content under the action (secondary buttons
+such as Quit / Reveal Data Folder, a drop hint) goes in its `extra` slot.
+A folder drop on onboarding shows the `DropOverlayView` look (§3).
 
 ### 4.7 Banner
 One line on `surfaceRaised`, leading status symbol in the system status
@@ -253,6 +257,18 @@ rest. Read-only values are selectable `row` text (monospaced digits for
 numbers); missing value: an en dash in tertiary. Sections are a `SectionLabel`
 plus rows with 2 pt between them. Removable tags are `SonarChip`s with a
 trailing `xmark`.
+
+### 4.10 Status badge (`StatusBadge`)
+`caption` text in a status colour (`Theme.Color.ok` / `warning` / `error`) on
+the same colour at 16 %, radius `small`, 6 / 2 padding. Online / offline
+libraries (Settings), exact / near duplicate groups.
+
+### 4.11 Settings and sheets
+Settings tabs are system grouped `Form`s (`.formStyle(.grouped)`), hints in
+`caption` secondary, errors in `Theme.Color.error`. The Libraries tab is a
+list plus a button row. Sheets (Enter License) are standard sheets with a
+`title` heading, a `surfaceWell` text well with a hairline border, and
+Cancel / default-action buttons.
 
 ## 5. Rules
 

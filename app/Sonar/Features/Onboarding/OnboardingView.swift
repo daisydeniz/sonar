@@ -9,27 +9,20 @@ struct OnboardingView: View {
     @State private var targeted = false
 
     var body: some View {
-        VStack(spacing: 14) {
-            Image(systemName: "waveform.circle").font(.system(size: 56)).foregroundStyle(.tint)
-                .accessibilityHidden(true)
-            Text("Welcome to Sonar").font(.largeTitle.bold())
-            Text("Find the right sample fast. Everything runs 100% on your Mac, offline: your audio never leaves it.")
-                .font(.title3).foregroundStyle(.secondary).multilineTextAlignment(.center)
-                .frame(maxWidth: 460)
-            Button("Add Folders…") {
+        EmptyStateView(
+            symbol: "waveform", title: "Welcome to Sonar",
+            message: "Find the right sample fast. Everything runs 100% on your Mac, offline: your audio never leaves it.",
+            actionTitle: "Add Folders…",
+            action: {
                 let paths = FolderPicker.pickFolders(prompt: "Add")
                 if !paths.isEmpty { Task { await model.addLibraries(paths: paths) } }
-            }
-            .controlSize(.large).buttonStyle(.borderedProminent)
-            .keyboardShortcut(.defaultAction)
-            Text("or drop folders here").font(.callout).foregroundStyle(.tertiary)
-        }
-        .padding(32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+            },
+            extra: { Text("or drop folders here").font(Theme.Font.caption).foregroundStyle(.tertiary) }
+        )
+        .defaultActionShortcut()
         .overlay {
             if targeted {
-                RoundedRectangle(cornerRadius: 10).stroke(Color.accentColor, lineWidth: 3).padding(8)
-                    .allowsHitTesting(false)
+                DropOverlayView(message: "Drop folders to add them as libraries", symbol: "folder.badge.plus")
             }
         }
         .onDrop(of: [.fileURL], isTargeted: $targeted) { providers in
@@ -47,7 +40,6 @@ struct OnboardingView: View {
             }
             return true
         }
-        .accessibilityElement(children: .contain)
     }
 
     private static func isFolder(_ url: URL) -> Bool {
@@ -68,16 +60,13 @@ struct EngineFailedView: View {
     let message: String
 
     var body: some View {
-        ContentUnavailableView {
-            Label("Could not open Sonar's library", systemImage: "exclamationmark.triangle")
-        } description: {
-            Text(message).textSelection(.enabled)
-        } actions: {
-            Button("Try Again") { Task { await model.retryOpen() } }
-                .buttonStyle(.borderedProminent)
-            Button("Reveal Data Folder") {
-                NSWorkspace.shared.activateFileViewerSelecting([AppSettings.revealableDataFolder()])
-            }
-        }
+        EmptyStateView(
+            symbol: "exclamationmark.triangle", title: "Could not open Sonar's library", message: message,
+            actionTitle: "Try Again", action: { Task { await model.retryOpen() } },
+            extra: {
+                Button("Reveal Data Folder") {
+                    NSWorkspace.shared.activateFileViewerSelecting([AppSettings.revealableDataFolder()])
+                }
+            })
     }
 }

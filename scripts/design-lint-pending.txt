@@ -1,8 +1,1 @@
 # Files not yet migrated to Theme tokens (scripts/design-lint.sh). Only remove lines.
-app/Sonar/Features/Duplicates/DuplicatesView.swift
-app/Sonar/Features/License/EnterLicenseView.swift
-app/Sonar/Features/License/LicenseGateView.swift
-app/Sonar/Features/License/LicenseSettingsView.swift
-app/Sonar/Features/Onboarding/OnboardingView.swift
-app/Sonar/Features/Settings/LibrariesSettingsView.swift
-app/Sonar/Features/Settings/SettingsView.swift

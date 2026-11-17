@@ -9,7 +9,7 @@ struct LibrariesSettingsView: View {
     @State private var selection: Int64?
 
     var body: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Theme.Space.s8) {
             if model.libraries.isEmpty {
                 EmptyStateView(
                     symbol: "folder.badge.plus", title: "No libraries",
@@ -17,12 +17,11 @@ struct LibrariesSettingsView: View {
             } else {
                 List(model.libraries, id: \.id, selection: $selection) { library in
                     HStack {
-                        Text(library.rootPath).lineLimit(1).truncationMode(.middle)
+                        Text(library.rootPath).font(Theme.Font.body).lineLimit(1).truncationMode(.middle)
                         Spacer()
-                        Text(library.online ? "Online" : "Offline")
-                            .font(.caption.bold())
-                            .padding(.horizontal, 6).padding(.vertical, 1)
-                            .background((library.online ? Color.green : Color.orange).opacity(0.2), in: Capsule())
+                        StatusBadge(
+                            text: library.online ? "Online" : "Offline",
+                            color: library.online ? Theme.Color.ok : Theme.Color.warning)
                     }
                     .tag(library.id)
                     .accessibilityElement(children: .combine)
@@ -48,9 +47,9 @@ struct LibrariesSettingsView: View {
                 Button("Remove…", role: .destructive) { pendingRemoval = chosen }
                     .disabled(chosen == nil)
             }
-            .padding(.horizontal)
+            .padding(.horizontal, Theme.Space.s16)
         }
-        .padding(.vertical)
+        .padding(.vertical, Theme.Space.s16)
         .confirmationDialog(
             "Remove this library from Sonar?",
             isPresented: Binding(get: { pendingRemoval != nil }, set: { if !$0 { pendingRemoval = nil } }),
