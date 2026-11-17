@@ -9,10 +9,12 @@ enum Format {
         return String(format: "%llu:%02llu.%03llu", seconds / 60, seconds % 60, ms % 1000)
     }
 
-    /// "128" or "127.5"; "-" when unknown.
+    /// "128" or "127.5"; "-" when unknown. Rounds to one decimal first so
+    /// 122.96 shows as "123", never "123.0".
     static func bpm(_ bpm: Double?) -> String {
-        guard let bpm else { return "-" }
-        return bpm == bpm.rounded() ? String(Int(bpm)) : String(format: "%.1f", bpm)
+        guard let bpm, bpm.isFinite else { return "-" }
+        let tenths = (bpm * 10).rounded() / 10
+        return tenths == tenths.rounded() ? String(Int(tenths)) : String(format: "%.1f", tenths)
     }
 
     /// "1.2 MB" for a byte count.
