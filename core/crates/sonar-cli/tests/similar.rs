@@ -128,3 +128,81 @@ fn similar_by_id_file_weights_and_filters() {
         "{out:?}"
     );
 }
+
+/// Region seeds (ADR-040) by id and by `--file`: the first 2 s of a loop
+/// find that loop (it is not excluded), its first kick ranks a kick
+/// one-shot above snares, hats and tonal notes, and bad ranges fail
+/// cleanly.
+#[test]
+fn similar_to_a_region_of_a_loop() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let fx = tmp.path().join("fx");
+    let home = tmp.path().join("home");
+    let fx_s = fx.to_str().expect("utf-8");
+    ok(&sonar(&home, &["fixtures", fx_s, "--skip-long"]));
+    for dir in ["loops", "oneshots", "tonal"] {
+        ok(&sonar(
+            &home,
+            &["scan", fx.join(dir).to_str().expect("utf-8")],
+        ));
+    }
+    ok(&sonar(&home, &["analyze"]));
+    let all = json(&home, &["search", "--json", "--limit", "1000"]);
+    let ids: HashMap<String, i64> = all["hits"]
+        .as_array()
+        .expect("hits")
+        .iter()
+        .map(|h| (short(&h["path"]), h["file_id"].as_i64().expect("id")))
+        .collect();
+    // 2 bars of a 90 BPM backbeat (5.33 s); kick + hat on step 0.
+    let rel = "loops/loop_002.wav";
+    let id = ids[rel].to_string();
+    let file = fx.join(rel);
+    let file = file.to_str().expect("utf-8");
+
+    let v = json(
+        &home,
+        &[
+            "similar", &id, "--start", "0", "--end", "2", "--json", "--limit", "3",
+        ],
+    );
+    let near = hits(&v);
+    assert!(near.iter().any(|(p, _)| p == rel), "{near:?}");
+    assert_eq!(v["seed"]["file_id"].as_i64(), Some(ids[rel]));
+    assert_eq!(v["seed"]["region"]["end_s"].as_f64(), Some(2.0));
+    assert_eq!(v["candidates"].as_u64(), Some(ids.len() as u64));
+
+    // First kick: two sixteenths at 90 BPM.
+    let kicks = ["hit_000", "hit_001", "hit_002", "hit_003"].map(|h| format!("oneshots/{h}.wav"));
+    let kick_region = ["--start", "0", "--end", "0.333", "--json", "--limit", "100"];
+    for seed in [&["similar", &id][..], &["similar", "--file", file]] {
+        let near = hits(&json(&home, &[seed, &kick_region[..]].concat()));
+        assert!(kicks.contains(&near[0].0), "{near:?}");
+        let unrelated = near
+            .iter()
+            .position(|(p, _)| !p.starts_with("loops/") && !kicks.contains(p));
+        assert!(unrelated.is_some_and(|p| p >= 3), "{near:?}");
+    }
+
+    let text = ok(&sonar(
+        &home,
+        &["similar", &id, "--start", "0", "--end", "2"],
+    ));
+    assert!(text.contains("[0.000–2.000 s]"), "{text}");
+
+    for (start, end, why) in [
+        ("1", "1.04", "shorter than 50 ms"),
+        ("5", "6", "past the end"),
+        ("-1", "1", "negative"),
+    ] {
+        for seed in [&["similar", &id][..], &["similar", "--file", file]] {
+            let out = sonar(
+                &home,
+                &[seed, &["--start", start, "--end", end][..]].concat(),
+            );
+            assert!(!out.status.success());
+            let err = String::from_utf8_lossy(&out.stderr);
+            assert!(err.contains(why), "{start}–{end}: {err}");
+        }
+    }
+}

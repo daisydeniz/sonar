@@ -203,8 +203,11 @@ impl SonarEngine {
     /// analyzed first). Shares the search cancel flag, latest wins: a newer
     /// `search`/`similarTo` or `cancelSearch` makes a running call throw
     /// `FfiError.Cancelled` (also during decoding); never show its result.
-    /// A `file` seed is never in its own result. Errors: `NotFound` (seed
-    /// not analyzed), `InvalidInput` (weights, filters), `Audio`/`Io`
+    /// A `file` seed is never in its own result, unless `query.region` is
+    /// set: then only that time range of the seed file is decoded and
+    /// analyzed like an external file (ADR-040). Errors: `NotFound` (seed
+    /// not analyzed or unknown), `InvalidInput` (weights, filters, region
+    /// out of range or < 50 ms), `Audio`/`Io`
     /// (external file), `Internal` (no analysis has run yet: "no vector
     /// store yet").
     pub fn similar_to(&self, query: SimilarQuery) -> Result<SimilarPage, FfiError> {

@@ -40,7 +40,8 @@ pub use license::{
     activate_license, deactivate_license, license_status, LicenseState, LicenseStateKind,
 };
 pub use similar_types::{
-    aspect_weights_from_sliders, AspectWeights, SimilarHit, SimilarPage, SimilarQuery, SimilarSeed,
+    aspect_weights_from_sliders, AspectWeights, SimilarHit, SimilarPage, SimilarQuery,
+    SimilarRegion, SimilarSeed,
 };
 pub use types::*;
 

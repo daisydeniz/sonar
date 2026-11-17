@@ -16,7 +16,72 @@ fn query(seed: SimilarSeed) -> SimilarQuery {
         limit: 100,
         sort: None,
         descending: false,
+        region: None,
     }
+}
+
+fn region(seed: SimilarSeed, start_s: f64, end_s: f64) -> SimilarQuery {
+    SimilarQuery {
+        region: Some(SimilarRegion { start_s, end_s }),
+        ..query(seed)
+    }
+}
+
+/// Region seeds (ADR-040), library and external: the first 2 s of a loop
+/// find that loop (not excluded), its first kick ranks a kick one-shot
+/// above unrelated sounds, bad ranges are `InvalidInput`.
+#[test]
+fn region_seeds_find_the_loop_and_its_kick() {
+    let (tmp, engine) = analyzed();
+    let rel = "loop_002.wav"; // 2 bars of a 90 BPM backbeat, 5.33 s
+    let path = tmp.path().join("fx/loops").join(rel);
+    let file_id = browse(&engine, "loop")
+        .iter()
+        .find(|r| r.path.ends_with(rel))
+        .expect("loop in the library")
+        .file_id;
+    let ext = || SimilarSeed::External {
+        path: path.display().to_string(),
+    };
+    let name = |r: &FileRow| r.path.rsplit('/').take(2).collect::<Vec<_>>().join("<");
+    let kick = |r: &FileRow| {
+        ["hit_000.wav", "hit_001.wav", "hit_002.wav", "hit_003.wav"]
+            .iter()
+            .any(|k| r.path.ends_with(&format!("oneshots/{k}")))
+    };
+    for seed in [SimilarSeed::File { file_id }, ext()] {
+        let page = engine
+            .similar_to(region(seed.clone(), 0.0, 2.0))
+            .expect("2 s region");
+        let top3: Vec<String> = page.rows.iter().take(3).map(name).collect();
+        assert!(
+            page.rows.iter().take(3).any(|r| r.file_id == file_id),
+            "{top3:?}"
+        );
+        // First kick: two sixteenths at 90 BPM.
+        let page = engine
+            .similar_to(region(seed.clone(), 0.0, 0.333))
+            .expect("kick region");
+        assert!(kick(&page.rows[0]), "{}", name(&page.rows[0]));
+        let unrelated = page
+            .rows
+            .iter()
+            .position(|r| !kick(r) && !r.path.contains("/loops/"));
+        assert!(unrelated.is_some_and(|p| p >= 3), "{unrelated:?}");
+        for (s, e) in [(1.0, 1.04), (5.0, 6.0), (-1.0, 1.0), (2.0, 1.0)] {
+            assert!(
+                matches!(
+                    engine.similar_to(region(seed.clone(), s, e)),
+                    Err(FfiError::InvalidInput { .. })
+                ),
+                "{s}–{e}"
+            );
+        }
+    }
+    assert!(matches!(
+        engine.similar_to(region(SimilarSeed::File { file_id: 999_999 }, 0.0, 1.0)),
+        Err(FfiError::NotFound { .. })
+    ));
 }
 
 /// Fixtures library, fully analyzed; returns the tempdir guard too.

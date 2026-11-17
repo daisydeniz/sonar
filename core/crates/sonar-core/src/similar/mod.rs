@@ -33,12 +33,18 @@
 //! it has none); an external file is decoded and analyzed on the fly with
 //! the `dsp` stage's code path ([`seed::analyze_file`]), then normalized
 //! with the library stats. An external copy of a library file therefore
-//! finds that file first at distance ≈ 0.
+//! finds that file first at distance ≈ 0. A region seed (ADR-040: a time
+//! range of a library or external file) is analyzed the same way over that
+//! range only ([`region::analyze_region`]); the whole file it was cut from
+//! stays a candidate, so a region of a library file can find that file.
 
+pub mod region;
 mod score;
 pub mod seed;
 mod weights;
 
+#[cfg(test)]
+mod region_tests;
 #[cfg(test)]
 mod tests;
 
@@ -49,6 +55,7 @@ use std::sync::Arc;
 use rayon::prelude::*;
 use serde::Serialize;
 
+pub use region::TimeRange;
 pub use score::AspectDistances;
 pub(crate) use score::{Cand, Scaler, TopK};
 pub use weights::AspectWeights;
@@ -70,6 +77,22 @@ pub enum Seed {
     File(i64),
     /// An audio file anywhere, analyzed on the fly.
     External(PathBuf),
+    /// A time range of a library file, decoded from its path and analyzed
+    /// on the fly; the file itself stays a candidate. Resolved to its path
+    /// by [`crate::engine::Engine::similar`] ([`similar`] alone rejects it).
+    FileRegion {
+        /// `files.id`.
+        file_id: i64,
+        /// The range (s).
+        range: TimeRange,
+    },
+    /// A time range of an audio file anywhere, analyzed on the fly.
+    ExternalRegion {
+        /// The audio file.
+        path: PathBuf,
+        /// The range (s).
+        range: TimeRange,
+    },
 }
 
 /// How to run a similarity query.
@@ -109,7 +132,8 @@ pub struct SimilarHit {
 /// Results of [`similar`].
 #[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct SimilarResults {
-    /// The seed's file id (`None` for an external seed).
+    /// The file id excluded as the seed (`None` for external and region
+    /// seeds).
     pub seed_file_id: Option<i64>,
     /// Allowed files that have vectors and were scored (seed excluded).
     pub candidates: usize,
@@ -121,7 +145,9 @@ pub struct SimilarResults {
 ///
 /// # Errors
 /// [`Error::NoVectors`] for a library file without a row; decode errors
-/// for an external file (see [`seed::analyze_file`]).
+/// for an external file (see [`seed::analyze_file`]); region errors (see
+/// [`region::analyze_region`]); [`Error::InvalidQuery`] for an unresolved
+/// [`Seed::FileRegion`].
 pub fn seed_vectors(
     vs: &VectorStore,
     seed: &Seed,
@@ -130,6 +156,10 @@ pub fn seed_vectors(
     match seed {
         Seed::File(id) => vs.vectors(*id).ok_or(Error::NoVectors { file_id: *id }),
         Seed::External(path) => seed::analyze_file(path, cancel),
+        Seed::ExternalRegion { path, range } => region::analyze_region(path, *range, cancel),
+        Seed::FileRegion { file_id, .. } => Err(Error::InvalidQuery {
+            reason: format!("region of file {file_id}: resolve its path first (Engine::similar)"),
+        }),
     }
 }
 
@@ -149,7 +179,7 @@ pub fn similar(
     let vectors = seed_vectors(vs, seed, opts.cancel.clone())?;
     let seed_id = match seed {
         Seed::File(id) => Some(*id),
-        Seed::External(_) => None,
+        Seed::External(_) | Seed::FileRegion { .. } | Seed::ExternalRegion { .. } => None,
     };
     let allowed = filtered_file_ids(index, &opts.filters)?;
     rank(vs, &vectors, seed_id, &allowed, opts)

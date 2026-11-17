@@ -16,24 +16,24 @@ use crate::scan::scan_library;
 use crate::Store;
 
 /// The analyzed fixture library shared by every test.
-struct Lib {
+pub(super) struct Lib {
     _tmp: tempfile::TempDir,
-    root: PathBuf,
+    pub(super) root: PathBuf,
     db: PathBuf,
     /// Every scanned file (with or without vectors).
-    fixtures: HashMap<i64, Fixture>,
+    pub(super) fixtures: HashMap<i64, Fixture>,
     /// Nothing hidden.
-    index: TextIndex,
+    pub(super) index: TextIndex,
     /// Every `formats/` file hidden.
     index_hidden: TextIndex,
 }
 
 impl Lib {
-    fn vs(&self) -> VectorStore {
+    pub(super) fn vs(&self) -> VectorStore {
         VectorStore::open_read(dir_for_db(&self.db)).expect("vector store")
     }
 
-    fn id_of(&self, rel: &str) -> i64 {
+    pub(super) fn id_of(&self, rel: &str) -> i64 {
         self.fixtures
             .iter()
             .find(|(_, f)| f.path == rel)
@@ -41,7 +41,7 @@ impl Lib {
             .unwrap_or_else(|| panic!("{rel} not in the library"))
     }
 
-    fn fixture(&self, id: i64) -> &Fixture {
+    pub(super) fn fixture(&self, id: i64) -> &Fixture {
         &self.fixtures[&id]
     }
 
@@ -59,7 +59,7 @@ impl Lib {
     }
 }
 
-fn lib() -> &'static Lib {
+pub(super) fn lib() -> &'static Lib {
     static LIB: OnceLock<Lib> = OnceLock::new();
     LIB.get_or_init(|| {
         let tmp = tempfile::tempdir().expect("tmp");
@@ -123,7 +123,7 @@ fn rel_path(path: &Path, root: &Path) -> String {
 
 /// Sound family from the manifest truth (what "similar" should mean on
 /// synthetic fixtures).
-fn family(f: &Fixture) -> &'static str {
+pub(super) fn family(f: &Fixture) -> &'static str {
     match (f.truth.category, f.truth.kind) {
         (Some(Category::Sine), Some(Kind::Tone)) => "sine",
         (Some(Category::Sine), _) => "sine burst",
@@ -140,12 +140,12 @@ fn family(f: &Fixture) -> &'static str {
     }
 }
 
-fn run(seed: Seed, opts: &SimilarOptions) -> SimilarResults {
+pub(super) fn run(seed: Seed, opts: &SimilarOptions) -> SimilarResults {
     let lib = lib();
     similar(&lib.vs(), &lib.index, &seed, opts).expect("similar")
 }
 
-fn opts(limit: usize, weights: AspectWeights) -> SimilarOptions {
+pub(super) fn opts(limit: usize, weights: AspectWeights) -> SimilarOptions {
     SimilarOptions {
         limit,
         weights,

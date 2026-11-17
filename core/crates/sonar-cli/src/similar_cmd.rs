@@ -1,5 +1,6 @@
 //! `sonar similar`: files that sound like a library file or an external
-//! file (ADR-024), with aspect weights and the filters of `sonar search`.
+//! file (ADR-024) or a time range of either (ADR-040), with aspect weights
+//! and the filters of `sonar search`.
 
 use std::path::PathBuf;
 use std::time::Instant;
@@ -9,7 +10,7 @@ use clap::Args;
 use serde::Serialize;
 use sonar_core::engine::{Engine, EngineOptions};
 use sonar_core::paths;
-use sonar_core::similar::{AspectDistances, AspectWeights, Seed, SimilarOptions};
+use sonar_core::similar::{AspectDistances, AspectWeights, Seed, SimilarOptions, TimeRange};
 use sonar_core::Store;
 
 use crate::search_args::FilterFlags;
@@ -24,6 +25,23 @@ pub struct SimilarArgs {
     /// the fly.
     #[arg(long, value_name = "PATH")]
     pub file: Option<PathBuf>,
+    /// Start (s) of the region of the seed to analyze (with `--end`); the
+    /// seed's own file stays a candidate.
+    #[arg(
+        long,
+        value_name = "S",
+        requires = "end",
+        allow_negative_numbers = true
+    )]
+    pub start: Option<f64>,
+    /// End (s) of the region (with `--start`; at least 50 ms after it).
+    #[arg(
+        long,
+        value_name = "E",
+        requires = "start",
+        allow_negative_numbers = true
+    )]
+    pub end: Option<f64>,
     /// Aspect weights, e.g. `timbre=2,pitch=1`: listed aspects only
     /// (others 0); `overall=W` adds W to all four. Default: all four 1.
     #[arg(long, value_name = "ASPECT=W,..", value_parser = parse_weights)]
@@ -47,6 +65,8 @@ fn parse_weights(s: &str) -> Result<AspectWeights, String> {
 struct SeedInfo {
     file_id: Option<i64>,
     path: Option<PathBuf>,
+    /// The analyzed time range (`--start`/`--end`), if any.
+    region: Option<TimeRange>,
 }
 
 #[derive(Serialize)]
@@ -81,13 +101,24 @@ pub fn run(args: &SimilarArgs) -> Result<()> {
         },
     )
     .context("opening the Sonar engine")?;
-    let (seed, seed_path) = match (&args.file, args.id) {
-        (Some(path), _) => (Seed::External(path.clone()), Some(path.clone())),
-        (None, Some(id)) => (
-            Seed::File(id),
+    let range = args.start.zip(args.end).map(|(s, e)| TimeRange::new(s, e));
+    let (seed, seed_path) = match (&args.file, args.id, range) {
+        (Some(path), _, None) => (Seed::External(path.clone()), Some(path.clone())),
+        (Some(path), _, Some(range)) => (
+            Seed::ExternalRegion {
+                path: path.clone(),
+                range,
+            },
+            Some(path.clone()),
+        ),
+        (None, Some(id), range) => (
+            range.map_or(Seed::File(id), |range| Seed::FileRegion {
+                file_id: id,
+                range,
+            }),
             engine.file_path(id).context("looking up the seed")?,
         ),
-        (None, None) => anyhow::bail!("give a file id or --file PATH"),
+        (None, None, _) => anyhow::bail!("give a file id or --file PATH"),
     };
     let opts = SimilarOptions {
         limit: args.limit,
@@ -117,8 +148,13 @@ pub fn run(args: &SimilarArgs) -> Result<()> {
         .context("looking up result paths")?;
     let report = Report {
         seed: SeedInfo {
-            file_id: results.seed_file_id,
+            // A region of a library file names it although it is not
+            // excluded from the hits.
+            file_id: results
+                .seed_file_id
+                .or(args.id.filter(|_| args.file.is_none())),
             path: seed_path,
+            region: range,
         },
         weights: opts.weights,
         candidates: results.candidates,
@@ -141,8 +177,11 @@ fn print_text(r: &Report) {
         .seed
         .file_id
         .map_or_else(String::new, |id| format!("#{id} "));
+    let region = r.seed.region.map_or_else(String::new, |t| {
+        format!(" [{:.3}–{:.3} s]", t.start_s, t.end_s)
+    });
     println!(
-        "similar to {id}{} ({})",
+        "similar to {id}{}{region} ({})",
         show(r.seed.path.as_ref()),
         r.weights
     );
@@ -200,8 +239,21 @@ mod tests {
             &["sonar", "similar", "1", "--weights", "color=1"],
             &["sonar", "similar", "1", "--weights", "pitch=0"],
             &["sonar", "similar", "1", "--sort", "bpm"],
+            &["sonar", "similar", "1", "--start", "0.5"],
+            &["sonar", "similar", "1", "--end", "0.5"],
         ] {
             assert!(Cli::try_parse_from(bad).is_err(), "{bad:?}");
+        }
+    }
+
+    #[test]
+    fn parses_region_bounds_together() {
+        let cli = Cli::try_parse_from([
+            "sonar", "similar", "--file", "x.wav", "--start", "-1", "--end", "2.5",
+        ]);
+        match cli.map(|c| c.command) {
+            Ok(Command::Similar(a)) => assert_eq!((a.start, a.end), (Some(-1.0), Some(2.5))),
+            other => panic!("{other:?}"),
         }
     }
 }

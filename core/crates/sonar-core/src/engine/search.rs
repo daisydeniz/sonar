@@ -155,12 +155,29 @@ impl Engine {
     /// Files that sound like `seed` (ADR-024) among those `opts.filters`
     /// allow, so favourites, hidden files and overrides apply as in
     /// [`Engine::search`]. Opens the aspect vector store read-only per call;
-    /// runs on the caller's thread and honours `opts.cancel`.
+    /// runs on the caller's thread and honours `opts.cancel`. A
+    /// [`Seed::FileRegion`] is decoded from the library file's path
+    /// (ADR-040); that file stays a candidate.
     ///
     /// # Errors
-    /// [`Error::VectorStore`] (no analysis yet), [`Error::NoVectors`], plus
-    /// everything [`crate::similar::similar`] returns.
+    /// [`Error::VectorStore`] (no analysis yet), [`Error::NoVectors`],
+    /// [`Error::FileNotFound`] (unknown region file), plus everything
+    /// [`crate::similar::similar`] returns.
     pub fn similar(&self, seed: &Seed, opts: &SimilarOptions) -> Result<SimilarResults> {
+        let resolved;
+        let seed = match seed {
+            Seed::FileRegion { file_id, range } => {
+                let path = self
+                    .file_path(*file_id)?
+                    .ok_or(Error::FileNotFound { id: *file_id })?;
+                resolved = Seed::ExternalRegion {
+                    path,
+                    range: *range,
+                };
+                &resolved
+            }
+            other => other,
+        };
         self.ensure_index()?;
         let vs = VectorStore::open_read(vector_dir(&self.inner.db_path))?;
         similar(&vs, &self.inner.index, seed, opts)

@@ -3,7 +3,7 @@
 //! live in `sonar_core::similar::AspectWeights`.
 
 use sonar_core::similar::{
-    AspectWeights as CoreWeights, Seed, SimilarHit as CoreHit, SimilarOptions,
+    AspectWeights as CoreWeights, Seed, SimilarHit as CoreHit, SimilarOptions, TimeRange,
 };
 
 use crate::convert;
@@ -66,6 +66,23 @@ pub struct SimilarQuery {
     /// Largest or last first (ignored for nearest-first).
     #[uniffi(default = false)]
     pub descending: bool,
+    /// `nil` = the whole seed. Otherwise only this time range of the seed
+    /// file (library or external) is decoded and analyzed (ADR-040); a
+    /// library seed's own file is then a normal candidate (a selection of a
+    /// loop finds that loop).
+    #[uniffi(default = None)]
+    pub region: Option<SimilarRegion>,
+}
+
+/// A time range of the seed, in seconds from the file's start. Must be
+/// finite, `start >= 0`, `end - start >= 0.05` and `end <= duration`
+/// (+10 ms, clamped); otherwise `FfiError.InvalidInput`.
+#[derive(Debug, Clone, Copy, PartialEq, uniffi::Record)]
+pub struct SimilarRegion {
+    /// Start (s).
+    pub start_s: f64,
+    /// End (s).
+    pub end_s: f64,
 }
 
 /// One neighbour's distances (smaller = more similar; 0 = identical,
@@ -135,9 +152,18 @@ impl From<CoreWeights> for AspectWeights {
 
 /// Core seed and options of an FFI query; validates the weights.
 pub fn query(q: SimilarQuery) -> Result<(Seed, SimilarOptions), FfiError> {
-    let seed = match q.seed {
-        SimilarSeed::File { file_id } => Seed::File(file_id),
-        SimilarSeed::External { path } => Seed::External(path.into()),
+    let range = q.region.map(|r| TimeRange::new(r.start_s, r.end_s));
+    if let Some(range) = range {
+        guard(|| range.validate())?;
+    }
+    let seed = match (q.seed, range) {
+        (SimilarSeed::File { file_id }, None) => Seed::File(file_id),
+        (SimilarSeed::External { path }, None) => Seed::External(path.into()),
+        (SimilarSeed::File { file_id }, Some(range)) => Seed::FileRegion { file_id, range },
+        (SimilarSeed::External { path }, Some(range)) => Seed::ExternalRegion {
+            path: path.into(),
+            range,
+        },
     };
     let weights = q.weights.map_or_else(CoreWeights::default, Into::into);
     guard(|| weights.validate())?;
