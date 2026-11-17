@@ -1,47 +1,55 @@
 import SwiftUI
 
-/// Inspector waveform: layer-rendered peaks, playhead, click-to-seek and
-/// zoom (pinch, Cmd-scroll, +/- buttons), scroll to pan when zoomed.
+/// Player-header waveform (DESIGN §4.4): layer-rendered peaks (played full
+/// accent, unplayed accent at 45 %), playhead, click-to-seek, zoom (pinch,
+/// Cmd-scroll, +/- buttons) and scroll-to-pan when zoomed. Fills the height
+/// its parent gives it; sits in a `surfaceWell`.
 @MainActor
 struct WaveformView: View {
     let model: WaveformModel
     let preview: AudioPreview
 
     var body: some View {
-        VStack(spacing: 4) {
-            ZStack {
-                WaveformRepresentable(model: model, preview: preview)
-                overlay
-            }
-            .frame(height: 96)
-            .background(.quaternary.opacity(0.4), in: RoundedRectangle(cornerRadius: 6))
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            HStack(spacing: 6) {
-                Spacer()
+        ZStack {
+            WaveformRepresentable(model: model, preview: preview)
+            overlay
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Theme.Color.surfaceWell, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.medium))
+        .overlay(alignment: .bottomTrailing) { zoomControls }
+    }
+
+    @ViewBuilder private var zoomControls: some View {
+        if case .ready = model.state {
+            HStack(spacing: Theme.Space.s4) {
                 Button { model.zoom(by: 1 / 1.5) } label: { Image(systemName: "minus.magnifyingglass") }
                     .disabled(!model.viewport.isZoomed)
+                    .help("Zoom out")
                     .accessibilityLabel("Zoom out")
                 Button { model.zoom(by: 1.5) } label: { Image(systemName: "plus.magnifyingglass") }
                     .disabled(model.viewport.zoom >= WaveformViewport.maxZoom)
+                    .help("Zoom in")
                     .accessibilityLabel("Zoom in")
-                Button("Reset") { model.resetZoom() }
+                Button { model.resetZoom() } label: { Image(systemName: "arrow.left.and.right") }
                     .disabled(!model.viewport.isZoomed)
+                    .help("Show whole file")
                     .accessibilityLabel("Reset zoom")
             }
             .buttonStyle(.borderless)
             .controlSize(.small)
+            .padding(Theme.Space.s6)
         }
     }
 
     @ViewBuilder private var overlay: some View {
         switch model.state {
-        case .loading:
-            ProgressView().controlSize(.small)
-        case .failed:
-            Label("Can't read this file. It may be missing, moved or unreadable.", systemImage: "exclamationmark.triangle")
-                .font(.caption).foregroundStyle(.secondary).multilineTextAlignment(.center).padding(6)
-        case .empty, .ready:
+        case .loading, .empty, .ready:
             EmptyView()
+        case .failed:
+            Text("Can't read this file. It may be missing, moved or unreadable.")
+                .font(Theme.Font.caption).foregroundStyle(.secondary)
+                .multilineTextAlignment(.center).padding(Theme.Space.s12)
         }
     }
 }

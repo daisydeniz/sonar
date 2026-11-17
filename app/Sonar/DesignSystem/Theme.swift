@@ -27,7 +27,13 @@ enum Theme {
         static let rowHeight: CGFloat = 24
         static let headerHeight: CGFloat = 22
         static let barHeight: CGFloat = 36
-        static let playerDockHeight: CGFloat = 104
+        /// Selected-waveform well in the player header: default, minimum and
+        /// maximum height (user-resizable, DESIGN §2.3).
+        static let waveformHeight: CGFloat = 180
+        static let waveformMinHeight: CGFloat = 120
+        static let waveformMaxHeight: CGFloat = 360
+        /// Height of the draggable split divider under the player header.
+        static let splitHandle: CGFloat = 6
         static let transportButton: CGFloat = 28
         static let chipHeight: CGFloat = 22
         /// Diameter of `Knob` and the width of its arc.
@@ -40,6 +46,9 @@ enum Theme {
         /// Maximum text width of `EmptyStateView`.
         static let emptyStateTextWidth: CGFloat = 360
     }
+
+    /// Opacity of the unplayed part of the waveform (played = full accent).
+    static let waveformUnplayedOpacity: Double = 0.45
 
     /// One physical pixel at the given backing scale (2 = Retina).
     static func hairlineWidth(scale: CGFloat) -> CGFloat { 1 / max(scale, 1) }

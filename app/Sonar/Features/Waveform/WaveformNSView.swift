@@ -24,7 +24,11 @@ final class WaveformNSView: NSView {
         }
     }
 
+    /// Unplayed part (accent at 45 %), the whole shape.
+    private let unplayedLayer = CAShapeLayer()
+    /// Played part (full accent): same shape, masked to the left of the playhead.
     private let waveLayer = CAShapeLayer()
+    private let playedMask = CALayer()
     private let playhead = CALayer()
     private var displayLink: CADisplayLink?
     private var playheadFraction: Double?
@@ -32,9 +36,14 @@ final class WaveformNSView: NSView {
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
+        layer?.addSublayer(unplayedLayer)
         layer?.addSublayer(waveLayer)
-        waveLayer.fillColor = nil
-        waveLayer.lineCap = .butt
+        for shape in [unplayedLayer, waveLayer] {
+            shape.fillColor = nil
+            shape.lineCap = .butt
+        }
+        playedMask.backgroundColor = Theme.NS.accent.cgColor  // mask alpha only
+        waveLayer.mask = playedMask
         playhead.isHidden = true
         layer?.addSublayer(playhead)
         setAccessibilityElement(true)
@@ -67,7 +76,8 @@ final class WaveformNSView: NSView {
 
     private func updateColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            waveLayer.strokeColor = NSColor.controlAccentColor.cgColor
+            waveLayer.strokeColor = Theme.NS.accent.cgColor
+            unplayedLayer.strokeColor = Theme.NS.accent.withAlphaComponent(Theme.waveformUnplayedOpacity).cgColor
             playhead.backgroundColor = NSColor.labelColor.cgColor
         }
     }
@@ -77,24 +87,40 @@ final class WaveformNSView: NSView {
         CATransaction.begin()
         CATransaction.setDisableActions(true)
         defer { CATransaction.commit() }
+        unplayedLayer.frame = bounds
         waveLayer.frame = bounds
         let scale = window?.backingScaleFactor ?? 2
         // One column per device pixel pair keeps the path small and crisp.
         let count = max(1, Int(size.width * scale / 2))
         let columns = WaveformMath.rebucket(peaks, from: viewport.start, to: viewport.end, into: count)
-        waveLayer.lineWidth = columns.isEmpty ? 1 : size.width / CGFloat(columns.count)
-        waveLayer.path = WaveformMath.path(columns: columns, size: size)
+        let path: CGPath
+        if columns.isEmpty {
+            // No peaks (none selected / loading): a flat centre line.
+            let line = CGMutablePath()
+            line.move(to: CGPoint(x: 0, y: size.height / 2))
+            line.addLine(to: CGPoint(x: size.width, y: size.height / 2))
+            path = line
+            unplayedLayer.lineWidth = 1
+        } else {
+            path = WaveformMath.path(columns: columns, size: size)
+            unplayedLayer.lineWidth = size.width / CGFloat(columns.count)
+        }
+        waveLayer.lineWidth = unplayedLayer.lineWidth
+        unplayedLayer.path = path
+        waveLayer.path = columns.isEmpty ? nil : path
         placePlayhead()
     }
 
     private func placePlayhead() {
         guard let f = playheadFraction, !peaks.isEmpty else {
             playhead.isHidden = true
+            playedMask.frame = .zero
             return
         }
         let x = viewport.x(forFraction: f, width: bounds.width)
         playhead.isHidden = x < 0 || x > bounds.width
         playhead.frame = CGRect(x: x - 0.5, y: 0, width: 1, height: bounds.height)
+        playedMask.frame = CGRect(x: 0, y: 0, width: min(max(x, 0), bounds.width), height: bounds.height)
     }
 
     // MARK: Playhead
@@ -140,7 +166,7 @@ final class WaveformNSView: NSView {
     override func scrollWheel(with event: NSEvent) {
         let horizontal = abs(event.scrollingDeltaX) >= abs(event.scrollingDeltaY)
         guard event.modifierFlags.contains(.command) || (viewport.isZoomed && horizontal) else {
-            // Let the inspector scroll vertically (Shift-wheel pans a mouse).
+            // Let the content column scroll vertically (Shift-wheel pans a mouse).
             super.scrollWheel(with: event)
             return
         }

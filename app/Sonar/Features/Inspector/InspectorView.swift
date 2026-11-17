@@ -5,8 +5,6 @@ import SwiftUI
 struct InspectorView: View {
     let model: AppModel
     let row: FileRow?
-    let preview: AudioPreview
-    let waveform: WaveformModel
     let onToggleFavorite: (FileRow) -> Void
     let onFindSimilar: (FileRow) -> Void
 
@@ -28,8 +26,6 @@ struct InspectorView: View {
                     }
                     Button { onFindSimilar(row) } label: { Label("Find Similar", systemImage: "waveform.badge.magnifyingglass") }
                 }
-                Section("Waveform") { WaveformView(model: waveform, preview: preview) }
-                PreviewControlsView(preview: preview)
                 OverrideFieldsView(model: model, row: row)
                 TagsEditorView(model: model, row: row)
                 Section("Details") {

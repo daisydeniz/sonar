@@ -60,6 +60,15 @@ final class UISnapshotTests: XCTestCase {
         try snapshot("main", contentView(model), dir: dir, emphasis: true, selectRow: 2)
     }
 
+    /// Player header without a selection: disabled transport, flat centre line.
+    func testMainNoSelection() async throws {
+        let dir = try outputDir()
+        let model = try await populated()
+        model.select(nil)
+        await model.waveform.settle()
+        try snapshot("main-noselection", contentView(model), dir: dir, emphasis: true)
+    }
+
     func testMainUnfocused() async throws {
         let dir = try outputDir()
         let model = try await populated()

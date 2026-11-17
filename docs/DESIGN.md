@@ -94,7 +94,10 @@ right-aligned in columns. No other font family, no italic, no extra weights.
   transport row 36 + waveform 180 (user-resizable 120–360 via a split
   divider; compare mode adds a 72 pt target well above) · icon in rows/bars 12–13 pt
   (`.imageScale(.small)`), transport button 28, category dot 6
-  (`Theme.Size.categoryDot`), knob 26 with a 2.5 arc (`Theme.Size.knob`,
+  (`Theme.Size.categoryDot`), waveform well `Theme.Size.waveformHeight` /
+  `waveformMinHeight` / `waveformMaxHeight` (180 / 120 / 360), split handle 6
+  (`splitHandle`), unplayed waveform opacity `Theme.waveformUnplayedOpacity`
+  0.45, knob 26 with a 2.5 arc (`Theme.Size.knob`,
   `knobStroke`).
 - **Hairlines** are 1 physical pixel (`Theme.hairlineWidth`).
 

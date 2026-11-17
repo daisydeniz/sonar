@@ -93,8 +93,8 @@ final class DesignTokenTests: XCTestCase {
                         Theme.Space.s16, Theme.Space.s24, Theme.Space.s32], [2, 4, 6, 8, 12, 16, 24, 32])
         XCTAssertEqual(Theme.Size.rowHeight, 24)
         XCTAssertEqual([Theme.Radius.small, Theme.Radius.medium, Theme.Radius.large], [4, 6, 10])
-        XCTAssertEqual([Theme.Size.headerHeight, Theme.Size.barHeight, Theme.Size.playerDockHeight,
-                        Theme.Size.transportButton, Theme.Size.chipHeight], [22, 36, 104, 28, 22])
+        XCTAssertEqual([Theme.Size.headerHeight, Theme.Size.barHeight, Theme.Size.waveformHeight,
+                        Theme.Size.transportButton, Theme.Size.chipHeight], [22, 36, 180, 28, 22])
         XCTAssertEqual(Theme.hairlineWidth(scale: 2), 0.5)
     }
 }

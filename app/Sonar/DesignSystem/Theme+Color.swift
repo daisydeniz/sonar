@@ -16,7 +16,7 @@ extension Theme {
         static let controlAccent = SwiftUI.Color("AccentColor")
         /// Results table and main content background.
         static let surfaceContent = SwiftUI.Color("SurfaceContent")
-        /// Filter bar, similarity bar, player dock, cards.
+        /// Filter bar, similarity bar, player header, cards.
         static let surfaceRaised = SwiftUI.Color("SurfaceRaised")
         /// Waveform well, inset areas, meter tracks.
         static let surfaceWell = SwiftUI.Color("SurfaceWell")

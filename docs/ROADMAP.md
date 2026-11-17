@@ -279,3 +279,8 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T9.1 review) `scripts/design-lint.sh` misses conditional colour literals (`x ? .red : .secondary`) and `Font.system(size:)` without a leading dot.
 - (from T9.2 review) Literals the lint misses in the results cells: hidden-dot alpha 0.4, skeleton width multiplier 0.4, 18×18 heart button; move to tokens (`Theme.Opacity.disabled`, `Theme.Size.rowIcon`).
 - (from T9.2 review) A reused row view that is already under the pointer shows no hover heart until the mouse moves (`ResultsRowView.prepareForReuse`).
+- (from T9.3 review) Player header readout captions (BPM/KEY/LENGTH) sit 2–4 pt below the top edge of the 36 pt transport row; give the row `barHeight + s8` or vertical padding (DESIGN §2.3/§3 change).
+- (from T9.3 review) Pitch shown as knob + "+0 st" text, not a `Readout` as DESIGN §4.3 lists; align spec or view.
+- (from T9.3 review) Waveform resize cursor pushed/popped by hand in `onHover`; can stick after a drag ends outside the handle (`.pointerStyle(.rowResize)`).
+- (from T9.3) Pause and Stop do the same thing (`AudioPreview` has no real pause/resume).
+- (from T9.3) Narrow window does not shrink the waveform to its 120 pt minimum first (DESIGN §3 Window).

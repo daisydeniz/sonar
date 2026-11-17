@@ -12,4 +12,3 @@ app/Sonar/Features/Settings/LibrariesSettingsView.swift
 app/Sonar/Features/Settings/SettingsView.swift
 app/Sonar/Features/Similar/SimilarityBarView.swift
 app/Sonar/Features/Status/StatusBannerView.swift
-app/Sonar/Features/Waveform/WaveformView.swift

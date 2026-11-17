@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// A value with a label-style caption above it (DESIGN §4.3): BPM, KEY,
-/// LENGTH, PITCH in the player dock. A nil value shows an en dash in tertiary.
+/// LENGTH, PITCH in the player header. A nil value shows an en dash in tertiary.
 struct Readout: View {
     let caption: String
     let value: String?

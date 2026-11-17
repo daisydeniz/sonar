@@ -32,7 +32,7 @@ struct ContentView: View {
         } detail: {
             detail
                 .inspector(isPresented: $showInspector) {
-                    InspectorView(model: model, row: model.selectedRow, preview: model.preview, waveform: model.waveform,
+                    InspectorView(model: model, row: model.selectedRow,
                         onToggleFavorite: { _ in Task { await model.toggleFavoriteOfSelection() } },
                         onFindSimilar: { model.findSimilar(to: $0) })
                     .inspectorColumnWidth(min: 240, ideal: 280, max: 400)
@@ -93,6 +93,7 @@ struct ContentView: View {
             DuplicatesView(model: model)
         case .ready:
             VStack(spacing: 0) {
+                PlayerHeaderView(row: model.selectedRow, preview: model.preview, waveform: model.waveform)
                 if model.showsFilterBar {
                     FilterBarView(model: model)
                     Hairline()
