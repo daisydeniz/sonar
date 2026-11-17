@@ -1,34 +1,5 @@
 import AppKit
 
-/// `NSTableView` that reports Space / Return / Esc instead of beeping;
-/// arrows and everything else stay native.
-final class KeyTableView: NSTableView {
-    /// Returns true when the key was handled.
-    var onKey: ((TableKey) -> Bool)?
-    /// ⌘C: copy the selected file URLs.
-    var onCopy: (() -> Void)?
-
-    @objc func copy(_ sender: Any?) { onCopy?() }
-
-    /// True while ⌘A runs: the selection grows but focus must not move.
-    private(set) var isSelectingAll = false
-
-    /// AppKit makes the LAST row `selectedRow` after select-all; put the
-    /// focus back on the row that had it.
-    override func selectAll(_ sender: Any?) {
-        let old = selectedRow
-        isSelectingAll = true
-        super.selectAll(sender)
-        if old >= 0 { selectRowIndexes([old], byExtendingSelection: true) }
-        isSelectingAll = false
-    }
-
-    override func keyDown(with event: NSEvent) {
-        if let key = TableKey.from(event), onKey?(key) == true { return }
-        super.keyDown(with: event)
-    }
-}
-
 /// Box for a menu entry's closure (`representedObject` needs a class).
 final class MenuAction: NSObject {
     let run: @MainActor () -> Void
@@ -329,6 +300,11 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
             view.identifier = ResultsRowView.identifier
             return view
         }()
+    }
+
+    /// A (re)used row view gets the table's hover state for its new row.
+    func tableView(_ tableView: NSTableView, didAdd rowView: NSTableRowView, forRow row: Int) {
+        self.tableView.applyHover(to: rowView, row: row)
     }
 
     func tableViewSelectionDidChange(_ notification: Notification) {

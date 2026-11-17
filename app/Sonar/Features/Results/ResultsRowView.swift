@@ -1,7 +1,10 @@
 import AppKit
 
-/// Row of the results table: rounded tinted selection (DESIGN §4.1) and
-/// hover tracking for the favourite heart. No layer effects, no timers.
+/// Row of the results table: rounded tinted selection (DESIGN §4.1) and the
+/// hover state for the favourite heart. The hover state is set by
+/// `KeyTableView` (one table-wide tracking area + scroll observation), never
+/// by per-row tracking areas: those miss `mouseExited` while scrolling reuses
+/// rows, which left hearts stuck on. No layer effects, no timers.
 final class ResultsRowView: NSTableRowView {
     static let identifier = NSUserInterfaceItemIdentifier("sonar.row")
 
@@ -12,7 +15,7 @@ final class ResultsRowView: NSTableRowView {
     @MainActor static var emphasisOverride: Bool?
 
     /// The pointer is over this row (the favourite cell shows its outline).
-    private(set) var isHovered = false {
+    var isHovered = false {
         didSet { if isHovered != oldValue { applyHover() } }
     }
 
@@ -34,17 +37,6 @@ final class ResultsRowView: NSTableRowView {
         super.prepareForReuse()
         isHovered = false
     }
-
-    override func updateTrackingAreas() {
-        super.updateTrackingAreas()
-        for area in trackingAreas { removeTrackingArea(area) }
-        addTrackingArea(
-            NSTrackingArea(
-                rect: .zero, options: [.mouseEnteredAndExited, .activeInActiveApp, .inVisibleRect], owner: self))
-    }
-
-    override func mouseEntered(with event: NSEvent) { isHovered = true }
-    override func mouseExited(with event: NSEvent) { isHovered = false }
 
     override func didAddSubview(_ subview: NSView) {
         super.didAddSubview(subview)

@@ -61,6 +61,12 @@ struct ComponentsGallery: View {
                     Readout("Length", value: "0:03.4")
                     Readout("Pitch", value: nil)
                 }
+                SectionLabel("Knob")
+                HStack(spacing: Theme.Space.s24) {
+                    Knob(value: .constant(0), in: -12...12, accessibilityLabel: "Default")
+                    Knob(value: .constant(7), in: -12...12, accessibilityLabel: "Up")
+                    Knob(value: .constant(-12), in: -12...12, accessibilityLabel: "Min")
+                }
                 SectionLabel("Hairline")
                 Hairline()
                 SectionLabel("EmptyStateView")

@@ -30,6 +30,9 @@ enum Theme {
         static let playerDockHeight: CGFloat = 104
         static let transportButton: CGFloat = 28
         static let chipHeight: CGFloat = 22
+        /// Diameter of `Knob` and the width of its arc.
+        static let knob: CGFloat = 26
+        static let knobStroke: CGFloat = 2.5
         /// Diameter of the category dot in table rows.
         static let categoryDot: CGFloat = 6
         /// Symbol point size of `EmptyStateView`.

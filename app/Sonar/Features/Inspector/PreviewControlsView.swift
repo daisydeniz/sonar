@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Compact preview controls: play/stop, loop, pitch (+reset), auto-play.
+/// Compact preview controls: play/stop, loop, pitch knob (double-click resets), auto-play.
 @MainActor
 struct PreviewControlsView: View {
     @Bindable var preview: AudioPreview
@@ -24,18 +24,17 @@ struct PreviewControlsView: View {
             }
             HStack {
                 Text("Pitch")
-                Slider(
-                    value: Binding(
-                        get: { Double(preview.pitchSemitones) },
-                        set: { preview.setPitch(semitones: Int($0.rounded())) }),
-                    in: Double(AudioPreview.pitchRange.lowerBound)...Double(AudioPreview.pitchRange.upperBound),
-                    step: 1
-                )
-                .accessibilityLabel("Pitch in semitones")
+                Spacer()
                 Text(String(format: "%+d st", preview.pitchSemitones))
-                    .monospacedDigit().frame(width: 48, alignment: .trailing)
-                Button("Reset") { preview.resetPitch() }
-                    .disabled(preview.pitchSemitones == 0)
+                    .monospacedDigit()
+                    .foregroundStyle(preview.pitchSemitones == 0 ? .secondary : .primary)
+                Knob(
+                    value: Binding(
+                        get: { preview.pitchSemitones },
+                        set: { preview.setPitch(semitones: $0) }),
+                    in: AudioPreview.pitchRange,
+                    defaultValue: 0,
+                    accessibilityLabel: "Pitch in semitones")
             }
             Toggle("Auto-play on selection", isOn: $preview.autoPlay)
             if let status = preview.status {

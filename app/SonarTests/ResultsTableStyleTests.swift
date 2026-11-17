@@ -84,4 +84,24 @@ final class ResultsTableStyleTests: XCTestCase {
         cell.setRowHovered(false)
         XCTAssertFalse(cell.isHeartVisible)
     }
+
+    /// A row view reused for another row (scrolling) takes the table's hover
+    /// state instead of keeping the old one: hearts never stay stuck on.
+    func testReusedRowViewTakesTableHover() {
+        let table = KeyTableView()
+        let row = ResultsRowView()
+        row.isHovered = true
+        table.applyHover(to: row, row: 5)
+        XCTAssertFalse(row.isHovered, "no row is hovered while the pointer is outside the table")
+        XCTAssertEqual(table.hoveredRow, -1)
+    }
+
+    /// DAW knob: drag up raises, down lowers, clamped to the range.
+    func testKnobDragMath() {
+        XCTAssertEqual(Knob.value(start: 0, dy: -Knob.pointsPerStep * 3, in: -12...12), 3)
+        XCTAssertEqual(Knob.value(start: 0, dy: Knob.pointsPerStep * 2, in: -12...12), -2)
+        XCTAssertEqual(Knob.value(start: 0, dy: Knob.pointsPerStep * 0.9, in: -12...12), 0)
+        XCTAssertEqual(Knob.value(start: 10, dy: -1000, in: -12...12), 12)
+        XCTAssertEqual(Knob.value(start: -10, dy: 1000, in: -12...12), -12)
+    }
 }

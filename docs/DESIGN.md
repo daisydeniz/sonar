@@ -93,7 +93,8 @@ right-aligned in columns. No other font family, no italic, no extra weights.
 - **Sizes**: table row 24 · table header 22 · bar height 36 · player dock 104 ·
   waveform in dock fills its height minus 2×8 · icon in rows/bars 12–13 pt
   (`.imageScale(.small)`), transport button 28, category dot 6
-  (`Theme.Size.categoryDot`).
+  (`Theme.Size.categoryDot`), knob 26 with a 2.5 arc (`Theme.Size.knob`,
+  `knobStroke`).
 - **Hairlines** are 1 physical pixel (`Theme.hairlineWidth`).
 
 ### 2.4 Motion
@@ -189,6 +190,15 @@ at most one primary action. Same component everywhere (`EmptyStateView`).
 One line on `surfaceRaised`, leading status symbol in the system status
 colour, `row` text, trailing action or dismiss. Never a tinted full-width
 background.
+
+### 4.8 Knob (`Knob`)
+DAW-style rotary control for stepped values (preview pitch). 270° arc in
+quaternary label colour, the part between the default and the value in
+`accent`, a `surfaceRaised` cap with a 1 pt tertiary rim and a primary
+pointer line. Vertical drag (6 pt per step,
+up = more), double-click resets to the default, arrow keys / VoiceOver
+adjust. Never paired with a Reset button; the value is shown as text beside
+it (secondary when at the default).
 
 ## 5. Rules
 
