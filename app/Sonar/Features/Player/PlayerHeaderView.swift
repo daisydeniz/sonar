@@ -20,6 +20,8 @@ struct PlayerHeaderView: View {
     let row: FileRow?
     @Bindable var preview: AudioPreview
     let waveform: WaveformModel
+    /// Find Similar to Selection (waveform region menu).
+    var onFindSimilarToSelection: () -> Void = {}
 
     @AppStorage(PlayerHeaderLayout.heightKey) private var storedHeight = Theme.Size.waveformHeight
     @State private var dragStartHeight: Double?
@@ -29,7 +31,7 @@ struct PlayerHeaderView: View {
     var body: some View {
         VStack(spacing: 0) {
             transportRow
-            WaveformView(model: waveform, preview: preview)
+            WaveformView(model: waveform, preview: preview, onFindSimilarToSelection: onFindSimilarToSelection)
                 .frame(height: height)
                 .padding(.horizontal, Theme.Space.s12)
                 .overlay(alignment: .bottomLeading) { statusLine }

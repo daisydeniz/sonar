@@ -25,6 +25,9 @@ final class AudioPreview {
     var loop = false {
         didSet { if loop != oldValue { restartIfPlaying() } }
     }
+    /// Selected waveform region of the current sound (fractions of its
+    /// duration): play and loop use it instead of the whole sound.
+    var region: WaveformRegion?
     /// Semitones, tempo preserved.
     private(set) var pitchSemitones = 0
     var autoPlay: Bool {
@@ -125,6 +128,16 @@ final class AudioPreview {
         return min(max(t / clip.duration, 0), 1)
     }
 
+    /// "Play Selection": plays the region from its start (or the whole sound
+    /// when there is none), restarting if it already plays.
+    func playSelection() {
+        guard let row = currentRow else { return }
+        generation += 1
+        endPlayback()
+        status = nil
+        start(row)
+    }
+
     /// Click on the waveform: plays the selection from `fraction` (0...1).
     /// Needs the clip to be decoded already (playing, or pre-decoded in the cache).
     func seek(toFraction fraction: Double) {
@@ -168,12 +181,16 @@ final class AudioPreview {
         }
     }
 
-    private func begin(_ clip: PreviewClip, _ row: FileRow, startAt: TimeInterval = 0) {
+    /// Starts `clip`; with a region only its frames play (and loop), from the
+    /// region start unless `startAt` seeks inside it.
+    private func begin(_ clip: PreviewClip, _ row: FileRow, startAt: TimeInterval? = nil) {
         currentClip = clip
+        let plan = region?.playback(
+            totalFrames: Int(clip.buffer.frameLength), sampleRate: clip.buffer.format.sampleRate, startAt: startAt)
         do {
             try player.play(
-                clip, loop: loop, gainDb: normalizeLoudness ? row.previewGainDb : nil, pitchCents: Float(pitchSemitones * 100),
-                startAt: startAt)
+                clip, loop: loop, gainDb: normalizeLoudness ? row.previewGainDb : nil,
+                pitchCents: Float(pitchSemitones * 100), startAt: plan?.startAt ?? startAt ?? 0, range: plan?.range)
             isPlaying = true
         } catch {
             isPlaying = false

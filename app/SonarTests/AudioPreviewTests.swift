@@ -10,6 +10,18 @@ final class FakePlayer: PreviewPlayer {
     private(set) var stops = 0
     private(set) var lastPlayInstant: ContinuousClock.Instant?
     private(set) var pitches: [Float] = []
+    /// Region range and start time of each `play` (nil range = whole clip).
+    private(set) var ranges: [Range<Int>?] = []
+    private(set) var starts: [TimeInterval] = []
+
+    func play(
+        _ clip: PreviewClip, loop: Bool, gainDb: Double?, pitchCents: Float, startAt: TimeInterval,
+        range: Range<Int>?
+    ) throws {
+        ranges.append(range)
+        starts.append(startAt)
+        try play(clip, loop: loop, gainDb: gainDb, pitchCents: pitchCents)
+    }
 
     func play(_ clip: PreviewClip, loop: Bool, gainDb: Double?, pitchCents: Float) throws {
         plays.append((clip, loop, gainDb, pitchCents))
@@ -25,6 +37,8 @@ final class FakeDecoder: PreviewDecoding, @unchecked Sendable {
     private var requested: [Int64] = []
     var delays: [Int64: UInt64] = [:]
     var failing: Set<Int64> = []
+    /// Length of the decoded clips (44.1 kHz mono).
+    var frames = 100
 
     var requests: [Int64] { lock.withLock { requested } }
 
@@ -32,7 +46,7 @@ final class FakeDecoder: PreviewDecoding, @unchecked Sendable {
         lock.withLock { requested.append(row.fileId) }
         if let d = delays[row.fileId] { try await Task.sleep(nanoseconds: d) }
         if failing.contains(row.fileId) { throw PreviewDecodeError.empty }
-        return Self.clip(frames: 100)
+        return Self.clip(frames: frames)
     }
 
     static func clip(frames: Int) -> PreviewClip {

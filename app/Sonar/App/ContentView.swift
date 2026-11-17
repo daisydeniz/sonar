@@ -93,7 +93,9 @@ struct ContentView: View {
             DuplicatesView(model: model)
         case .ready:
             VStack(spacing: 0) {
-                PlayerHeaderView(row: model.selectedRow, preview: model.preview, waveform: model.waveform)
+                PlayerHeaderView(
+                    row: model.selectedRow, preview: model.preview, waveform: model.waveform,
+                    onFindSimilarToSelection: { model.findSimilarToSelection() })
                 if model.showsFilterBar {
                     FilterBarView(model: model)
                     Hairline()
@@ -130,6 +132,10 @@ struct ContentView: View {
                 onSort: { key, descending in Task { await model.setSort(key, descending: descending) } },
                 onSelectionChange: { model.selectedFileIDs = $0 },
                 onKey: { key in
+                    if key == .escape, model.waveform.region != nil {
+                        model.waveform.clearRegion()
+                        return true
+                    }
                     if key == .escape, model.similarity.isActive {
                         model.exitSimilarity()
                         return true

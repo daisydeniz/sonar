@@ -39,6 +39,12 @@ enum Theme {
         /// Diameter of `Knob` and the width of its arc.
         static let knob: CGFloat = 26
         static let knobStroke: CGFloat = 2.5
+        /// Waveform region: edge line width and drag-handle size (DESIGN §4.4).
+        static let regionEdge: CGFloat = 1
+        static let regionHandleWidth: CGFloat = 6
+        static let regionHandleHeight: CGFloat = 24
+        /// Width of the floating readout + menu on a region.
+        static let regionBarWidth: CGFloat = 200
         /// Diameter of the category dot in table rows.
         static let categoryDot: CGFloat = 6
         /// Symbol point size of `EmptyStateView`.

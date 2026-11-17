@@ -197,8 +197,12 @@ unplayed part accent at 45 %. Playhead: 1 pt line in label colour. Loading:
 flat centre line; error: caption text centred in the well.
 - **Click** seeks (and starts playback if auto-play is on). **Drag**
   selects a region: `selection` tint over the region, 1 pt accent edges
-  with small drag handles, start/length readout in `caption` monospaced
-  above the well. Esc or click outside clears it.
+  with small drag handles (`Theme.Size.regionEdge`, `regionHandleWidth` /
+  `regionHandleHeight`; edges stay draggable), start/length readout in
+  `caption` monospaced digits in a small floating bar on the region's top
+  edge (`surfaceRaised`, `regionBarWidth`, with the actions menu). Regions
+  are at least 50 ms (a shorter drag is a click). Esc, a click outside, or a
+  different sample clears it.
 - With a region: play plays the region (loops it if loop is on); the
   context menu and a small floating button on the region offer **Play
   Selection** and **Find Similar to Selection** (⌘⇧F uses the region when

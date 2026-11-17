@@ -69,6 +69,15 @@ final class UISnapshotTests: XCTestCase {
         try snapshot("main-noselection", contentView(model), dir: dir, emphasis: true)
     }
 
+    /// Waveform with a selected region: tint, edge handles, readout and menu.
+    func testMainRegion() async throws {
+        let dir = try outputDir()
+        let model = try await populated()
+        let duration = try XCTUnwrap(model.waveform.duration)
+        model.waveform.setRegion(WaveformRegion(from: 0.12, to: 0.4, duration: duration))
+        try snapshot("main-region", contentView(model), dir: dir, emphasis: true, selectRow: 2)
+    }
+
     func testMainUnfocused() async throws {
         let dir = try outputDir()
         let model = try await populated()

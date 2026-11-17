@@ -70,6 +70,12 @@ final class WaveformModel {
 
     private(set) var state: WaveformState = .empty
     private(set) var viewport = WaveformViewport()
+    /// Selected time range (DESIGN §4.4); cleared when the selected sample changes.
+    private(set) var region: WaveformRegion?
+    /// Duration (s) of the selected sound; without it no region can be drawn.
+    var duration: Double?
+    /// Called whenever the region changes (the app wires it to the preview).
+    @ObservationIgnored var onRegionChange: ((WaveformRegion?) -> Void)?
 
     @ObservationIgnored var provider: WaveformProviding?
     @ObservationIgnored private let cache: WaveformCache
@@ -118,6 +124,17 @@ final class WaveformModel {
 
     /// Waits for the pending load (tests).
     func settle() async { await task?.value }
+
+    // MARK: Region
+
+    /// Sets (or with nil clears) the region.
+    func setRegion(_ new: WaveformRegion?) {
+        guard new != region else { return }
+        region = new
+        onRegionChange?(new)
+    }
+
+    func clearRegion() { setRegion(nil) }
 
     // MARK: Viewport
 

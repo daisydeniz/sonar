@@ -87,6 +87,9 @@ final class SimilarityModel {
     /// The current seed; non-nil = similarity mode is on.
     private(set) var target: SimilarityTarget?
     var sliders = AspectSliders()
+    /// Time range of the seed file the search uses (waveform selection);
+    /// nil = the whole file.
+    private(set) var region: SimilarRegion?
     /// A query is running.
     private(set) var isLoading = false
     /// Inline status of the last query (error or hint); nil when fine.
@@ -102,9 +105,10 @@ final class SimilarityModel {
     @ObservationIgnored var searchOverride: (@Sendable (SimilarQuery) async throws -> SimilarPage)?
     @ObservationIgnored private(set) var debounceToken = 0
 
-    func begin(_ newTarget: SimilarityTarget) {
+    func begin(_ newTarget: SimilarityTarget, region: SimilarRegion? = nil) {
         if !isActive { sliders = AspectSliders() }
         target = newTarget
+        self.region = region
         message = nil
         hits = []
         isLoading = true
@@ -112,6 +116,7 @@ final class SimilarityModel {
 
     func exit() {
         target = nil
+        region = nil
         message = nil
         hits = []
         isLoading = false

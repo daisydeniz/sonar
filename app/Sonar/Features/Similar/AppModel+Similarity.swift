@@ -16,13 +16,22 @@ extension AppModel {
         startSimilarity(.external(url: url))
     }
 
-    /// Cmd-Shift-F: the selected row is the seed.
+    /// Cmd-Shift-F: the selected row is the seed; with a waveform region only
+    /// that time range of it (ADR-040), else the whole file.
     func findSimilarToSelection() {
-        if let row = selectedRow { findSimilar(to: row) }
+        guard let row = selectedRow else { return }
+        startSimilarity(.file(id: row.fileId, name: row.name), region: selectionRegion(of: row))
     }
 
-    private func startSimilarity(_ target: SimilarityTarget) {
-        similarity.begin(target)
+    /// The waveform region as the core's seed range, if one is selected and
+    /// the sound's duration is known.
+    private func selectionRegion(of row: FileRow) -> SimilarRegion? {
+        guard let region = waveform.region, let ms = row.durationMs, ms > 0 else { return nil }
+        return region.similarRegion(duration: Double(ms) / 1000)
+    }
+
+    private func startSimilarity(_ target: SimilarityTarget, region: SimilarRegion? = nil) {
+        similarity.begin(target, region: region)
         resetSort()  // nearest first; a header click reorders them
         scheduleRefresh()
     }
@@ -90,7 +99,8 @@ extension AppModel {
             let query = SimilarQuery(
                 seed: target.seed, weights: try similarity.sliders.weights(),
                 filters: filters.apply(to: base), limit: Self.similarLimit,
-                sort: sortKey == .relevance ? nil : sortKey, descending: sortDescending)
+                sort: sortKey == .relevance ? nil : sortKey, descending: sortDescending,
+                region: similarity.region)
             let page = try await Self.searchRetryingCancelled(query, search) { mine == self.generation }
             guard mine == generation else { return }
             guard let page else {

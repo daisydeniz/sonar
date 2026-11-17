@@ -121,7 +121,9 @@ final class AppModel {
     /// (auto-play + pre-decode of the cached neighbours, nearest first).
     /// `neighbours` overrides the pager lookup (Duplicates view: the group).
     func select(_ row: FileRow?, neighbours explicit: [FileRow]? = nil) {
+        if row?.fileId != selectedRow?.fileId { waveform.clearRegion() }
         selectedRow = row
+        waveform.duration = row?.durationMs.map { Double($0) / 1000 }
         preview.select(row, neighbours: explicit ?? neighbours(of: row))
         waveform.load(fileId: row?.fileId)
     }
@@ -165,6 +167,7 @@ final class AppModel {
             waveform.provider = CoreWaveformProvider(engine: engine)
         }
         keyboard.onTogglePreview = { [weak preview] in preview?.toggle() }
+        waveform.onRegionChange = { [weak preview] in preview?.region = $0 }
         activePollNs = activePollMs * 1_000_000
         idlePollNs = idlePollMs * 1_000_000
         pager.onError = { [weak self] in self?.errorMessage = Self.describe($0) }

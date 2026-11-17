@@ -127,10 +127,17 @@ enum WaveformMath {
     /// is clamped to `duration`.
     static func playbackTime(elapsed: Double, start: Double, duration: Double, loop: Bool) -> Double {
         guard duration > 0, elapsed.isFinite, elapsed >= 0 else { return 0 }
-        let s = min(max(start, 0), duration)
-        let t = s + elapsed
-        if t < duration { return t }
-        guard loop else { return duration }
-        return (t - duration).truncatingRemainder(dividingBy: duration)
+        return playbackTime(elapsed: elapsed, start: start, from: 0, to: duration, loop: loop)
+    }
+
+    /// Like `playbackTime` for a region `from..<to` (seconds): the first pass
+    /// plays `start..<to`, later passes (loop) `from..<to`; without `loop` the
+    /// time stops at `to`.
+    static func playbackTime(elapsed: Double, start: Double, from: Double, to: Double, loop: Bool) -> Double {
+        guard to > from, elapsed.isFinite, elapsed >= 0 else { return max(from, 0) }
+        let t = min(max(start, from), to) + elapsed
+        if t < to { return t }
+        guard loop else { return to }
+        return from + (t - to).truncatingRemainder(dividingBy: to - from)
     }
 }
