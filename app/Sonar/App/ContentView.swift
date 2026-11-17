@@ -95,6 +95,8 @@ struct ContentView: View {
             VStack(spacing: 0) {
                 PlayerHeaderView(
                     row: model.selectedRow, preview: model.preview, waveform: model.waveform,
+                    target: model.similarity.well, targetWaveform: model.targetWaveform,
+                    onToggleTarget: { model.toggleTargetPlayback() },
                     onFindSimilarToSelection: { model.findSimilarToSelection() })
                 if model.showsFilterBar {
                     FilterBarView(model: model)
@@ -109,11 +111,7 @@ struct ContentView: View {
             .background(Theme.Color.surfaceContent)
             .onDrop(of: [.fileURL], delegate: SimilarityDropDelegate(model: model, isTargeted: $dropTargeted))
             .overlay {
-                if dropTargeted {
-                    RoundedRectangle(cornerRadius: Theme.Radius.large)
-                        .stroke(Theme.Color.accent, lineWidth: Theme.Space.s2).padding(Theme.Space.s2)
-                        .allowsHitTesting(false)
-                }
+                if dropTargeted { DropOverlayView() }
             }
         }
     }

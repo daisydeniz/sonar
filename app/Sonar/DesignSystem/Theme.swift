@@ -32,6 +32,12 @@ enum Theme {
         static let waveformHeight: CGFloat = 180
         static let waveformMinHeight: CGFloat = 120
         static let waveformMaxHeight: CGFloat = 360
+        /// Compare mode: similarity-target well height and the caption row
+        /// above each well (DESIGN §3).
+        static let compareWellHeight: CGFloat = 72
+        static let compareLabelHeight: CGFloat = 22
+        /// Width of one aspect slider in the similarity bar.
+        static let aspectSliderWidth: CGFloat = 48
         /// Height of the draggable split divider under the player header.
         static let splitHandle: CGFloat = 6
         static let transportButton: CGFloat = 28

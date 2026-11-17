@@ -20,6 +20,11 @@ struct PlayerHeaderView: View {
     let row: FileRow?
     @Bindable var preview: AudioPreview
     let waveform: WaveformModel
+    /// Compare mode (similarity mode only): the target well above the
+    /// selected waveform; nil = normal header.
+    var target: TargetWell?
+    var targetWaveform: WaveformModel = WaveformModel()
+    var onToggleTarget: () -> Void = {}
     /// Find Similar to Selection (waveform region menu).
     var onFindSimilarToSelection: () -> Void = {}
 
@@ -31,6 +36,12 @@ struct PlayerHeaderView: View {
     var body: some View {
         VStack(spacing: 0) {
             transportRow
+            if let target {
+                TargetWellView(
+                    well: target, waveform: targetWaveform, isPlaying: preview.isTargetPlaying,
+                    onTogglePlay: onToggleTarget)
+                CompareCaption(prefix: "Selected", name: row?.name ?? "none") {}
+            }
             WaveformView(model: waveform, preview: preview, onFindSimilarToSelection: onFindSimilarToSelection)
                 .frame(height: height)
                 .padding(.horizontal, Theme.Space.s12)

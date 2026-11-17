@@ -8,7 +8,7 @@ extension AppModel {
 
     /// "Find similar" from a library row (also re-seeds from similarity results).
     func findSimilar(to row: FileRow) {
-        startSimilarity(.file(id: row.fileId, name: row.name))
+        startSimilarity(.file(id: row.fileId, name: row.name), row: row)
     }
 
     /// "Find similar" from a file outside the library (drop).
@@ -20,7 +20,7 @@ extension AppModel {
     /// that time range of it (ADR-040), else the whole file.
     func findSimilarToSelection() {
         guard let row = selectedRow else { return }
-        startSimilarity(.file(id: row.fileId, name: row.name), region: selectionRegion(of: row))
+        startSimilarity(.file(id: row.fileId, name: row.name), region: selectionRegion(of: row), row: row)
     }
 
     /// The waveform region as the core's seed range, if one is selected and
@@ -30,8 +30,10 @@ extension AppModel {
         return region.similarRegion(duration: Double(ms) / 1000)
     }
 
-    private func startSimilarity(_ target: SimilarityTarget, region: SimilarRegion? = nil) {
-        similarity.begin(target, region: region)
+    private func startSimilarity(_ target: SimilarityTarget, region: SimilarRegion? = nil, row: FileRow? = nil) {
+        similarity.begin(target, region: region, row: row)
+        syncTargetWaveform()
+        preview.stopTarget()
         resetSort()  // nearest first; a header click reorders them
         scheduleRefresh()
     }
@@ -40,12 +42,41 @@ extension AppModel {
     func exitSimilarity() {
         guard similarity.isActive else { return }
         similarity.exit()
+        syncTargetWaveform()
+        preview.stopTarget()
         scheduleRefresh()
+    }
+
+    /// Loads (or clears) the compare-mode target waveform and its region.
+    func syncTargetWaveform() {
+        guard let well = similarity.well, let row = well.row else {
+            targetWaveform.load(fileId: nil)
+            targetWaveform.setRegion(nil)
+            return
+        }
+        let duration = row.durationMs.map { Double($0) / 1000 }
+        targetWaveform.duration = duration
+        targetWaveform.load(fileId: row.fileId)
+        targetWaveform.setRegion(
+            duration.flatMap { d in
+                well.region.flatMap { WaveformRegion(from: $0.startS / d, to: $0.endS / d, duration: d) }
+            })
+    }
+
+    /// The target well's play button: plays/stops the seed (its region if any).
+    func toggleTargetPlayback() {
+        guard let row = similarity.targetRow else { return }
+        preview.toggleTarget(row, region: targetWaveform.region)
     }
 
     /// Typing in the search field leaves similarity mode.
     func searchTextChanged() {
+        let wasActive = similarity.isActive
         similarity.exit()
+        if wasActive {
+            syncTargetWaveform()
+            preview.stopTarget()
+        }
         scheduleRefresh()
     }
 

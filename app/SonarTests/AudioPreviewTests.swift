@@ -156,6 +156,24 @@ final class AudioPreviewTests: XCTestCase {
         XCTAssertEqual(player.plays.count, 2, "nothing selected, nothing to play")
     }
 
+    func testSpaceAndSeekEndTargetPlayback() async {
+        let (preview, player, _) = make()
+        preview.select(previewRow(1))
+        await preview.settle()
+        preview.toggleTarget(previewRow(2), region: nil)
+        await preview.settle()
+        XCTAssertTrue(preview.isTargetPlaying)
+        preview.toggle()
+        XCTAssertFalse(preview.isTargetPlaying, "Space stops the target")
+        XCTAssertFalse(preview.isPlaying)
+        preview.toggleTarget(previewRow(2), region: nil)
+        await preview.settle()
+        preview.seek(toFraction: 0.5)
+        XCTAssertFalse(preview.isTargetPlaying, "a waveform click plays the selection instead")
+        XCTAssertTrue(preview.isPlaying)
+        XCTAssertEqual(player.plays.count, 4)
+    }
+
     func testAutoPlayOffOnlyPrefetchesAndPersists() async {
         let (preview, player, decoder) = make()
         preview.autoPlay = false

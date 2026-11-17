@@ -132,6 +132,25 @@ final class SimilarityTests: XCTestCase {
         XCTAssertEqual(all[2].weights, all[0].weights)
     }
 
+    /// Compare mode: the target well exists only in similarity mode and
+    /// carries the seed region; leaving the mode removes it.
+    func testTargetWellOnlyInSimilarityModeAndCarriesRegion() async throws {
+        let model = fakeModel { _ in fakePage([1]) }
+        XCTAssertNil(model.similarity.well)
+        let seed = fakeRow(7, name: "seed")
+        model.similarity.begin(.file(id: 7, name: "seed"), region: SimilarRegion(startS: 0.1, endS: 0.3), row: seed)
+        let well = try XCTUnwrap(model.similarity.well)
+        XCTAssertEqual(well.name, "seed")
+        XCTAssertEqual(well.row?.fileId, 7)
+        XCTAssertEqual(well.region, SimilarRegion(startS: 0.1, endS: 0.3))
+        model.similarity.exit()
+        XCTAssertNil(model.similarity.well)
+        model.similarity.begin(.external(url: URL(fileURLWithPath: "/tmp/drop.wav")))
+        XCTAssertEqual(model.similarity.well?.name, "drop")
+        XCTAssertNil(model.similarity.well?.row)
+        XCTAssertNil(model.similarity.well?.region)
+    }
+
     func testRapidSliderChangesCoalesceIntoOneQuery() async throws {
         let log = QueryLog()
         let model = fakeModel { q in

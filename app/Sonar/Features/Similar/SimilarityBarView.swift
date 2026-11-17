@@ -1,50 +1,61 @@
 import SwiftUI
 
-/// "Similar to: <name>" bar above the results: the five aspect sliders,
-/// Reset weights, a progress indicator and inline status (no alerts).
+/// Similarity bar (DESIGN §3): one 36 pt row on `surfaceRaised` with the
+/// target name (and region seed), the five compact aspect sliders, a progress
+/// indicator / inline status, and icon-only Reset and Close. No alerts.
 @MainActor
 struct SimilarityBarView: View {
     let model: AppModel
 
     var body: some View {
         let similarity = model.similarity
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                Image(systemName: "waveform.badge.magnifyingglass").foregroundStyle(.secondary)
-                Text("Similar to: \(similarity.target?.displayName ?? "")")
-                    .font(.headline).lineLimit(1).truncationMode(.middle)
-                if similarity.isLoading {
-                    ProgressView().controlSize(.small).accessibilityLabel("Finding similar samples")
-                }
-                if let message = similarity.message {
-                    Text(message).font(.callout).foregroundStyle(.orange).lineLimit(1)
-                }
-                Spacer()
-                Button("Reset Weights") { model.resetSimilarityWeights() }
-                    .disabled(similarity.sliders == AspectSliders())
-                Button { model.exitSimilarity() } label: { Image(systemName: "xmark.circle.fill") }
-                    .buttonStyle(.borderless)
-                    .keyboardShortcut(.cancelAction)
-                    .help("Back to search (Esc)")
-                    .accessibilityLabel("Close similarity search")
+        HStack(spacing: Theme.Space.s8) {
+            Image(systemName: "waveform.badge.magnifyingglass")
+                .imageScale(.small).foregroundStyle(.secondary).accessibilityHidden(true)
+            Text(title(similarity))
+                .font(Theme.Font.row).lineLimit(1).truncationMode(.middle)
+                .layoutPriority(1)
+            if similarity.isLoading {
+                ProgressView().controlSize(.small).accessibilityLabel("Finding similar samples")
             }
-            HStack(spacing: 14) {
-                ForEach(SimilarityAspect.allCases, id: \.self) { aspect in
-                    VStack(alignment: .leading, spacing: 0) {
-                        Text(aspect.title).font(.caption).foregroundStyle(.secondary)
-                        Slider(
-                            value: Binding(
-                                get: { Double(similarity.sliders[aspect]) },
-                                set: { model.setSimilarityWeight(aspect, Float($0)) }),
-                            in: 0...1
-                        )
-                        .controlSize(.small)
-                        .accessibilityLabel("\(aspect.title) weight")
-                    }
+            if let message = similarity.message {
+                Text(message).font(Theme.Font.caption).foregroundStyle(Theme.Color.warning).lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            ForEach(SimilarityAspect.allCases, id: \.self) { aspect in
+                HStack(spacing: Theme.Space.s4) {
+                    Text(aspect.title).font(Theme.Font.caption).foregroundStyle(.secondary).fixedSize()
+                    Slider(
+                        value: Binding(
+                            get: { Double(similarity.sliders[aspect]) },
+                            set: { model.setSimilarityWeight(aspect, Float($0)) }),
+                        in: 0...1
+                    )
+                    .controlSize(.small)
+                    .frame(minWidth: Theme.Space.s16, maxWidth: Theme.Size.aspectSliderWidth)
+                    .accessibilityLabel("\(aspect.title) weight")
                 }
             }
+            Button { model.resetSimilarityWeights() } label: { Image(systemName: "arrow.counterclockwise") }
+                .buttonStyle(.borderless)
+                .disabled(similarity.sliders == AspectSliders())
+                .help("Reset weights")
+                .accessibilityLabel("Reset weights")
+            Button { model.exitSimilarity() } label: { Image(systemName: "xmark") }
+                .buttonStyle(.borderless)
+                .keyboardShortcut(.cancelAction)
+                .help("Back to search (Esc)")
+                .accessibilityLabel("Close similarity search")
         }
-        .padding(.horizontal, 12).padding(.vertical, 8)
-        .background(.bar)
+        .controlSize(.small)
+        .padding(.horizontal, Theme.Space.s12)
+        .frame(height: Theme.Size.barHeight)
+        .background(Theme.Color.surfaceRaised)
+    }
+
+    private func title(_ similarity: SimilarityModel) -> String {
+        let name = similarity.target?.displayName ?? ""
+        guard let region = similarity.region else { return "Similar to: \(name)" }
+        return "Similar to: \(name) (\(String(format: "%.2f", region.startS))–\(String(format: "%.2f", region.endS)) s)"
     }
 }

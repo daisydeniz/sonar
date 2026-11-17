@@ -38,6 +38,8 @@ final class AppModel {
     let preview: AudioPreview
     /// Waveform of the selected row (peaks from the core, zoom viewport).
     let waveform = WaveformModel()
+    /// Waveform of the similarity target (compare mode, read-only).
+    let targetWaveform = WaveformModel()
     /// Similarity mode (seed, sliders, status); see `Features/Similar`.
     let similarity = SimilarityModel()
     /// Organize state (hidden switch, prompts, override error); see `Features/Organize`.
@@ -165,6 +167,7 @@ final class AppModel {
         if let engine {
             preview.decoder = CoreDecoder(engine: engine)
             waveform.provider = CoreWaveformProvider(engine: engine)
+            targetWaveform.provider = waveform.provider
         }
         keyboard.onTogglePreview = { [weak preview] in preview?.toggle() }
         waveform.onRegionChange = { [weak preview] in preview?.region = $0 }
@@ -198,6 +201,7 @@ final class AppModel {
                 if let engine = bridge?.engine {
                     preview.decoder = CoreDecoder(engine: engine)
                     waveform.provider = CoreWaveformProvider(engine: engine)
+                    targetWaveform.provider = waveform.provider
                 }
             }
             engineState = .ready

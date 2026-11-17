@@ -145,7 +145,12 @@ final class UISnapshotTests: XCTestCase {
         let rows = SnapshotFixtures.rows()
         let model = try await populated(rows: rows)
         let seed = rows[2]
-        model.similarity.begin(.file(id: seed.fileId, name: seed.name))
+        model.targetWaveform.provider = SnapshotWaveformProvider()
+        // Compare mode: the target well shows the seed with its region.
+        model.similarity.begin(
+            .file(id: seed.fileId, name: seed.name), region: SimilarRegion(startS: 0.05, endS: 0.2), row: seed)
+        model.syncTargetWaveform()
+        await model.targetWaveform.settle()
         let neighbours = Array(rows.dropFirst(10).prefix(60))
         _ = try await model.pager.reset(loader: ArrayResultLoader(rows: neighbours))
         model.similarity.finish(
@@ -155,6 +160,17 @@ final class UISnapshotTests: XCTestCase {
                     amplitude: 0.1)
             })
         try snapshot("main-similar", contentView(model), dir: dir)
+    }
+
+    /// The overlay shown while an audio file is dragged over the results.
+    func testMainDrop() async throws {
+        let dir = try outputDir()
+        let model = try await populated()
+        // The real overlay covers the detail column: between sidebar (220) and inspector (280).
+        let view = contentView(model).overlay {
+            DropOverlayView().padding(.leading, 220).padding(.trailing, 280)
+        }
+        try snapshot("main-drop", view, dir: dir, emphasis: true, selectRow: 2)
     }
 
     func testEmpty() async throws {

@@ -95,7 +95,9 @@ right-aligned in columns. No other font family, no italic, no extra weights.
   divider; compare mode adds a 72 pt target well above) · icon in rows/bars 12–13 pt
   (`.imageScale(.small)`), transport button 28, category dot 6
   (`Theme.Size.categoryDot`), waveform well `Theme.Size.waveformHeight` /
-  `waveformMinHeight` / `waveformMaxHeight` (180 / 120 / 360), split handle 6
+  `waveformMinHeight` / `waveformMaxHeight` (180 / 120 / 360), compare-mode
+  target well 72 + caption row 22 (`compareWellHeight`, `compareLabelHeight`),
+  aspect slider width 48 (`aspectSliderWidth`), split handle 6
   (`splitHandle`), unplayed waveform opacity `Theme.waveformUnplayedOpacity`
   0.45, knob 26 with a 2.5 arc (`Theme.Size.knob`,
   `knobStroke`).
@@ -156,6 +158,10 @@ states; the playhead follows audio via display link. No springs, no bounces.
   `caption`, with its own small play button; the selected region is drawn
   if the search used one). The large well below shows the browsed row
   ("Selected: name"). Leaving similarity mode removes the target well.
+  The similarity bar is one 36 pt row on `surfaceRaised` (target name,
+  five compact aspect sliders, icon-only Reset and Close). The drop overlay
+  (audio file dragged onto the results) is an `accentSoft` fill with an
+  accent hairline border, radius `large`, and a centred caption; no blur.
 - **Inspector**: metadata and editing only (no transport, no waveform): header
   (name `title`, folder path `caption`), actions (favorite, find similar,
   reveal), then sections "Analysis" (BPM / key / category / kind with

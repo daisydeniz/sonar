@@ -20,6 +20,8 @@ final class AudioPreview {
 
     private(set) var isPlaying = false
     private(set) var isLoading = false
+    /// The compare-mode target (not the selection) is playing or loading.
+    private(set) var isTargetPlaying = false
     /// Quiet status line (decode failure etc.); nil when fine.
     private(set) var status: String?
     var loop = false {
@@ -64,7 +66,10 @@ final class AudioPreview {
         self.maxConcurrentPrefetch = maxConcurrentPrefetch
         autoPlay = defaults.object(forKey: Self.autoPlayKey) as? Bool ?? true
         normalizeLoudness = defaults.object(forKey: Self.normalizeKey) as? Bool ?? true
-        player.onFinished = { [weak self] in self?.isPlaying = false }
+        player.onFinished = { [weak self] in
+            self?.isPlaying = false
+            self?.isTargetPlaying = false
+        }
     }
 
     /// Pre-starts the audio output (call once at app start, not in tests).
@@ -94,10 +99,11 @@ final class AudioPreview {
         prefetch(neighbours)
     }
 
-    /// Space: stop if playing or loading, else play the selection.
+    /// Space: stop if playing or loading (the selection or the compare
+    /// target), else play the selection.
     func toggle() {
         generation += 1
-        if isPlaying || isLoading {
+        if isPlaying || isLoading || isTargetPlaying {
             endPlayback()
         } else if let row = currentRow {
             status = nil
@@ -151,6 +157,48 @@ final class AudioPreview {
         begin(clip, row, startAt: min(max(fraction, 0), 1) * clip.duration)
     }
 
+    // MARK: Compare-mode target
+
+    /// The similarity target's own play button: plays the seed (its region if
+    /// any) or stops it. Independent of the selection: the selected row's
+    /// playhead and `currentRow` are untouched.
+    func toggleTarget(_ row: FileRow, region: WaveformRegion?) {
+        if isTargetPlaying {
+            stop()
+            return
+        }
+        generation += 1
+        endPlayback()
+        status = nil
+        isTargetPlaying = true
+        let mine = generation
+        let task = clipTask(row)
+        playTask = Task { [weak self] in
+            let clip = await task.value
+            guard let self, mine == self.generation else { return }
+            guard let clip else {
+                self.isTargetPlaying = false
+                self.status = "Can't preview \(row.name)"
+                return
+            }
+            let plan = region?.playback(
+                totalFrames: Int(clip.buffer.frameLength), sampleRate: clip.buffer.format.sampleRate)
+            do {
+                try self.player.play(
+                    clip, loop: self.loop, gainDb: self.normalizeLoudness ? row.previewGainDb : nil,
+                    pitchCents: Float(self.pitchSemitones * 100), startAt: plan?.startAt ?? 0, range: plan?.range)
+            } catch {
+                self.isTargetPlaying = false
+                self.status = "Audio output unavailable"
+            }
+        }
+    }
+
+    /// Stops the target if it plays (leaving similarity mode, new seed).
+    func stopTarget() {
+        if isTargetPlaying { stop() }
+    }
+
     // MARK: Playback
 
     private func endPlayback() {
@@ -158,6 +206,7 @@ final class AudioPreview {
         playTask = nil
         isLoading = false
         isPlaying = false
+        isTargetPlaying = false
         player.stop()
     }
 
@@ -184,6 +233,7 @@ final class AudioPreview {
     /// Starts `clip`; with a region only its frames play (and loop), from the
     /// region start unless `startAt` seeks inside it.
     private func begin(_ clip: PreviewClip, _ row: FileRow, startAt: TimeInterval? = nil) {
+        isTargetPlaying = false  // the selection replaces a playing compare target
         currentClip = clip
         let plan = region?.playback(
             totalFrames: Int(clip.buffer.frameLength), sampleRate: clip.buffer.format.sampleRate, startAt: startAt)

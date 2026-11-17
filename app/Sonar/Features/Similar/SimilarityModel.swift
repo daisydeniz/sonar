@@ -24,6 +24,13 @@ enum SimilarityTarget: Equatable, Sendable {
     }
 }
 
+/// What the compare-mode target well shows.
+struct TargetWell: Equatable {
+    let name: String
+    let row: FileRow?
+    let region: SimilarRegion?
+}
+
 /// The five similarity sliders (PRODUCT §5). Values are 0...1 and only
 /// passed to the core, which maps them to aspect weights.
 enum SimilarityAspect: CaseIterable, Sendable {
@@ -97,7 +104,18 @@ final class SimilarityModel {
     /// Distances of the shown rows, in row order.
     private(set) var hits: [SimilarHit] = []
 
+    /// The library row behind a file seed (decode/waveform/play of the target
+    /// in compare mode); nil for external files or when unknown.
+    private(set) var targetRow: FileRow?
+
     var isActive: Bool { target != nil }
+
+    /// Compare mode's target well (DESIGN §3): exists only while similarity
+    /// mode is on and carries the seed region when the search used one.
+    var well: TargetWell? {
+        guard let target else { return nil }
+        return TargetWell(name: target.displayName, row: targetRow, region: region)
+    }
 
     /// Delay before a slider change re-queries.
     @ObservationIgnored var debounceNs: UInt64 = 150_000_000
@@ -105,9 +123,10 @@ final class SimilarityModel {
     @ObservationIgnored var searchOverride: (@Sendable (SimilarQuery) async throws -> SimilarPage)?
     @ObservationIgnored private(set) var debounceToken = 0
 
-    func begin(_ newTarget: SimilarityTarget, region: SimilarRegion? = nil) {
+    func begin(_ newTarget: SimilarityTarget, region: SimilarRegion? = nil, row: FileRow? = nil) {
         if !isActive { sliders = AspectSliders() }
         target = newTarget
+        targetRow = row
         self.region = region
         message = nil
         hits = []
@@ -116,6 +135,7 @@ final class SimilarityModel {
 
     func exit() {
         target = nil
+        targetRow = nil
         region = nil
         message = nil
         hits = []
