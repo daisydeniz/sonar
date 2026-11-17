@@ -104,7 +104,7 @@ Every T9 task: only `Theme` tokens, restyled files leave `scripts/design-lint-pe
 - [x] T9.6 (swift-ui) Similarity bar, compare view and drop overlay on tokens: target name, aspect weights compact in one row, reset/close; compare mode per DESIGN §3 (ADR-040, founder request): the similarity target's waveform (72 pt, own play button, seed region drawn if used) above the selected sample's waveform in the player header. AC: `main-similar` snapshots show both waveforms; `SimilarityTests` green. (0594dc7)
 - [x] T9.7 (swift-ui) Sidebar, toolbar, indexing status and banner per DESIGN §3/§4.7 (section-header add buttons, badges, offline state, trial badge). AC: snapshots incl. indexing in progress, offline library and a banner. (21e44d8)
 - [x] T9.8 (swift-ui) Secondary screens on tokens and `EmptyStateView`: onboarding, empty/error states, duplicates, settings tabs, license gate/sheet. AC: snapshots of each in light and dark; `scripts/design-lint-pending.txt` is empty. (1067b42)
-- [x] T9.9 (reviewer) Design pass over all snapshots against the DESIGN §6 checklist (alignment across bars, type steps, contrast, states); fix findings; delete the pending list and its handling if empty. AC: reviewer APPROVE on the full snapshot set.
+- [x] T9.9 (reviewer) Design pass over all snapshots against the DESIGN §6 checklist (alignment across bars, type steps, contrast, states); fix findings; delete the pending list and its handling if empty. AC: reviewer APPROVE on the full snapshot set. (a624246)
 
 ## Future (do not start)
 v1.x: record-to-search, 2D map, tempo-synced preview, kit builder, `.als` project map.
