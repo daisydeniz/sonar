@@ -135,7 +135,11 @@ states; the playhead follows audio via display link. No springs, no bounces.
   Tags as popover buttons; Favorites as an icon toggle; result count right,
   `caption`, monospaced digits. A popover button with a selection turns into
   an active chip (`accentSoft` background, accent text, shows the selection
-  summary, has a clear `×`). Facet lists with counts live inside the popovers.
+  summary, has a clear `×`). Facet lists with counts live inside the popovers
+  (checkbox rows: value, count in `caption` monospaced digits, width
+  `Theme.Size.popoverWidth`). Chips scroll horizontally when the column is
+  narrow; Favorites, "Clear all" and the count stay fixed on the right.
+  Library is not in the bar (the sidebar already filters by library).
 - **Results table**: see §4.1.
 - **Player header** (founder request 2026-11-17, ADR-040; modelled on how
   pro sample browsers work, not on any one product's look): always present
@@ -184,7 +188,9 @@ system control when one exists; write a component only for the things below.
 Height 22, radius `small`, `row` font, 8 pt horizontal padding. States:
 default (hairline border, secondary text) · hover (`surfaceWell`) · active
 (`accentSoft`, accent text, no border) · disabled (40 % opacity). Optional
-count in `caption` monospaced digits; optional leading category dot.
+count in `caption` monospaced digits; optional leading category dot;
+optional trailing clear `×` (own button and action, active chips only: the
+filter bar's popover chips).
 
 ### 4.3 Readout (`Readout`)
 A value with a caption above it: caption in `label`, value in 15 pt medium

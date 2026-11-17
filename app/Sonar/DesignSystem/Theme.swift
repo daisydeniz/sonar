@@ -53,6 +53,11 @@ enum Theme {
         static let propertyLabelWidth: CGFloat = 72
         /// Maximum text width of `EmptyStateView`.
         static let emptyStateTextWidth: CGFloat = 360
+        /// Filter-bar popovers: content width, tallest facet list, and the
+        /// min/max number fields of range filters.
+        static let popoverWidth: CGFloat = 240
+        static let popoverListMaxHeight: CGFloat = 240
+        static let rangeField: CGFloat = 64
     }
 
     /// Opacity of the unplayed part of the waveform (played = full accent).

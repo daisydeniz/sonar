@@ -186,6 +186,35 @@ final class FilterSearchTests: XCTestCase {
         XCTAssertTrue(chips.allSatisfy(\.selected))
     }
 
+    func testChipSummariesAndKindSegments() {
+        XCTAssertNil(FilterState.summary(of: []))
+        XCTAssertEqual(FilterState.summary(of: ["snare"]), "snare")
+        XCTAssertEqual(FilterState.summary(of: ["snare", "kick", "clap"], display: Format.categoryTitle), "Clap +2")
+        XCTAssertNil(FilterState.rangeSummary(min: nil, max: nil))
+        XCTAssertEqual(FilterState.rangeSummary(min: 90, max: 130), "90–130")
+        XCTAssertEqual(FilterState.rangeSummary(min: 90, max: nil), "≥ 90")
+        XCTAssertEqual(FilterState.rangeSummary(min: nil, max: 2.5, unit: "s"), "≤ 2.5 s")
+        XCTAssertEqual(FilterBarView.countText(1), "1 result")
+        for kind in KindFilter.allCases { XCTAssertEqual(KindFilter(kinds: kind.kinds), kind) }
+        XCTAssertEqual(KindFilter(kinds: ["loop", "one_shot"]), .all)
+    }
+
+    func testClearingOneGroupLeavesOthers() {
+        let model = AppModel()
+        model.filters.categories = ["kick"]
+        model.filters.bpmMin = 90
+        model.filters.keys = ["Am"]
+        model.filters.compatibleKeys = true
+        // what the Key chip's x does
+        model.filters.keys = []
+        model.filters.compatibleKeys = false
+        XCTAssertEqual(model.filters.activeCount, 2)
+        model.filters.bpmMin = nil
+        XCTAssertEqual(model.filters.categories, ["kick"])
+        model.clearFilters()
+        XCTAssertFalse(model.filters.isActive)
+    }
+
     func testFacetsRequestedOnlyForFirstPage() async throws {
         let home = makeHome().path
         let engine = try await Task.detached { try SonarEngine.open(home: home) }.value

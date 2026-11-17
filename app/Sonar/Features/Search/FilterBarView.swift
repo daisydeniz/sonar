@@ -1,119 +1,145 @@
 import SwiftUI
 
-/// Filter chips above the results: category, kind, key (+ compatible keys),
-/// library, tags, favourites, BPM and duration ranges, and the result total.
-/// Counts come from the core's facets (drill-sideways); changing anything
-/// re-queries the core through `AppModel` (the view only edits `filters`).
+/// The filter bar (DESIGN §3): one 36 pt row on `surfaceRaised`. Kind as a
+/// segmented control, Category / Key / BPM / Duration / Tags as popover chips with facet counts from the core
+/// (drill-sideways), a Favorites icon toggle and the result count. Changing
+/// anything re-queries the core through `AppModel` (the view only edits
+/// `filters`).
 @MainActor
 struct FilterBarView: View {
     @Bindable var model: AppModel
 
     var body: some View {
-        let facets = model.facets
-        VStack(alignment: .leading, spacing: 6) {
-            chipRow("Category", FacetChip.chips(facets: facets?.categories ?? [], selected: model.filters.categories)) {
-                FilterState.toggle($0, in: &model.filters.categories)
-            }
-            chipRow("Kind", FacetChip.chips(facets: facets?.kinds ?? [], selected: model.filters.kinds)) {
-                FilterState.toggle($0, in: &model.filters.kinds)
-            }
-            HStack(spacing: 8) {
-                chipRow("Key", FacetChip.chips(facets: facets?.keys ?? [], selected: model.filters.keys)) {
-                    FilterState.toggle($0, in: &model.filters.keys)
+        HStack(spacing: Theme.Space.s8) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: Theme.Space.s8) {
+                    kindPicker
+                    categoryChip
+                    keyChip
+                    bpmChip
+                    durationChip
+                    tagsChip
                 }
-                if !model.filters.keys.isEmpty {
-                    Toggle("Compatible keys", isOn: $model.filters.compatibleKeys)
-                        .toggleStyle(.checkbox)
-                        .fixedSize()
-                }
+                .padding(.vertical, Theme.Space.s2)
             }
-            if model.showsLibraryChips {
-                chipRow("Library", libraryChips(facets)) { id in
-                    if let id = Int64(id) { FilterState.toggle(id, in: &model.filters.libraryIds) }
-                }
+            favoritesToggle
+            if model.filters.isActive {
+                Button("Clear all") { model.clearFilters() }
+                    .buttonStyle(.plain)
+                    .font(Theme.Font.row)
+                    .foregroundStyle(.secondary)
+                    .keyboardShortcut(.delete, modifiers: [.command, .shift])
+                    .help("Clear all filters (⇧⌘⌫)")
             }
-            if let tags = facets?.tags, !tags.isEmpty || !model.filters.tags.isEmpty {
-                chipRow("Tags", FacetChip.chips(facets: tags, selected: model.filters.tags)) {
-                    FilterState.toggle($0, in: &model.filters.tags)
-                }
-            }
-            HStack(spacing: 12) {
-                Toggle(isOn: $model.filters.favoritesOnly) {
-                    Label(favoritesTitle(facets), systemImage: "heart")
-                }
-                .toggleStyle(.button)
-                .accessibilityLabel("Favorites only")
-                rangeFields("BPM", min: $model.filters.bpmMin, max: $model.filters.bpmMax)
-                rangeFields("Duration (s)", min: $model.filters.durationMinSec, max: $model.filters.durationMaxSec)
-                Spacer()
-                if model.filters.isActive {
-                    Button("Clear filters") { model.clearFilters() }
-                        .keyboardShortcut(.delete, modifiers: [.command, .shift])
-                }
-                Text("\(model.resultCount.formatted()) results")
-                    .monospacedDigit().foregroundStyle(.secondary)
-                    .accessibilityLabel("\(model.resultCount) results")
-            }
+            Text(Self.countText(model.resultCount))
+                .font(Theme.Font.captionNumeric).foregroundStyle(.secondary)
+                .lineLimit(1).fixedSize()
+                .accessibilityLabel("\(model.resultCount) results")
         }
         .controlSize(.small)
-        .padding(.horizontal, 10).padding(.vertical, 6)
+        .padding(.horizontal, Theme.Space.s12)
+        .frame(height: Theme.Size.barHeight)
+        .background(Theme.Color.surfaceRaised)
     }
 
-    private func favoritesTitle(_ facets: SearchFacets?) -> String {
-        facets.map { "Favorites (\($0.favorites))" } ?? "Favorites"
+    static func countText(_ count: Int) -> String {
+        count == 1 ? "1 result" : "\(count.formatted()) results"
     }
 
-    private func libraryChips(_ facets: SearchFacets?) -> [FacetChip] {
-        let names = Dictionary(uniqueKeysWithValues: model.libraries.map {
-            ($0.id, URL(fileURLWithPath: $0.rootPath).lastPathComponent)
-        })
-        let counts = Dictionary(uniqueKeysWithValues: (facets?.libraries ?? []).map { ($0.libraryId, $0.count) })
-        return model.libraries.map { lib in
-            // `value` carries the id (for toggling); the title is looked up by `chipTitle`.
-            FacetChip(value: String(lib.id), count: counts[lib.id] ?? 0,
-                      selected: model.filters.libraryIds.contains(lib.id))
-        }.sorted { names[Int64($0.value) ?? 0] ?? "" < names[Int64($1.value) ?? 0] ?? "" }
-    }
+    // MARK: Controls
 
-    private func title(_ label: String, _ chip: FacetChip) -> String {
-        if label == "Library", let id = Int64(chip.value),
-            let lib = model.libraries.first(where: { $0.id == id })
-        {
-            return URL(fileURLWithPath: lib.rootPath).lastPathComponent
+    private var kindPicker: some View {
+        Picker(
+            "Kind",
+            selection: Binding(
+                get: { KindFilter(kinds: model.filters.kinds) },
+                set: { model.filters.kinds = $0.kinds })
+        ) {
+            ForEach(KindFilter.allCases) { Text($0.title).tag($0) }
         }
-        return chip.value
+        .pickerStyle(.segmented)
+        .labelsHidden()
+        .fixedSize()
+        .accessibilityLabel("Kind")
     }
 
-    @ViewBuilder
-    private func chipRow(_ label: String, _ chips: [FacetChip], toggle: @escaping (String) -> Void) -> some View {
-        if !chips.isEmpty {
-            HStack(spacing: 6) {
-                Text(label).foregroundStyle(.secondary).frame(width: 58, alignment: .leading)
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 4) {
-                        ForEach(chips) { chip in
-                            Toggle(isOn: Binding(get: { chip.selected }, set: { _ in toggle(chip.value) })) {
-                                Text("\(title(label, chip)) \(chip.count)")
-                            }
-                            .toggleStyle(.button)
-                            .opacity(chip.count == 0 && !chip.selected ? 0.5 : 1)
-                            .accessibilityLabel("\(label) \(title(label, chip)), \(chip.count) results")
-                        }
-                    }
-                }
+    private var categoryChip: some View {
+        FilterPopoverChip(
+            title: "Category",
+            summary: FilterState.summary(of: model.filters.categories, display: Format.categoryTitle),
+            onClear: { model.filters.categories = [] }
+        ) {
+            FacetListView(
+                title: "Category",
+                chips: FacetChip.chips(facets: model.facets?.categories ?? [], selected: model.filters.categories),
+                display: Format.categoryTitle, dot: { Theme.categoryColor($0) }
+            ) { FilterState.toggle($0, in: &model.filters.categories) }
+        }
+    }
+
+    private var keyChip: some View {
+        FilterPopoverChip(
+            title: "Key",
+            summary: FilterState.summary(of: model.filters.keys).map {
+                model.filters.compatibleKeys ? "\($0) ≈" : $0
+            },
+            onClear: { model.filters.keys = []; model.filters.compatibleKeys = false }
+        ) {
+            VStack(alignment: .leading, spacing: Theme.Space.s8) {
+                FacetListView(
+                    title: "Key",
+                    chips: FacetChip.chips(facets: model.facets?.keys ?? [], selected: model.filters.keys)
+                ) { FilterState.toggle($0, in: &model.filters.keys) }
+                Toggle("Include compatible keys", isOn: $model.filters.compatibleKeys)
+                    .toggleStyle(.checkbox)
+                    .font(Theme.Font.row)
+                    .disabled(model.filters.keys.isEmpty)
             }
         }
     }
 
-    private func rangeFields(_ label: String, min: Binding<Double?>, max: Binding<Double?>) -> some View {
-        HStack(spacing: 4) {
-            Text(label).foregroundStyle(.secondary)
-            TextField("min", value: min, format: .number).frame(width: 54)
-                .accessibilityLabel("\(label) minimum")
-            Text("–")
-            TextField("max", value: max, format: .number).frame(width: 54)
-                .accessibilityLabel("\(label) maximum")
+    private var bpmChip: some View {
+        FilterPopoverChip(
+            title: "BPM",
+            summary: FilterState.rangeSummary(min: model.filters.bpmMin, max: model.filters.bpmMax),
+            onClear: { model.filters.bpmMin = nil; model.filters.bpmMax = nil }
+        ) {
+            RangeFieldsView(title: "BPM", unit: "", min: $model.filters.bpmMin, max: $model.filters.bpmMax)
         }
-        .textFieldStyle(.roundedBorder)
+    }
+
+    private var durationChip: some View {
+        FilterPopoverChip(
+            title: "Duration",
+            summary: FilterState.rangeSummary(
+                min: model.filters.durationMinSec, max: model.filters.durationMaxSec, unit: "s"),
+            onClear: { model.filters.durationMinSec = nil; model.filters.durationMaxSec = nil }
+        ) {
+            RangeFieldsView(
+                title: "Duration", unit: "s", min: $model.filters.durationMinSec, max: $model.filters.durationMaxSec)
+        }
+    }
+
+    private var tagsChip: some View {
+        FilterPopoverChip(
+            title: "Tags", summary: FilterState.summary(of: model.filters.tags),
+            onClear: { model.filters.tags = [] }
+        ) {
+            FacetListView(
+                title: "Tags", chips: FacetChip.chips(facets: model.facets?.tags ?? [], selected: model.filters.tags)
+            ) { FilterState.toggle($0, in: &model.filters.tags) }
+        }
+    }
+
+    private var favoritesToggle: some View {
+        let on = model.filters.favoritesOnly
+        let count = model.facets.map { " (\($0.favorites))" } ?? ""
+        return Toggle(isOn: $model.filters.favoritesOnly) {
+            Image(systemName: on ? "heart.fill" : "heart")
+                .foregroundStyle(on ? Theme.Color.favorite : Color.secondary)
+        }
+        .toggleStyle(.button)
+        .accessibilityLabel("Favorites only")
+        .help("Show favorites only\(count)")
     }
 }

@@ -60,6 +60,42 @@ final class UISnapshotTests: XCTestCase {
         try snapshot("main", contentView(model), dir: dir, emphasis: true, selectRow: 2)
     }
 
+    /// Filter bar with active chips (category, BPM, tags) and favorites on.
+    func testMainFilters() async throws {
+        let dir = try outputDir()
+        let model = try await populated()
+        model.filters.categories = ["kick", "snare"]
+        model.filters.kinds = ["loop"]
+        model.filters.bpmMin = 90
+        model.filters.bpmMax = 130
+        model.filters.tags = ["dark"]
+        model.filters.favoritesOnly = true
+        try snapshot("main-filters", contentView(model), dir: dir, emphasis: true, selectRow: 2)
+    }
+
+    /// An open filter popover. A real popover is its own window and is not in
+    /// the captured window, so its content is drawn on a card under the chip.
+    func testMainFilterPopover() async throws {
+        let dir = try outputDir()
+        let model = try await populated()
+        model.filters.categories = ["bass", "clap"]
+        let chips = FacetChip.chips(facets: model.facets?.categories ?? [], selected: model.filters.categories)
+        let card = FacetListView(
+            title: "Category", chips: chips, display: Format.categoryTitle, dot: { Theme.categoryColor($0) }
+        ) { _ in }
+        .padding(Theme.Space.s12)
+        .frame(width: Theme.Size.popoverWidth)
+        .background(Theme.Color.surfaceRaised, in: RoundedRectangle(cornerRadius: Theme.Radius.large))
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.large)
+                .strokeBorder(Theme.Color.hairline, lineWidth: Theme.hairlineWidth)
+        }
+        let view = contentView(model).overlay(alignment: .topLeading) {
+            card.padding(.top, 260).padding(.leading, 400)
+        }
+        try snapshot("main-filter-popover", view, dir: dir, emphasis: true, selectRow: 2)
+    }
+
     /// Player header without a selection: disabled transport, flat centre line.
     func testMainNoSelection() async throws {
         let dir = try outputDir()

@@ -5,7 +5,6 @@ app/Sonar/Features/License/EnterLicenseView.swift
 app/Sonar/Features/License/LicenseGateView.swift
 app/Sonar/Features/License/LicenseSettingsView.swift
 app/Sonar/Features/Onboarding/OnboardingView.swift
-app/Sonar/Features/Search/FilterBarView.swift
 app/Sonar/Features/Settings/LibrariesSettingsView.swift
 app/Sonar/Features/Settings/SettingsView.swift
 app/Sonar/Features/Similar/SimilarityBarView.swift

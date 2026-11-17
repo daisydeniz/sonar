@@ -61,6 +61,56 @@ struct FilterState: Equatable, Sendable {
     }
 }
 
+/// Presentation helpers for the filter bar's active chips (pure, tested).
+extension FilterState {
+    /// "Kick", "Kick +2" (sorted by display name), nil when nothing is selected.
+    static func summary(of selected: Set<String>, display: (String) -> String = { $0 }) -> String? {
+        let names = selected.map(display).sorted()
+        guard let first = names.first else { return nil }
+        return names.count == 1 ? first : "\(first) +\(names.count - 1)"
+    }
+
+    /// "90–130", "≥ 90", "≤ 130 s"; nil when unbounded.
+    static func rangeSummary(min: Double?, max: Double?, unit: String = "") -> String? {
+        func number(_ v: Double) -> String { String(format: "%g", v) }
+        let suffix = unit.isEmpty ? "" : " \(unit)"
+        switch (min, max) {
+        case (nil, nil): return nil
+        case (let lo?, let hi?): return "\(number(lo))–\(number(hi))\(suffix)"
+        case (let lo?, nil): return "≥ \(number(lo))\(suffix)"
+        case (nil, let hi?): return "≤ \(number(hi))\(suffix)"
+        }
+    }
+}
+
+/// The Kind segmented control's three states, mapped to the core's `kind` values.
+enum KindFilter: String, CaseIterable, Identifiable, Sendable {
+    case all, loops, oneShots
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .all: return "All"
+        case .loops: return "Loops"
+        case .oneShots: return "One-shots"
+        }
+    }
+
+    /// The `kinds` set this segment stands for (empty = no restriction).
+    var kinds: Set<String> {
+        switch self {
+        case .all: return []
+        case .loops: return ["loop"]
+        case .oneShots: return ["one_shot"]
+        }
+    }
+
+    /// The segment for a `kinds` set (anything else shows as All).
+    init(kinds: Set<String>) {
+        self = Self.allCases.first { !$0.kinds.isEmpty && $0.kinds == kinds } ?? .all
+    }
+}
+
 /// A chip to render: a facet value with its count, or a selected value
 /// that the facets no longer list (count 0, kept visible).
 struct FacetChip: Identifiable, Equatable, Sendable {
