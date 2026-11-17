@@ -1212,3 +1212,21 @@ the engine fails to open).
 - **Not chosen**: third-party SwiftUI component kits (extra deps, fight the
   system look); a fully custom dark-only skin (breaks light mode and system
   chrome); web skills such as frontend-design (HTML/CSS only).
+
+## ADR-040 — Player header on top, region selection, compare view (founder request)
+- **Why**: the founder (2026-11-17) compared with a pro sample browser and
+  asked for: a big waveform at the top with transport/pitch above it;
+  selecting a region of the waveform to play it and to search for similar
+  sounds from just that region; and, in similarity mode, the target's
+  waveform above the browsed one.
+- **Decision**: DESIGN §3 replaces the 104 pt bottom dock with a **player
+  header** at the top of the content column (transport row 36 + resizable
+  180 pt waveform). Waveform gets region selection, Play Selection and Find
+  Similar to Selection (§4.4). Similarity mode shows a 72 pt target well
+  above the selected waveform (compare mode). Core: a similarity seed can be
+  a time range of a library or external file (`sonar similar --start/--end`,
+  seconds), analyzed on the fly like an external file (ADR-024); FFI exposes
+  the same. Layout look stays Sonar's own tokens (DESIGN §2), no copying.
+- **Not chosen**: keeping the bottom dock (waveform too small for region
+  editing); region similarity in Swift (product logic belongs in core).
+

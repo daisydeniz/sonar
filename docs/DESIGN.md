@@ -15,7 +15,7 @@ frame.
 - **System frame, custom content.** Window chrome (sidebar, toolbar, inspector
   container, menus, sheets, settings) is standard SwiftUI/AppKit, so it gets
   the current macOS look (Liquid Glass on macOS 26+) for free. Sonar's own
-  identity lives in the content layer: results table, player dock, waveform,
+  identity lives in the content layer: results table, player header, waveform,
   chips, meters.
 - **Light and dark are equal citizens.** The app follows the system appearance;
   there is no in-app theme switch. Every colour is a token with a light and a
@@ -47,7 +47,7 @@ else:
 | `accent` (`AccentContent`) | `#007A70` | `#2DD4BF` | content accent: waveform, playhead, selection tint, active chip, accent-coloured text and icons |
 | `controlAccent` (`AccentColor`) | `#007A70` | `#11827A` | the app's system accent: fill of default/prominent buttons, menu highlight, sliders, focus ring |
 | `surfaceContent` | `#FFFFFF` | `#17181A` | results table, main content background |
-| `surfaceRaised` | `#F4F5F7` | `#1E2023` | filter bar, similarity bar, player dock, cards |
+| `surfaceRaised` | `#F4F5F7` | `#1E2023` | filter bar, similarity bar, player header, cards |
 | `surfaceWell` | `#E9EBEE` | `#0E0F11` | waveform well, inset areas, meter tracks |
 | `hairline` | `#000000` 10 % | `#FFFFFF` 9 % | 1 px separators and borders |
 | `favorite` | `#E5484D` | `#FF6369` | filled heart |
@@ -73,7 +73,7 @@ SF Pro (system font) only. Four steps plus one label style:
 
 | Token | Size / weight | Use |
 |---|---|---|
-| `title` | 15 semibold | inspector name, empty-state title, dock title |
+| `title` | 15 semibold | inspector name, empty-state title, player title |
 | `body` | 13 regular | default controls, inspector values, sidebar |
 | `row` | 12 regular | table cells, chips, bar controls |
 | `caption` | 11 regular | secondary info, counts, hints |
@@ -90,8 +90,9 @@ right-aligned in columns. No other font family, no italic, no extra weights.
   sections: 16. Around empty states: 32.
 - **Radius**: `small` 4 (chips, badges, row selection), `medium` 6 (controls,
   wells), `large` 10 (cards, drop overlay).
-- **Sizes**: table row 24 · table header 22 · bar height 36 · player dock 104 ·
-  waveform in dock fills its height minus 2×8 · icon in rows/bars 12–13 pt
+- **Sizes**: table row 24 · table header 22 · bar height 36 · player header:
+  transport row 36 + waveform 180 (user-resizable 120–360 via a split
+  divider; compare mode adds a 72 pt target well above) · icon in rows/bars 12–13 pt
   (`.imageScale(.small)`), transport button 28, category dot 6
   (`Theme.Size.categoryDot`), knob 26 with a 2.5 arc (`Theme.Size.knob`,
   `knobStroke`).
@@ -107,15 +108,17 @@ states; the playhead follows audio via display link. No springs, no bounces.
 
 ```
 ┌──────────┬───────────────────────────────────────────┬────────────┐
-│ Sidebar  │ Filter bar (36)                           │ Inspector  │
-│ (system) ├───────────────────────────────────────────┤ (system    │
-│          │ Similarity bar (only in similarity mode)  │ container, │
-│          ├───────────────────────────────────────────┤ Sonar      │
-│          │ Results table (surfaceContent, 24 pt rows)│ content)   │
-│          │                                           │            │
+│ Sidebar  │ Player header: transport row (36)         │ Inspector  │
+│ (system) │  ▶ ■ ⟳ auto · name · pitch · BPM KEY LEN  │ (system    │
+│          ├───────────────────────────────────────────┤ container, │
+│          │ [compare mode only] target waveform (72)  │ Sonar      │
+│          │ Selected waveform (180, resizable)        │ content)   │
 │          ├───────────────────────────────────────────┤            │
-│          │ Player dock (104): transport · waveform · │            │
-│          │ readouts                                  │            │
+│          │ Filter bar (36)                           │            │
+│          ├───────────────────────────────────────────┤            │
+│          │ Similarity bar (only in similarity mode)  │            │
+│          ├───────────────────────────────────────────┤            │
+│          │ Results table (surfaceContent, 24 pt rows)│            │
 └──────────┴───────────────────────────────────────────┴────────────┘
 ```
 
@@ -131,18 +134,29 @@ states; the playhead follows audio via display link. No springs, no bounces.
   an active chip (`accentSoft` background, accent text, shows the selection
   summary, has a clear `×`). Facet lists with counts live inside the popovers.
 - **Results table**: see §4.1.
-- **Player dock**: always present under the table (stable layout), on
-  `surfaceRaised` with a hairline above. Left: transport (play/stop, loop,
-  auto-play) and file name. Centre: waveform in a `surfaceWell`, full
-  remaining width. Right: readouts (BPM, key, duration) and pitch. With no
-  selection: controls disabled, well shows a flat centre line.
+- **Player header** (founder request 2026-11-17, ADR-040; modelled on how
+  pro sample browsers work, not on any one product's look): always present
+  at the **top** of the content column (stable layout), on `surfaceRaised`,
+  hairline below. Row 1 (36 pt): transport (play/pause, stop, loop,
+  auto-play), file name (`title`, middle truncation), pitch knob, readouts
+  (BPM, KEY, LENGTH). Below: the **big waveform** in a `surfaceWell`, full
+  width, 180 pt by default, resizable with a split divider (120–360,
+  remembered). Waveform interactions in §4.4 (seek, region selection, play
+  selection, find similar to selection). With no selection: controls
+  disabled, well shows a flat centre line.
+- **Compare mode** (similarity mode only): a compact 72 pt well above the
+  selected waveform shows the **similarity target** ("Similar to: name",
+  `caption`, with its own small play button; the selected region is drawn
+  if the search used one). The large well below shows the browsed row
+  ("Selected: name"). Leaving similarity mode removes the target well.
 - **Inspector**: metadata and editing only (no transport, no waveform): header
   (name `title`, folder path `caption`), actions (favorite, find similar,
   reveal), then sections "Analysis" (BPM / key / category / kind with
   overrides), "Tags", "File". Sections use a `label` heading and a two-column
   grid (label secondary left, value right); not a grouped settings `Form`.
 - **Window**: minimum 900×520. When narrow, hide the inspector first, then
-  collapse the sidebar; the table and dock never disappear.
+  collapse the sidebar; the table and player header never disappear (the waveform shrinks to
+  its 120 pt minimum first).
 
 ## 4. Components
 
@@ -171,13 +185,22 @@ count in `caption` monospaced digits; optional leading category dot.
 
 ### 4.3 Readout (`Readout`)
 A value with a caption above it: caption in `label`, value in 15 pt medium
-monospaced digits. Used in the player dock (BPM, KEY, LENGTH, PITCH). Missing
+monospaced digits. Used in the player header (BPM, KEY, LENGTH, PITCH). Missing
 value: an en dash in tertiary.
 
 ### 4.4 Waveform
 Bars in `accent` on `surfaceWell`, radius `medium`. Played part full accent,
 unplayed part accent at 45 %. Playhead: 1 pt line in label colour. Loading:
 flat centre line; error: caption text centred in the well.
+- **Click** seeks (and starts playback if auto-play is on). **Drag**
+  selects a region: `selection` tint over the region, 1 pt accent edges
+  with small drag handles, start/length readout in `caption` monospaced
+  above the well. Esc or click outside clears it.
+- With a region: play plays the region (loops it if loop is on); the
+  context menu and a small floating button on the region offer **Play
+  Selection** and **Find Similar to Selection** (⌘⇧F uses the region when
+  one exists, else the whole file).
+- Zoom (pinch / ⌘-scroll) and pan (horizontal scroll) as before.
 
 ### 4.5 Section header (`SectionLabel`)
 `label` style text, secondary colour, 16 above / 6 below.

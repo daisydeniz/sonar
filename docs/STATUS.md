@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M9 UI redesign (founder request 2026-11-17, ADR-039, `docs/DESIGN.md`); M0–M7 done; T3.7, T7.4, T8.1 human
-- Next task: T9.3 player dock
+- Next task: T9.3 player header (top, ADR-040), then T9.3b/T9.3c region selection + region similarity
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
