@@ -178,7 +178,10 @@ final class AppModel {
 
     /// Test/snapshot seam (no production caller): puts the model into a
     /// ready state with fixed sidebar data, without opening an engine.
-    func installStaticState(libraries: [LibraryInfo], collections: [CollectionInfo]) {
+    func installStaticState(
+        libraries: [LibraryInfo], collections: [CollectionInfo], progress: IndexingProgress? = nil
+    ) {
+        if let progress { self.progress = progress }
         self.libraries = libraries
         self.collections = collections
         sidebarLoaded = true

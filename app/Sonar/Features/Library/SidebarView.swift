@@ -1,6 +1,9 @@
 import SwiftUI
 
-/// Sidebar: Library (All Samples, Favorites), Libraries, Collections.
+/// Sidebar: Library (All Samples, Favorites), Libraries, Collections
+/// (DESIGN §3). Standard `.sidebar` list; counts are badges, offline
+/// libraries are dimmed with a warning symbol, "Add…" is a `+` button in the
+/// section header.
 @MainActor
 struct SidebarView: View {
     @Bindable var model: AppModel
@@ -10,30 +13,19 @@ struct SidebarView: View {
         List(selection: $model.sidebarSelection) {
             Section("Library") {
                 Label("All Samples", systemImage: "waveform").tag(SidebarItem.allSamples)
-                Label("Favorites", systemImage: "heart").tag(SidebarItem.favorites)
+                Label("Favorites", systemImage: "heart")
+                    .badge(Int(model.facets?.favorites ?? 0))
+                    .tag(SidebarItem.favorites)
                 Label("Duplicates", systemImage: "square.on.square").tag(SidebarItem.duplicates)
             }
-            Section("Libraries") {
+            Section {
                 ForEach(model.libraries, id: \.id) { library in
-                    Label(Self.title(library), systemImage: library.online ? "folder" : "externaldrive.badge.exclamationmark")
-                        .opacity(library.online ? 1 : 0.5)
-                        .tag(SidebarItem.library(library.id))
-                        .help(library.online ? library.rootPath : "Offline: \(library.rootPath) is not available")
-                        .accessibilityLabel(library.online ? Self.title(library) : "\(Self.title(library)), offline")
-                        .contextMenu {
-                            Button("Remove Library…", role: .destructive) { pendingRemoval = library }
-                        }
+                    libraryRow(library)
                 }
-                Button {
-                    addLibrary()
-                } label: {
-                    Label("Add Library…", systemImage: "plus")
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("Add Library")
+            } header: {
+                SidebarSectionHeader(title: "Libraries", addLabel: "Add Library", action: addLibrary)
             }
-            Section("Collections") {
+            Section {
                 ForEach(model.collections, id: \.id) { collection in
                     Label(collection.name, systemImage: "square.stack")
                         .badge(Int(collection.files))
@@ -47,14 +39,10 @@ struct SidebarView: View {
                             }
                         }
                 }
-                Button {
+            } header: {
+                SidebarSectionHeader(title: "Collections", addLabel: "New Collection") {
                     model.organizeState.ask(.newCollection([]))
-                } label: {
-                    Label("New Collection…", systemImage: "plus")
                 }
-                .buttonStyle(.plain)
-                .foregroundStyle(.secondary)
-                .accessibilityLabel("New Collection")
             }
         }
         .listStyle(.sidebar)
@@ -71,6 +59,29 @@ struct SidebarView: View {
         }
     }
 
+    @ViewBuilder private func libraryRow(_ library: LibraryInfo) -> some View {
+        let title = Self.title(library)
+        let count = model.facets?.libraries.first { $0.libraryId == library.id }?.count
+        Group {
+            if library.online {
+                Label(title, systemImage: "folder")
+            } else {
+                Label {
+                    Text(title).foregroundStyle(.tertiary)
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.Color.warning)
+                }
+            }
+        }
+        .badge(library.online ? Int(count ?? 0) : 0)
+        .tag(SidebarItem.library(library.id))
+        .help(library.online ? library.rootPath : "Offline: \(library.rootPath) is not available")
+        .accessibilityLabel(library.online ? title : "\(title), offline")
+        .contextMenu {
+            Button("Remove Library…", role: .destructive) { pendingRemoval = library }
+        }
+    }
+
     private func addLibrary() {
         let paths = FolderPicker.pickFolders()
         if !paths.isEmpty { Task { await model.addLibraries(paths: paths) } }
@@ -78,5 +89,24 @@ struct SidebarView: View {
 
     private static func title(_ library: LibraryInfo) -> String {
         URL(fileURLWithPath: library.rootPath).lastPathComponent
+    }
+}
+
+/// Sidebar section header with a trailing `+` button (instead of a fake row).
+private struct SidebarSectionHeader: View {
+    let title: String
+    let addLabel: String
+    let action: () -> Void
+
+    var body: some View {
+        HStack {
+            Text(title)
+            Spacer()
+            Button(action: action) { Image(systemName: "plus") }
+                .buttonStyle(.borderless)
+                .controlSize(.small)
+                .help("\(addLabel)…")
+                .accessibilityLabel(addLabel)
+        }
     }
 }

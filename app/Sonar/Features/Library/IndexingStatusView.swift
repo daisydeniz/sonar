@@ -8,12 +8,13 @@ struct IndexingStatusView: View {
     var body: some View {
         let progress = model.progress
         if progress.running {
-            HStack(spacing: 8) {
+            HStack(spacing: Theme.Space.s8) {
                 ProgressView(value: Double(progress.done), total: Double(max(progress.total, 1)))
-                    .frame(width: 100)
+                    .controlSize(.small)
+                    .frame(width: Theme.Size.indexingProgressWidth)
                     .accessibilityLabel("Indexing progress")
                 Text(label(progress))
-                    .font(.caption.monospacedDigit())
+                    .font(Theme.Font.captionNumeric)
                     .foregroundStyle(.secondary)
                 if progress.paused {
                     Button { model.resumeIndexing() } label: { Image(systemName: "play.fill") }

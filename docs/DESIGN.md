@@ -129,9 +129,13 @@ states; the playhead follows audio via display link. No springs, no bounces.
 
 - **Sidebar**: standard `.sidebar` list. SF Symbols, counts as badges, offline
   libraries dimmed with a warning symbol. "Add…" actions live in the section
-  header (a `+` button), not as fake rows.
-- **Toolbar**: search field (centre/trailing), indexing status, inspector
-  toggle. No custom-drawn toolbar items.
+  header (a `+` button), not as fake rows. Library rows carry their file
+  count as a badge; an offline library has a `warning` triangle icon and
+  tertiary text.
+- **Toolbar**: search field (centre/trailing), trial badge (small bordered
+  button, `caption`), indexing status (small progress bar
+  `Theme.Size.indexingProgressWidth` 100 + `caption` monospaced counter +
+  pause/resume), inspector toggle. No custom-drawn toolbar items.
 - **Filter bar**: ONE row, `surfaceRaised`, hairline below. Kind as a compact
   segmented control (All / Loops / One-shots); Category, Key, BPM, Duration,
   Tags as popover buttons; Favorites as an icon toggle; result count right,

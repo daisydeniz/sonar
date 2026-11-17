@@ -173,6 +173,56 @@ final class UISnapshotTests: XCTestCase {
         try snapshot("main-drop", view, dir: dir, emphasis: true, selectRow: 2)
     }
 
+    /// The borderless snapshot window has no real toolbar, so the toolbar
+    /// items (trial badge, indexing status, inspector toggle) are drawn in a
+    /// stand-in strip above the content.
+    private func withToolbarStrip(_ model: AppModel) -> some View {
+        let license = LicenseManager(service: SnapshotLicenseService())
+        return VStack(spacing: 0) {
+            HStack(spacing: Theme.Space.s8) {
+                Spacer()
+                TrialBadgeView(license: license)
+                IndexingStatusView(model: model)
+                Image(systemName: "sidebar.trailing")
+            }
+            .padding(.horizontal, Theme.Space.s12)
+            .frame(height: Theme.Size.barHeight)
+            Hairline()
+            ContentView(model: model, license: license)
+        }
+    }
+
+    /// Indexing in progress (toolbar status) and an offline library in the sidebar.
+    func testMainIndexing() async throws {
+        let dir = try outputDir()
+        let model = try await populated()
+        model.installStaticState(
+            libraries: SnapshotFixtures.libraries, collections: SnapshotFixtures.collections,
+            progress: IndexingProgress(
+                enabled: true, running: true, paused: false, stage: .dsp, total: 12_480, done: 4_213, errors: 0))
+        try snapshot("main-indexing", withToolbarStrip(model), dir: dir, emphasis: true, selectRow: 2)
+    }
+
+    /// Paused indexing.
+    func testMainIndexingPaused() async throws {
+        let dir = try outputDir()
+        let model = try await populated()
+        model.installStaticState(
+            libraries: SnapshotFixtures.libraries, collections: SnapshotFixtures.collections,
+            progress: IndexingProgress(
+                enabled: true, running: true, paused: true, stage: .embed, total: 12_480, done: 9_800, errors: 0))
+        try snapshot("main-indexing-paused", withToolbarStrip(model), dir: dir, emphasis: true, selectRow: 2)
+    }
+
+    /// Status banner above the results.
+    func testMainBanner() async throws {
+        let dir = try outputDir()
+        let model = try await populated()
+        model.banner.post("Watcher failed for /Volumes/Archive/Drum Hits: volume was unmounted")
+        model.banner.post("Watcher failed for /Volumes/Archive/Drum Hits: volume was unmounted")
+        try snapshot("main-banner", contentView(model), dir: dir, emphasis: true, selectRow: 2)
+    }
+
     func testEmpty() async throws {
         let dir = try outputDir()
         let model = try await populated(rows: [])

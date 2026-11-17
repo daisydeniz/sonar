@@ -63,6 +63,7 @@ struct ContentView: View {
             ToolbarItem { IndexingStatusView(model: model) }
             ToolbarItem {
                 Button { showInspector.toggle() } label: { Label("Inspector", systemImage: "sidebar.trailing") }
+                    .help("Show or hide the inspector")
             }
         }
         .alert("Sonar", isPresented: Binding(

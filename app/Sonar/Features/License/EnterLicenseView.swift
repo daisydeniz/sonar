@@ -43,21 +43,3 @@ struct EnterLicenseView: View {
         .onAppear { license.clearActivationError() }
     }
 }
-
-/// Toolbar badge "Trial: N days left"; opens the Enter License sheet.
-@MainActor
-struct TrialBadgeView: View {
-    let license: LicenseManager
-
-    var body: some View {
-        if let text = license.trialBadgeText {
-            Button { license.showsEnterSheet = true } label: {
-                Text(text).font(.caption.weight(.medium))
-            }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .help("Enter a license key")
-            .accessibilityLabel("\(text). Enter license")
-        }
-    }
-}

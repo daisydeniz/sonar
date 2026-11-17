@@ -64,6 +64,8 @@ enum Theme {
         static let popoverWidth: CGFloat = 240
         static let popoverListMaxHeight: CGFloat = 240
         static let rangeField: CGFloat = 64
+        /// Progress bar of the toolbar indexing status.
+        static let indexingProgressWidth: CGFloat = 100
     }
 
     /// Opacity of the unplayed part of the waveform (played = full accent).

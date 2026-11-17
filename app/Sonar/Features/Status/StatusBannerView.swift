@@ -1,25 +1,37 @@
 import SwiftUI
 
-/// Thin banner above the results: an engine event error with a dismiss button.
+/// Banner above the results (DESIGN §4.7): one line on `surfaceRaised`, a
+/// leading status symbol in the system status colour, `row` text and a
+/// trailing dismiss button.
 @MainActor
 struct StatusBannerView: View {
     let banner: StatusBanner
 
     var body: some View {
         if let text = banner.displayText {
-            HStack(spacing: 8) {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
-                Text(text).lineLimit(2).textSelection(.enabled)
-                Spacer()
+            HStack(spacing: Theme.Space.s8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .imageScale(.small)
+                    .foregroundStyle(Theme.Color.warning)
+                    .accessibilityHidden(true)
+                Text(text)
+                    .font(Theme.Font.row)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .textSelection(.enabled)
+                    .help(text)
+                Spacer(minLength: Theme.Space.s8)
                 Button { banner.dismiss() } label: { Image(systemName: "xmark") }
                     .buttonStyle(.borderless)
+                    .controlSize(.small)
+                    .help("Dismiss")
                     .accessibilityLabel("Dismiss message")
             }
-            .font(.callout)
-            .padding(.horizontal, 12).padding(.vertical, 6)
-            .background(.orange.opacity(0.12))
+            .padding(.horizontal, Theme.Space.s12)
+            .frame(height: Theme.Size.barHeight)
+            .background(Theme.Color.surfaceRaised)
             .accessibilityElement(children: .contain)
-            Divider()
+            Hairline()
         }
     }
 }
