@@ -230,6 +230,14 @@ up = more), double-click resets to the default, arrow keys / VoiceOver
 adjust. Never paired with a Reset button; the value is shown as text beside
 it (secondary when at the default).
 
+### 4.9 Property row (`PropertyRow`)
+Inspector grid row, at least 24 pt high: label in `row` secondary on the left
+(`Theme.Size.propertyLabelWidth`, 72), value or editor right-aligned in the
+rest. Read-only values are selectable `row` text (monospaced digits for
+numbers); missing value: an en dash in tertiary. Sections are a `SectionLabel`
+plus rows with 2 pt between them. Removable tags are `SonarChip`s with a
+trailing `xmark`.
+
 ## 5. Rules
 
 Do

@@ -49,6 +49,8 @@ enum Theme {
         static let categoryDot: CGFloat = 6
         /// Symbol point size of `EmptyStateView`.
         static let emptyStateSymbol: CGFloat = 28
+        /// Label column of `PropertyRow` (inspector grids).
+        static let propertyLabelWidth: CGFloat = 72
         /// Maximum text width of `EmptyStateView`.
         static let emptyStateTextWidth: CGFloat = 360
     }

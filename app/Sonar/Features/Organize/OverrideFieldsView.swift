@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// Inspector fields for BPM / Key / Category / Kind. Editing writes a user
-/// override for the whole selection (the core keeps it across re-analysis);
-/// "Revert to detected" clears it. A value the core rejects shows its message
-/// inline and the field reverts.
+/// Inspector "Analysis" section: BPM / Key / Category / Kind. Editing writes a
+/// user override for the whole selection (the core keeps it across
+/// re-analysis); "Revert to detected" clears it. A value the core rejects
+/// shows its message inline and the field reverts.
 @MainActor
 struct OverrideFieldsView: View {
     @Bindable var model: AppModel
@@ -11,14 +11,29 @@ struct OverrideFieldsView: View {
     @State private var bpmDraft = ""
     @State private var keyDraft = ""
 
+    /// Rows the edits apply to (the multi-selection, else the focused row).
+    private var targets: [FileRow] {
+        let rows = model.organizeTargetRows
+        return rows.isEmpty ? [row] : rows
+    }
+    /// Selected rows that are not loaded cannot be compared: treat as mixed.
+    private var partial: Bool { model.organizeTargetRows.count < model.selectedFileIDs.count }
+    private var bpm: CommonValue<Double> { CommonValue(targets.map(\.bpm), forceMixed: partial) }
+    private var key: CommonValue<String> { CommonValue(targets.map(\.key), forceMixed: partial) }
+    private var category: CommonValue<String> { CommonValue(targets.map(\.category), forceMixed: partial) }
+    private var kind: CommonValue<String> { CommonValue(targets.map(\.kind), forceMixed: partial) }
+
     var body: some View {
-        Section("Detected values") {
-            textRow("BPM", text: $bpmDraft, field: .bpm)
-            textRow("Key", text: $keyDraft, field: .key)
-            popupRow("Category", current: row.category, options: model.organizeState.categories, field: .category)
-            popupRow("Kind", current: row.kind, options: ["loop", "one_shot"], field: .kind)
+        VStack(spacing: Theme.Space.s2) {
+            SectionLabel("Analysis")
+            textRow("BPM", text: $bpmDraft, field: .bpm, mixed: bpm.isMixed)
+            textRow("Key", text: $keyDraft, field: .key, mixed: key.isMixed)
+            popupRow("Category", common: category, options: model.organizeState.categories, field: .category)
+            popupRow("Kind", common: kind, options: ["loop", "one_shot"], field: .kind)
             if let error = model.organizeState.overrideError {
-                Text(error).font(.caption).foregroundStyle(.red)
+                Text(error)
+                    .font(Theme.Font.caption).foregroundStyle(Theme.Color.error)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .accessibilityLabel("Override error: \(error)")
             }
         }
@@ -27,17 +42,22 @@ struct OverrideFieldsView: View {
         // refresh must not clobber an in-progress edit.
         .onChange(of: row.bpm) { syncDrafts() }
         .onChange(of: row.key) { syncDrafts() }
+        .onChange(of: model.selectedFileIDs) { syncDrafts() }
+        .onChange(of: bpm) { syncDrafts() }
+        .onChange(of: key) { syncDrafts() }
     }
 
     private func syncDrafts() {
-        bpmDraft = row.bpm.map { $0 == $0.rounded() ? String(Int($0)) : String($0) } ?? ""
-        keyDraft = row.key ?? ""
+        bpmDraft = bpm.value.map { $0 == $0.rounded() ? String(Int($0)) : String($0) } ?? ""
+        keyDraft = key.value ?? ""
     }
 
-    private func textRow(_ title: String, text: Binding<String>, field: OverrideField) -> some View {
-        LabeledContent(title) {
-            HStack {
-                TextField(title, text: text)
+    private func textRow(_ title: String, text: Binding<String>, field: OverrideField, mixed: Bool) -> some View {
+        PropertyRow(title) {
+            HStack(spacing: Theme.Space.s4) {
+                TextField(title, text: text, prompt: Text(mixed ? "Mixed" : "\u{2013}"))
+                    .textFieldStyle(.roundedBorder)
+                    .controlSize(.small)
                     .multilineTextAlignment(.trailing)
                     .onSubmit { commit(field, text.wrappedValue) }
                 revert(title, field)
@@ -45,9 +65,12 @@ struct OverrideFieldsView: View {
         }
     }
 
-    private func popupRow(_ title: String, current: String?, options: [String], field: OverrideField) -> some View {
-        LabeledContent(title) {
-            HStack {
+    private func popupRow(
+        _ title: String, common: CommonValue<String>, options: [String], field: OverrideField
+    ) -> some View {
+        let current = common.value
+        return PropertyRow(title) {
+            HStack(spacing: Theme.Space.s4) {
                 Picker(title, selection: Binding(
                     get: { current ?? "" },
                     set: { value in
@@ -55,22 +78,31 @@ struct OverrideFieldsView: View {
                         Task { await model.setOverride(field, value: value) }
                     })
                 ) {
-                    if current == nil || !options.contains(current ?? "") { Text("-").tag(current ?? "") }
-                    ForEach(options, id: \.self) { Text($0).tag($0) }
+                    if current == nil || !options.contains(current ?? "") {
+                        Text(common.isMixed ? "Mixed" : "\u{2013}").tag(current ?? "")
+                    }
+                    ForEach(options, id: \.self) { Text(display($0, field)).tag($0) }
                 }
                 .labelsHidden()
+                .controlSize(.small)
+                .frame(maxWidth: .infinity, alignment: .trailing)
                 revert(title, field)
             }
         }
+    }
+
+    private func display(_ value: String, _ field: OverrideField) -> String {
+        field == .kind ? Format.kindTitle(value) : Format.categoryTitle(value)
     }
 
     private func revert(_ title: String, _ field: OverrideField) -> some View {
         Button {
             Task { await model.revertOverride(field) }
         } label: {
-            Image(systemName: "arrow.uturn.backward")
+            Image(systemName: "arrow.uturn.backward").imageScale(.small)
         }
         .buttonStyle(.borderless)
+        .foregroundStyle(.secondary)
         .help("Revert to detected")
         .accessibilityLabel("Revert \(title) to detected")
     }

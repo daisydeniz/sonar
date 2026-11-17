@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Simple wrapping layout for tag chips.
 struct FlowLayout: Layout {
-    var spacing: CGFloat = 6
+    var spacing: CGFloat = Theme.Space.s6
 
     func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
         arrange(width: proposal.width ?? .infinity, subviews: subviews).size
@@ -34,40 +34,48 @@ struct FlowLayout: Layout {
     }
 }
 
-/// Inspector tags: the focused row's tags as removable chips (removal applies
-/// to the whole selection) and a field to add comma-separated tags.
+/// Inspector "Tags" section: the focused row's tags (with several rows
+/// selected, the tags every selected row has) as removable chips (removal
+/// applies to the whole selection) and a field to add comma-separated tags.
 @MainActor
 struct TagsEditorView: View {
     @Bindable var model: AppModel
     let row: FileRow
     @State private var draft = ""
 
+    /// Tags shown as chips: the intersection across a multi-selection.
+    private var shownTags: [String] {
+        guard model.selectedFileIDs.count > 1 else { return row.tags }
+        let rows = model.organizeTargetRows
+        // Unloaded selected rows cannot be compared: show nothing uncertain.
+        guard rows.count >= model.selectedFileIDs.count else { return [] }
+        let common = commonTags(rows.map(\.tags))
+        return row.tags.filter(common.contains)
+    }
+
     var body: some View {
-        Section("Tags") {
-            if !row.tags.isEmpty {
+        VStack(spacing: Theme.Space.s6) {
+            SectionLabel("Tags")
+            if !shownTags.isEmpty {
                 FlowLayout {
-                    ForEach(row.tags, id: \.self) { tag in
-                        HStack(spacing: 2) {
-                            Text(tag)
-                            Button {
-                                Task { await model.removeTag(tag) }
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Remove tag \(tag)")
+                    ForEach(shownTags, id: \.self) { tag in
+                        SonarChip(title: tag, trailingSymbol: "xmark") {
+                            Task { await model.removeTag(tag) }
                         }
-                        .padding(.horizontal, 8).padding(.vertical, 2)
-                        .background(Capsule().fill(.quaternary))
+                        .help("Remove tag")
+                        .accessibilityLabel("Remove tag \(tag)")
                     }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            HStack {
+            HStack(spacing: Theme.Space.s4) {
                 TextField("Add tag", text: $draft)
+                    .textFieldStyle(.roundedBorder)
+                    .controlSize(.small)
                     .onSubmit(commit)
                     .onChange(of: row.fileId) { draft = "" }
                     .accessibilityLabel("Add tag")
-                let suggestions = model.organizeState.tags.filter { !row.tags.contains($0.name) }
+                let suggestions = model.organizeState.tags.filter { !shownTags.contains($0.name) }
                 if !suggestions.isEmpty {
                     Menu {
                         ForEach(suggestions, id: \.name) { info in
@@ -79,6 +87,8 @@ struct TagsEditorView: View {
                         Image(systemName: "tag")
                     }
                     .menuStyle(.borderlessButton).fixedSize()
+                    .controlSize(.small)
+                    .help("Existing tags")
                     .accessibilityLabel("Existing tags")
                 }
             }

@@ -69,6 +69,14 @@ final class UISnapshotTests: XCTestCase {
         try snapshot("main-noselection", contentView(model), dir: dir, emphasis: true)
     }
 
+    /// Inspector with several samples selected: count header, batch actions.
+    func testMainMultiSelection() async throws {
+        let dir = try outputDir()
+        let rows = SnapshotFixtures.rows()
+        let model = try await populated(rows: rows)
+        try snapshot("main-multi", contentView(model), dir: dir, emphasis: true, selectRows: IndexSet(2...4))
+    }
+
     /// Waveform with a selected region: tint, edge handles, readout and menu.
     func testMainRegion() async throws {
         let dir = try outputDir()
@@ -144,8 +152,10 @@ final class UISnapshotTests: XCTestCase {
     // MARK: Rendering
 
     private func snapshot<V: View>(
-        _ name: String, _ view: V, dir: URL, emphasis: Bool? = nil, selectRow: Int? = nil
+        _ name: String, _ view: V, dir: URL, emphasis: Bool? = nil, selectRow: Int? = nil,
+        selectRows: IndexSet? = nil
     ) throws {
+        let selection = selectRows ?? selectRow.map { IndexSet(integer: $0) }
         ResultsRowView.emphasisOverride = emphasis
         defer { ResultsRowView.emphasisOverride = nil }
         for (suffix, appearanceName) in [("light", NSAppearance.Name.aqua), ("dark", .darkAqua)] {
@@ -164,8 +174,8 @@ final class UISnapshotTests: XCTestCase {
                 RunLoop.main.run(until: Date().addingTimeInterval(0.1))
                 host.layoutSubtreeIfNeeded()
             }
-            if let selectRow, let table = Self.findTable(in: host) {
-                table.selectRowIndexes(IndexSet(integer: selectRow), byExtendingSelection: false)
+            if let selection, let table = Self.findTable(in: host) {
+                table.selectRowIndexes(selection, byExtendingSelection: false)
                 for _ in 0..<3 {
                     RunLoop.main.run(until: Date().addingTimeInterval(0.1))
                     host.layoutSubtreeIfNeeded()

@@ -10,6 +10,8 @@ struct SonarChip: View {
     /// Colour of the leading dot, usually `Theme.categoryColor(_:)`.
     var dot: Color?
     var isActive = false
+    /// Optional trailing SF Symbol (e.g. `xmark` on a removable tag).
+    var trailingSymbol: String?
     let action: () -> Void
 
     @State private var hovering = false
@@ -24,6 +26,9 @@ struct SonarChip: View {
                 Text(title).font(Theme.Font.row)
                 if let count {
                     Text("\(count)").font(Theme.Font.captionNumeric).foregroundStyle(.tertiary)
+                }
+                if let trailingSymbol {
+                    Image(systemName: trailingSymbol).font(Theme.Font.caption).imageScale(.small)
                 }
             }
             .foregroundStyle(isActive ? Theme.Color.accent : Color.secondary)
