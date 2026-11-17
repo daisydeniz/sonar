@@ -93,8 +93,6 @@ re-review finished phases. After the merge in step 8: `rm -f logs/handoff.md`.
   control is preferred over a custom one. No literal colours, paddings,
   radii or font sizes in feature code: `scripts/design-lint.sh` (part of
   `check.sh`) fails on them.
-- A task that restyles a file removes it from
-  `scripts/design-lint-pending.txt`. Never add files to that list.
 - Every screen works in light **and** dark and has empty / loading / error /
   filled states. Agents verify by looking: `scripts/ui-snapshots.sh` →
   `logs/ui/<screen>-<light|dark>.png` (add a screen there when a task
@@ -150,7 +148,7 @@ re-review finished phases. After the merge in step 8: `rm -f logs/handoff.md`.
 - `scripts/bootstrap.sh` — toolchain setup/check (macOS).
 - `scripts/check.sh` — all quality gates (fmt, clippy, tests, deny,
   fixtures eval, xcodebuild when `app/project.yml` exists).
-- `scripts/design-lint.sh` — design-token gate (`--all` ignores the pending list).
+- `scripts/design-lint.sh` — design-token gate (no exemption list; per-line `// design-lint:allow <reason>`).
 - `scripts/ui-snapshots.sh` — light/dark PNGs of the main screens in `logs/ui/`.
 - `scripts/autopilot.sh` — runs the loop unattended (founder starts it).
 - `cd core && cargo run -p sonar-cli -- <cmd>` — CLI.

@@ -79,6 +79,8 @@ struct ContentView: View {
         VStack(spacing: 0) {
             StatusBannerView(banner: model.banner)
             detailContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Theme.Color.surfaceContent)
         }
     }
 
@@ -109,7 +111,6 @@ struct ContentView: View {
                 }
                 results
             }
-            .background(Theme.Color.surfaceContent)
             .onDrop(of: [.fileURL], delegate: SimilarityDropDelegate(model: model, isTargeted: $dropTargeted))
             .overlay {
                 if dropTargeted { DropOverlayView() }

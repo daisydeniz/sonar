@@ -15,7 +15,7 @@ struct SonarApp: App {
         // Single main window: one engine and one poll loop per app.
         Window(AppInfo.name, id: "main") {
             ContentView(model: model, license: license)
-                .frame(minWidth: 900, minHeight: 480)
+                .frame(minWidth: 900, minHeight: 520)
                 .task { if !Self.isTesting { await model.start() } }
                 .task { if !Self.isTesting { await license.refresh() } }
         }

@@ -17,7 +17,7 @@ struct OnboardingView: View {
                 let paths = FolderPicker.pickFolders(prompt: "Add")
                 if !paths.isEmpty { Task { await model.addLibraries(paths: paths) } }
             },
-            extra: { Text("or drop folders here").font(Theme.Font.caption).foregroundStyle(.tertiary) }
+            extra: { Text("or drop folders here").font(Theme.Font.caption).foregroundStyle(.secondary) }
         )
         .defaultActionShortcut()
         .overlay {

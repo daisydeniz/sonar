@@ -1,1 +1,0 @@
-# Files not yet migrated to Theme tokens (scripts/design-lint.sh). Only remove lines.
