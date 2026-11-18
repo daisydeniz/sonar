@@ -137,7 +137,7 @@ exported by the FFI as `key_tier_high()` / `key_tier_medium()`; inclusive
 lower bounds). `sonar eval` (fixtures and `--silver`, names hidden) reports
 per-tier n / correct / accuracy, a 10-bin reliability table and the expected
 calibration error (ECE; Naeini et al. 2015, Guo et al. 2017: `Σ |B|/n ·
-|acc(B) − conf(B)|`, 10 equal-width bins).
+|acc(B) − conf(B)|`, 15 equal-width bins as category calibration; the reliability table uses 10).
 
 **Correct**: the file has tonal truth (key label, else the note label's
 pitch class) and the emitted tonic pitch class matches; when both name a
@@ -153,24 +153,25 @@ are excluded. Files that got no key are not in any tier (counted apart).
 metrics: `key.tier_high_acc_pct`, `key.tier_medium_acc_pct` (drop > 1 point
 = regression); `key.ece_pct` is report only (lower is better).
 
-Bounds (fitted T10.4): `KEY_TIER_HIGH` = 0.75, `KEY_TIER_MEDIUM` = 0.30.
-Fixtures, 104 keys (68 on tonal files, 36 on drums / noise):
+Bounds (fitted T10.4 on silver): `KEY_TIER_HIGH` = 0.90, `KEY_TIER_MEDIUM` = 0.60.
 
-| Tier | n | Correct | Accuracy (%) |
-|---|---:|---:|---:|
-| high (>= 0.75) | 68 | 68 | 100.00 |
-| medium (0.30-0.75) | 0 | 0 | n/a |
-| low (< 0.30) | 36 | 0 | 0.00 |
+| Set (names hidden) | high (>= 0.90) | medium (0.60-0.90) | low (< 0.60) | ECE (%) | Key exact / MIREX (%) |
+|---|---:|---:|---:|---:|---:|
+| Fixtures (104 keys, 36 on drums/noise) | 50/50 = 100.0 % | 18/18 = 100.0 % | 0/36 = 0.0 % | 3.74 | 100 / 100 |
+| Silver (344 keys, 1 percussion pack, name-labelled) | 47/59 = 79.7 % | 59/96 = 61.5 % | 60/189 = 31.7 % | 18.52 | 30.02 / 34.19 |
+| Golden (88 keys, pack labels) | 11/16 = 68.8 % | 10/29 = 34.5 % | 15/43 = 34.9 % | 31.67 | 30.48 / 37.90 |
 
-ECE 3.74 %; monotone yes. Fixture confidences are bimodal: every wrong key
-(drums, noise) is <= 0.24, every correct one >= 0.80, so any high bound in
-(0.24, 0.80] and any medium bound in [0.24, high) gives the same fixture
-table; the fixtures **cannot validate the medium tier**. Silver (real,
-noisy keys) is where the medium bound is to be re-fitted: run
-`sonar eval --silver <dir>` and move `KEY_TIER_MEDIUM` up (and `KEY_TIER_HIGH`
-down/up) until medium >= 60 % and high >= 90 % hold, keeping the bounds
-monotone and `KEY_TIER_MEDIUM >= 0.3` so drums/noise stay low. No silver
-numbers exist yet (`$SONAR_SILVER_DIR` not readable by the agents).
+Fixture confidences are bimodal (wrong <= 0.24, correct >= 0.80), so they
+cannot place the bounds; silver did. Silver per 0.1 band: 0.9-1.0 79.7 %,
+0.6-0.9 61.5 % overall, every band below 0.6 <= 47 % except 0.3-0.4 (5/7).
+So medium = 0.60 meets its 60 % target and is monotone; **no bound reaches
+the 90 % high target** — the best band is 79.7 %, so high = 0.90 is the
+most accurate tier available. Golden (small) is weaker and not monotone
+(medium ≈ low, n = 29 / 43: within noise); medium = 0.50 would make golden
+monotone (~39 % vs ~31 %) but drops silver medium to ~59 % (< 60 %), so it
+was rejected. Reaching the high target needs analysis work, not a bound
+(ROADMAP `## Later`, T10.4b). Re-run `scripts/eval-real.sh` after key changes
+and re-fit.
 
 ### Similarity (P@10, MRR)
 `sonar eval` ranks the evaluated files exactly as `sonar similar` does with

@@ -2,16 +2,18 @@
 //! high / medium / low certainty instead of a continuous fade, and the
 //! key filter / facet use medium + high by default.
 //!
-//! The bounds are fitted on eval data (names hidden) so that the high tier
-//! is at least 90 % correct and the medium tier at least 60 % (see
-//! `docs/EVAL.md`, "Key calibration"). Both are inclusive lower bounds.
+//! The bounds are fitted on silver (real files, names hidden) toward the
+//! targets high >= 90 % and medium >= 60 % correct (see `docs/EVAL.md`,
+//! "Key calibration"; the high target is not yet reached). Both are
+//! inclusive lower bounds.
 
-/// Smallest stored key confidence of the high tier (inclusive).
-pub const KEY_TIER_HIGH: f32 = 0.75;
+/// Smallest stored key confidence of the high tier (inclusive). The most
+/// accurate silver band (0.9–1.0: 79.7 %, T10.4).
+pub const KEY_TIER_HIGH: f32 = 0.90;
 /// Smallest stored key confidence of the medium tier (inclusive); below it
-/// is the low tier (drums and noise stay there: their confidence is
-/// at most 0.24 on the fixtures, ADR-041).
-pub const KEY_TIER_MEDIUM: f32 = 0.30;
+/// is the low tier. Silver 0.6–0.9 is 61.5 % correct, below 0.6 31.7 %
+/// (T10.4); drums/noise fixtures are <= 0.24.
+pub const KEY_TIER_MEDIUM: f32 = 0.60;
 
 /// Certainty class of a key.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

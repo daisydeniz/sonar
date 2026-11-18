@@ -4,7 +4,7 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
 
 ## fixtures
 
-120 files, generated (sonar fixtures, default seed), revision 497119c (2026-11-18)
+120 files, generated (sonar fixtures, default seed), revision a5a8418 (2026-11-18)
 
 | Metric | Value | Target |
 |---|---:|---|
@@ -14,6 +14,7 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
 | Key exact (%) | 100.00 | report only |
 | Key MIREX weighted (%) | 100.00 | >= 80 |
 | Key accuracy, high confidence tier (%) | 100.00 | >= 90 |
+| Key accuracy, medium confidence tier (%) | 100.00 | >= 60 |
 | Note exact pitch class (%) | 100.00 | >= 90 |
 | Note exact MIDI (%) | 100.00 | >= 90 |
 | Category top-1, DSP only (%) | 33.93 | report only |
@@ -30,7 +31,7 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
   "tiers": {
     "fixtures": {
       "date": "2026-11-18",
-      "git_sha": "497119c",
+      "git_sha": "a5a8418",
       "files": 120,
       "source": "generated (sonar fixtures, default seed)",
       "metrics": {
@@ -42,6 +43,7 @@ Written by `sonar eval --write-baseline`; `sonar eval --check` fails when a trac
         "key.exact_pct": 100.0,
         "key.mirex_pct": 100.0,
         "key.tier_high_acc_pct": 100.0,
+        "key.tier_medium_acc_pct": 100.0,
         "kind.accuracy_pct": 100.0,
         "note.midi_pct": 100.0,
         "note.pitch_class_pct": 100.0,

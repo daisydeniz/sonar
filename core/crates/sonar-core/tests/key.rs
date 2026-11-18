@@ -27,8 +27,8 @@ use sonar_core::text::{Key, KeyPrior, Mode, PriorSource};
 const MIN_KEY_ACCURACY: f64 = 0.90;
 /// Required note accuracy (exact MIDI).
 const MIN_NOTE_ACCURACY: f64 = 0.95;
-/// Provisional low-tier bound (T10.4 fits the real one): unpitched
-/// material must stay below it.
+/// Stricter than the shipped low-tier bound (`KEY_TIER_MEDIUM` 0.60, T10.4b):
+/// unpitched material must stay below it.
 const LOW_TIER: f32 = 0.3;
 
 /// Decoded, analysed and classified fixture.

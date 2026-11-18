@@ -10,7 +10,7 @@
 //! incorrect, which is what keeps the low tier honest. Files without any
 //! truth statement and files that got no key are not scored.
 //!
-//! ECE: standard 10-bin expected calibration error (Naeini, Cooper &
+//! ECE: 15-bin (shared `ECE_BINS`) expected calibration error (Naeini, Cooper &
 //! Hauskrecht 2015; Guo et al. 2017, "On calibration of modern neural
 //! networks") over `(confidence, correct)`, see [`crate::classify::category::calibrate::ece`].
 
@@ -76,7 +76,7 @@ pub struct KeyCalibration {
     pub bound_high: f64,
     /// See `bound_high`.
     pub bound_medium: f64,
-    /// 10-bin expected calibration error (%).
+    /// 15-bin expected calibration error (%), as category calibration.
     pub ece_pct: f64,
     /// Reliability bins.
     pub bins: Vec<BinRow>,
@@ -255,15 +255,15 @@ mod tests {
         assert!(key_correct(am, key(21, Some(Mode::Minor))), "mod 12");
     }
 
-    /// Hand-computed: high {0.9 ok, 0.8 ok, 0.8 wrong}, medium {0.5 ok,
-    /// 0.4 wrong}, low {0.1 wrong x2}. The atonal files count wrong, files
+    /// Hand-computed: high {0.95 ok, 0.92 ok, 0.92 wrong}, medium {0.75 ok,
+    /// 0.65 wrong}, low {0.1 wrong x2}. The atonal files count wrong, files
     /// without truth or without a key are skipped.
     #[test]
     fn tiers_and_ece_match_hand_computation() {
         let c = key(0, Some(Mode::Major));
         let d = key(2, Some(Mode::Major));
         let mut a = KeyCalibrationAcc::default();
-        for (conf, got) in [(0.9, c), (0.8, c), (0.8, d), (0.5, c), (0.4, d)] {
+        for (conf, got) in [(0.95, c), (0.92, c), (0.92, d), (0.75, c), (0.65, d)] {
             a.add(Some(c), false, Some((got, conf)));
         }
         a.add(None, true, Some((c, 0.1)));
@@ -276,9 +276,10 @@ mod tests {
         assert_eq!((row(0), row(1), row(2)), ((3, 2), (2, 1), (2, 0)));
         assert!((k.tiers[0].accuracy_pct - 200.0 / 3.0).abs() < 1e-9);
         assert!(k.monotone && k.high_ok == Some(false) && k.medium_ok == Some(false));
-        // Bins: 0.1 -> n2 acc 0 |0.1-0|; 0.4 -> n1 acc 0 gap .4; 0.5 -> n1
-        // acc 1 gap .5; 0.8 -> n2 acc .5 conf .8 gap .3; 0.9 -> n1 acc 1 gap .1.
-        let want = (2.0 * 0.1 + 0.4 + 0.5 + 2.0 * 0.3 + 0.1) / 7.0 * 100.0;
+        // ECE uses 15 bins (ECE_BINS): 0.1 -> n2 acc 0 gap .1; 0.65 -> n1
+        // gap .65; 0.75 -> n1 acc 1 gap .25; 0.92 -> n2 acc .5 gap .42;
+        // 0.95 -> n1 acc 1 gap .05.
+        let want = (2.0 * 0.1 + 0.65 + 0.25 + 2.0 * 0.42 + 0.05) / 7.0 * 100.0;
         assert!((k.ece_pct - want).abs() < 1e-4, "{} vs {want}", k.ece_pct);
     }
 
@@ -287,8 +288,8 @@ mod tests {
         let c = key(0, None);
         let wrong = key(1, None);
         let mut a = KeyCalibrationAcc::default();
-        a.add(Some(c), false, Some((wrong, 0.9)));
-        a.add(Some(c), false, Some((c, 0.5)));
+        a.add(Some(c), false, Some((wrong, 0.95)));
+        a.add(Some(c), false, Some((c, 0.7)));
         let k = a.finish().unwrap();
         assert!(!k.monotone && k.high_ok == Some(false) && k.medium_ok == Some(true));
         assert_eq!(k.tier_acc(KeyTier::Low), None);
