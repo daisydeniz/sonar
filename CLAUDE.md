@@ -37,10 +37,11 @@ approval; make reasonable decisions, record them (ADR / STATUS log), continue.
    otherwise add one line to ROADMAP `## Later`. If something non-critical is
    still open after round 2, move it to `## Later` and finish the task.
 6. For analysis/search changes: run eval (`eval` subagent) and compare to
-   BASELINE; regressions follow the rule in EVAL.md. If `$SONAR_SILVER_DIR`
-   and/or `$SONAR_GOLDEN_DIR` are set (the founder's real samples, read-only),
-   also run `--silver` / `--golden` on them once `sonar eval` supports it and
-   report those numbers next to the fixture numbers in the STATUS log entry.
+   BASELINE; regressions follow the rule in EVAL.md. Also run
+   `scripts/eval-real.sh` (silver = `Samples/`, golden = `eval/golden/`, the
+   founder's real samples, read-only; never type `$SONAR_*` variables in a
+   command, headless sessions deny them) and report those numbers next to the
+   fixture numbers in the STATUS log entry.
 6b. For UI changes (anything under `app/Sonar` that is visible): run
    `scripts/ui-snapshots.sh`, open the changed screens' PNGs in `logs/ui/`
    (light and dark) yourself, and give the paths to the reviewer. Fix what
@@ -148,6 +149,7 @@ re-review finished phases. After the merge in step 8: `rm -f logs/handoff.md`.
 - `scripts/bootstrap.sh` — toolchain setup/check (macOS).
 - `scripts/check.sh` — all quality gates (fmt, clippy, tests, deny,
   fixtures eval, xcodebuild when `app/project.yml` exists).
+- `scripts/eval-real.sh` — `sonar eval` on the founder's real samples (silver `Samples/`, golden `eval/golden/`).
 - `scripts/design-lint.sh` — design-token gate (no exemption list; per-line `// design-lint:allow <reason>`).
 - `scripts/ui-snapshots.sh` — light/dark PNGs of the main screens in `logs/ui/`.
 - `scripts/autopilot.sh` — runs the loop unattended (founder starts it).

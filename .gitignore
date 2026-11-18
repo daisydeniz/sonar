@@ -22,3 +22,5 @@ logs/
 # Founder's local sample packs (copyrighted audio, never in git)
 Samples/
 dist/
+# Local editor files
+.idea/

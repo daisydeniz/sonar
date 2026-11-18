@@ -29,8 +29,7 @@ Principles
 Design (docs/DESIGN.md, ADR-039)
 - Only `Theme` tokens and `DesignSystem/Components`; no literal colours,
   paddings, radii or font sizes in feature code (`scripts/design-lint.sh`
-  must stay green; remove the files you restyle from
-  `scripts/design-lint-pending.txt`).
+  must stay green).
 - System control before custom component. Standard chrome (sidebar, toolbar,
   inspector container, sheets) is never custom-drawn; no blur/glass/shadow in
   the content layer.

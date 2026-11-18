@@ -14,4 +14,7 @@ You own measurement. Read `docs/EVAL.md` and `CLAUDE.md`.
   `eval/reports/BASELINE.md` only when the orchestrator accepts new numbers.
 - Always report deltas vs baseline and flag regressions per the EVAL.md rule.
 - Metrics code is tested itself (small hand-computed cases).
+- Real samples: run `scripts/eval-real.sh` (silver `Samples/`, golden
+  `eval/golden/labels.csv`); never type `$SONAR_*` in a command (denied in
+  headless sessions).
 - Never fabricate numbers; if a dataset is missing, say so.
