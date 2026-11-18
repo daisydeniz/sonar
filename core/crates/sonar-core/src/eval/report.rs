@@ -223,6 +223,9 @@ fn tier_markdown(s: &mut String, t: &TierReport, baseline: Option<&Baseline>) {
             let _ = writeln!(s, "| {} | {:.2} | {:.2} |", r.name, r.p10_pct, r.mrr_pct);
         }
     }
+    if let Some(k) = &m.key_calibration {
+        super::key_calib::markdown(s, k);
+    }
     if let Some(c) = &m.category {
         super::category::markdown(s, c);
     }

@@ -65,6 +65,9 @@ pub struct Labels {
     pub note_midi: Option<u8>,
     /// Category (`docs/categories.md`).
     pub category: Option<Category>,
+    /// Known to have no tonal content at all (fixture drums / noise): any
+    /// key emitted for it is wrong (key calibration only).
+    pub atonal: bool,
     /// Decoding is expected to fail (corrupt fixture).
     pub expect_error: bool,
     /// Fixture sound family: relevance class of the similarity metric
@@ -80,6 +83,7 @@ impl Labels {
             || self.key.is_some()
             || self.note_midi.is_some()
             || self.category.is_some()
+            || self.atonal
             || self.expect_error
     }
 }
@@ -180,6 +184,25 @@ pub fn fixtures_dataset(manifest: &Manifest, dir: &Path) -> Dataset {
                 .category
                 .filter(|_| t.corrupt.is_none())
                 .and_then(|c| fixture_category(c, t.kind)),
+            // Percussion and noise without a key or note truth (a sine
+            // burst or a sine test tone is not "atonal", it just has no
+            // label).
+            atonal: t.key.is_none()
+                && t.note_midi.is_none()
+                && t.corrupt.is_none()
+                && (t.kind == Some(TruthKind::Noise)
+                    || matches!(
+                        t.category,
+                        Some(
+                            TruthCategory::Kick
+                                | TruthCategory::Snare
+                                | TruthCategory::HatClosed
+                                | TruthCategory::HatOpen
+                                | TruthCategory::Drums
+                                | TruthCategory::Click
+                                | TruthCategory::Noise
+                        )
+                    )),
             expect_error: t.corrupt.is_some(),
             family: fixture_family(f).map(str::to_string),
         };

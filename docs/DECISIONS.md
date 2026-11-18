@@ -1278,3 +1278,12 @@ the engine fails to open).
   `1 − (1−a)(1−c)`, chroma mode kept only if `a ≥ 0.2`; else T10.2's
   stronger-wins `w·(1−l)`; then fused with the name as before. Stored as a
   mode-less `key` (as one-shot notes), no schema change; `KEY_VERSION` 4.
+- **Implementation (T10.4)**: `key::tier` (`KEY_TIER_HIGH` 0.75,
+  `KEY_TIER_MEDIUM` 0.30, `KeyTier`, `key_tier`; FFI `key_tier_high()` /
+  `key_tier_medium()`), `eval::key_calib` (tier table, 10-bin ECE; a key on a
+  drum/noise fixture is wrong; definition in EVAL.md). Fitted on fixtures
+  (names hidden): wrong keys <= 0.24, correct >= 0.80, so 0.75 leaves margin
+  to the lowest correct key and 0.30 keeps the provisional T10.2 bound; high
+  100 % (68/68), ECE 3.74 %. The medium band is empty on fixtures, so its
+  60 % target is unvalidated until a silver run; re-fit there. No analysis
+  change.

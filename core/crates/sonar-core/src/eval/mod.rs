@@ -20,6 +20,7 @@ mod csv;
 pub mod dataset;
 mod dump;
 pub mod golden;
+pub mod key_calib;
 pub mod metrics;
 pub mod report;
 pub mod run;

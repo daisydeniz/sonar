@@ -27,6 +27,7 @@ pub mod fuse;
 pub mod note;
 pub mod profiles;
 pub mod root;
+pub mod tier;
 
 #[cfg(test)]
 mod root_tests;
@@ -43,6 +44,7 @@ pub use fuse::{
 };
 pub use note::{Note, NoteTracker};
 pub use root::{loop_root, Root, MIN_ROOT_SHARE};
+pub use tier::{key_tier, KeyTier, KEY_TIER_HIGH, KEY_TIER_MEDIUM};
 
 use crate::classify::{Kind, KindResult};
 use crate::dsp::Features;

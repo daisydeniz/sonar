@@ -119,6 +119,7 @@ fn analyze(item: &Item, with_aspects: bool, opts: &EvalOptions) -> Result<Analys
             kind: a.kind.kind,
             bpm: a.tempo.map(|t| f64::from(t.bpm)),
             key: a.key_note.key.map(|k| k.key),
+            key_conf: a.key_note.key.map_or(0.0, |k| k.confidence),
             note_midi: a.key_note.note.map(|n| n.midi),
             category: Some(category),
         };

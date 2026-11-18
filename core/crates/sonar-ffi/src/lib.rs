@@ -53,6 +53,19 @@ pub fn core_version() -> String {
     sonar_core::version().to_owned()
 }
 
+/// Lower bound of the high key-confidence tier (inclusive, ADR-041).
+#[uniffi::export]
+pub fn key_tier_high() -> f32 {
+    sonar_core::key::KEY_TIER_HIGH
+}
+
+/// Lower bound of the medium key-confidence tier (inclusive, ADR-041);
+/// below it a key is low-tier.
+#[uniffi::export]
+pub fn key_tier_medium() -> f32 {
+    sonar_core::key::KEY_TIER_MEDIUM
+}
+
 /// The valid values for a category override / filter, in taxonomy order.
 #[uniffi::export]
 pub fn category_ids() -> Vec<String> {

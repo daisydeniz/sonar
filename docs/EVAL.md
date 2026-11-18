@@ -130,6 +130,48 @@ worst 0.046 LU.
 | Latency | search p50/p95 at 500k docs | p95 < 50 ms |
 | Throughput | scan files/s, analysis files/s | ≥ 2,000 / ≥ 100 |
 
+### Key calibration (T10.4, ADR-041)
+Every non-silent file gets a key with a confidence; the UI shows it as one of
+three tiers cut at `KEY_TIER_HIGH` / `KEY_TIER_MEDIUM` (`core/.../key/tier.rs`,
+exported by the FFI as `key_tier_high()` / `key_tier_medium()`; inclusive
+lower bounds). `sonar eval` (fixtures and `--silver`, names hidden) reports
+per-tier n / correct / accuracy, a 10-bin reliability table and the expected
+calibration error (ECE; Naeini et al. 2015, Guo et al. 2017: `Σ |B|/n ·
+|acc(B) − conf(B)|`, 10 equal-width bins).
+
+**Correct**: the file has tonal truth (key label, else the note label's
+pitch class) and the emitted tonic pitch class matches; when both name a
+mode the modes must agree. A mode-less key (one-shot note, loop root)
+counts correct on the pitch class alone; a mode-less truth compares the
+tonic only. A key emitted for a file known to have **no tonal truth** is
+always **incorrect**: fixtures with no key/note truth that are drums, clicks
+or noise; on silver there is no such label, so files without a key label
+are excluded. Files that got no key are not in any tier (counted apart).
+
+**Targets**: high tier >= 90 %, medium tier >= 60 %, accuracy monotone
+(high >= medium >= low). An empty tier is "n/a", not a failure. Tracked
+metrics: `key.tier_high_acc_pct`, `key.tier_medium_acc_pct` (drop > 1 point
+= regression); `key.ece_pct` is report only (lower is better).
+
+Bounds (fitted T10.4): `KEY_TIER_HIGH` = 0.75, `KEY_TIER_MEDIUM` = 0.30.
+Fixtures, 104 keys (68 on tonal files, 36 on drums / noise):
+
+| Tier | n | Correct | Accuracy (%) |
+|---|---:|---:|---:|
+| high (>= 0.75) | 68 | 68 | 100.00 |
+| medium (0.30-0.75) | 0 | 0 | n/a |
+| low (< 0.30) | 36 | 0 | 0.00 |
+
+ECE 3.74 %; monotone yes. Fixture confidences are bimodal: every wrong key
+(drums, noise) is <= 0.24, every correct one >= 0.80, so any high bound in
+(0.24, 0.80] and any medium bound in [0.24, high) gives the same fixture
+table; the fixtures **cannot validate the medium tier**. Silver (real,
+noisy keys) is where the medium bound is to be re-fitted: run
+`sonar eval --silver <dir>` and move `KEY_TIER_MEDIUM` up (and `KEY_TIER_HIGH`
+down/up) until medium >= 60 % and high >= 90 % hold, keeping the bounds
+monotone and `KEY_TIER_MEDIUM >= 0.3` so drums/noise stay low. No silver
+numbers exist yet (`$SONAR_SILVER_DIR` not readable by the agents).
+
 ### Similarity (P@10, MRR)
 `sonar eval` ranks the evaluated files exactly as `sonar similar` does with
 default weights (ADR-024: library z-score over the evaluated pool, per-aspect

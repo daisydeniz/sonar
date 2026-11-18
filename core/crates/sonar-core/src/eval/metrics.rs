@@ -17,6 +17,7 @@ use crate::text::{Key, Mode};
 
 use super::category::{CategoryAccumulator, CategoryMetrics, CategoryObs};
 use super::dataset::Labels;
+use super::key_calib::{KeyCalibration, KeyCalibrationAcc};
 use super::similarity::SimilarMetrics;
 
 /// BPM tolerance (BPM) of "correct".
@@ -34,6 +35,8 @@ pub struct Observation {
     pub bpm: Option<f64>,
     /// Key (`mode: None` for a one-shot's pitch class).
     pub key: Option<Key>,
+    /// Stored confidence of [`Observation::key`] (0 when there is none).
+    pub key_conf: f32,
     /// MIDI number of the detected one-shot note.
     pub note_midi: Option<u8>,
     /// Category decisions.
@@ -180,6 +183,9 @@ pub struct Metrics {
     pub bpm: Option<BpmMetrics>,
     /// Key.
     pub key: Option<KeyMetrics>,
+    /// Key confidence tiers and ECE, see [`super::key_calib`].
+    #[serde(default)]
+    pub key_calibration: Option<KeyCalibration>,
     /// Note.
     pub note: Option<NoteMetrics>,
     /// Similarity (P@10, MRR), see [`super::similarity`]; set by the runner,
@@ -203,6 +209,7 @@ pub struct Accumulator {
     bpm: BpmMetrics,
     key: KeyMetrics,
     mirex_sum: f64,
+    key_calib: KeyCalibrationAcc,
     note: NoteMetrics,
     category: CategoryAccumulator,
 }
@@ -244,6 +251,14 @@ impl Accumulator {
                 self.mirex_sum += mirex_key_score(want, k);
             }
         }
+        // Tonal truth for the calibration: the key label, else the note's
+        // pitch class (a one-shot has no mode).
+        let truth = labels.key.or(labels.note_midi.map(|m| Key {
+            root: m % 12,
+            mode: None,
+        }));
+        self.key_calib
+            .add(truth, labels.atonal, got.key.map(|k| (k, got.key_conf)));
         if let Some(want) = labels.note_midi {
             self.note.total += 1;
             if let Some(m) = got.note_midi {
@@ -260,11 +275,13 @@ impl Accumulator {
             mut bpm,
             mut key,
             mirex_sum,
+            key_calib,
             mut note,
             category,
         } = self;
         let mut m = Metrics {
             category: category.finish(T_FUSED, T_DSP),
+            key_calibration: key_calib.finish(),
             ..Metrics::default()
         };
         if let Some(p) = pct(kind.correct, kind.total) {
@@ -366,6 +383,7 @@ mod tests {
             kind,
             bpm,
             key,
+            key_conf: 0.0,
             note_midi: note,
             category: None,
         }

@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 
 use super::report::EvalReport;
 use super::run::TierReport;
+use crate::key::KeyTier;
 
 /// Largest tolerated drop of a percentage metric (points); a bigger drop is
 /// a regression (`docs/EVAL.md`).
@@ -71,6 +72,24 @@ pub const METRICS: &[MetricInfo] = &[
         label: "Key MIREX weighted (%)",
         target: ">= 80",
         tracked: true,
+    },
+    MetricInfo {
+        key: "key.tier_high_acc_pct",
+        label: "Key accuracy, high confidence tier (%)",
+        target: ">= 90",
+        tracked: true,
+    },
+    MetricInfo {
+        key: "key.tier_medium_acc_pct",
+        label: "Key accuracy, medium confidence tier (%)",
+        target: ">= 60",
+        tracked: true,
+    },
+    MetricInfo {
+        key: "key.ece_pct",
+        label: "Key confidence ECE (%)",
+        target: "report only",
+        tracked: false,
     },
     MetricInfo {
         key: "note.pitch_class_pct",
@@ -209,6 +228,15 @@ pub fn values(t: &TierReport) -> BTreeMap<String, f64> {
     if let Some(k) = &m.key {
         put("key.exact_pct", k.exact_pct);
         put("key.mirex_pct", k.mirex_pct);
+    }
+    if let Some(c) = &m.key_calibration {
+        put("key.ece_pct", c.ece_pct);
+        if let Some(a) = c.tier_acc(KeyTier::High) {
+            put("key.tier_high_acc_pct", a);
+        }
+        if let Some(a) = c.tier_acc(KeyTier::Medium) {
+            put("key.tier_medium_acc_pct", a);
+        }
     }
     if let Some(n) = &m.note {
         put("note.pitch_class_pct", n.pitch_class_pct);

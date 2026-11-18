@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M10 honest key (M0–M7, M9 done; human-only: T3.7, T7.4, T8.1)
-- Next task: T10.4 (M10 honest key, ADR-041)
+- Next task: T10.5 (M10 honest key, ADR-041)
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
@@ -14,6 +14,7 @@ rustc/cargo 1.99.1 · cargo-deny 0.20.2 · claude 2.1.316 · gh: not installed (
 ## Needs human
 _(Agents list anything that requires the founder: decisions, credentials,
 manual tests, labeled data. Keep each item one line with the task id.)_
+- T10.4 Re-fit key tiers on real files: run `sonar eval --silver <dir>` (names carry keys); medium tier (60 % target) could not be validated on synthetic fixtures.
 - T9.9 `.claude/agents/swift-ui.md` lines 32–33 still say "remove the files you restyle from `scripts/design-lint-pending.txt`" (list deleted; the agent could not edit agent definitions). Delete that clause.
 - T9.1 `git push origin main` failed in the agent shell (2026-11-17: `could not read Username for 'https://github.com'`, no credential in the keychain for this shell). `main` is ahead of `origin/main` locally; run `git push origin main` once from your terminal.
 - T0.1 (optional) For `cargo` in a normal terminal / hand-started `claude`, add to ~/.zprofile: `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"` (scripts and autopilot already handle it). Optional: `brew install gh`.
@@ -46,6 +47,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-18 — T10.4: Key calibration: `sonar eval` prints accuracy per tier + 10-bin ECE (fixtures and `--silver`, names hidden; any key on drum/noise = wrong, mode-less matches on pitch class). Bounds `KEY_TIER_HIGH` 0.75 / `KEY_TIER_MEDIUM` 0.30 in `key/tier.rs`, FFI `key_tier_high()/medium()`. Fixtures: high 68/68 100 %, medium empty, low 0/36, ECE 3.74 %, monotone. Silver not readable from agent shell. New tracked `key.tier_high_acc_pct`. check.sh green; reviewer APPROVE r1. Later: 2 T10.4 items.
 - 2026-11-18 — T10.3: Loop root note (`key/root.rs`): onset segments → YIN note per segment (unpitched <50 ms sustain), ≥ 60 % energy on one pitch class → mode-less key, conf = share × note conf; fused with chroma (same tonic noisy-or, else T10.2 rule). Seeded loops: root 16/16, mixed max conf 0.24, drum loops 0.09, clicks 0; fixtures key 16/16, note 52/52 unchanged. ~10 ms per 30 s loop. KEY_VERSION 4, DSP_VERSION 9, no migration. check.sh green; reviewer APPROVE r1. Later: 2 T10.3 items.
 - 2026-11-18 — T10.2: Fused key with graded confidence (`key/fuse.rs`): ADR-022 gates now ramps multiplying audio confidence; name prior fused (agree → noisy-or, source both; disagree → winner·(1−loser)); every non-silent file gets a key, silence none; note confidence × cos(π·cents/100). Migration 0003 (`key_source` 'both'), KEY_VERSION 3, DSP_VERSION 8, schema 3. Fixtures key/note 100 % unchanged; drum/noise max conf 0.21 (< 0.3). Silver/golden dirs not readable from agent shell. check.sh green; reviewer APPROVE r1. Later: 4 T10.2 items.
-- 2026-11-18 — T10.1: Filename key prior: bracketed `(C)`/`[F#]`/`(Am)`, trailing bare letter with a tonal word (bass, 808, tom, dunun, piano…), lowercase `am`/`gm` only with a BPM/loop word (`fm`/`db`/`ebm` only right after a BPM); new `text/key_context.rs`. 53 new table cases; `Piano_C.wav` deliberately moved from negative to positive. ANALYZER_VERSION 3, KEY_VERSION 2, DSP_VERSION 7 (libraries re-analyze). Fixtures eval unchanged; check.sh green; reviewer APPROVE r1. Later: 3 T10.1 items.
