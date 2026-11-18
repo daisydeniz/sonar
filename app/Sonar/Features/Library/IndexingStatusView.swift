@@ -26,6 +26,7 @@ struct IndexingStatusView: View {
                         .accessibilityLabel("Pause indexing")
                 }
             }
+            .padding(.horizontal, Theme.Space.s8)
         }
     }
 

@@ -60,7 +60,9 @@ struct ContentView: View {
         .onDisappear { searchMonitor.remove() }
         .toolbar {
             ToolbarItem { TrialBadgeView(license: license) }
+            if #available(macOS 26, *) { ToolbarSpacer(.fixed) }
             ToolbarItem { IndexingStatusView(model: model) }
+            if #available(macOS 26, *) { ToolbarSpacer(.fixed) }
             ToolbarItem {
                 Button { showInspector.toggle() } label: { Label("Inspector", systemImage: "sidebar.trailing") }
                     .help("Show or hide the inspector")
