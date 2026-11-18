@@ -41,8 +41,9 @@ use crate::text::{Key, KeyPrior};
 use crate::Result;
 
 /// Version of the key/note definitions; bump when any changes so stored
-/// keys and notes are recomputed.
-pub const KEY_VERSION: u32 = 1;
+/// keys and notes are recomputed. 2 (T10.1): more filename key priors
+/// (bracketed / trailing note letters, lowercase keys).
+pub const KEY_VERSION: u32 = 2;
 /// Minimum share of the band power in sinusoidal peaks for a key.
 pub const MIN_TONAL_RATIO: f32 = 0.5;
 /// A pitch class counts as present at this fraction of the strongest.

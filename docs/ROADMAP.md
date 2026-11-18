@@ -121,6 +121,9 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 
 ## Later (not picked by the loop — founder triages after M8)
 - (from toolbar-header fix) Fixed ToolbarSpacers stay when the trial badge / indexing status is hidden; tie each spacer to its item's condition if the gap is visible.
+- (from T10.1 review) Trailing-letter/bracket key rules also fire on queries (`Piano C` → `key:c|note:c|c`); consider limiting to filenames.
+- (from T10.1 review) `top`/`ride` drum words block a bracketed key without a tonal word (`Top Line Loop (C)`).
+- (from T10.1 review) T10.1 and T10.2 both bump `DSP_VERSION` (full re-analysis); fold into one bump before release.
 - (from T1.7c review) Resume pressed while a failed job is shutting down may start a few files that are stopped immediately.
 - (from T1.7c review) Loop guard against a loop that cannot happen today.
 - (from T1.7c) `cargo deny` advisories check failed once (not in check.sh, no deps changed); cause unconfirmed. (T1.7d: it is `basic-toml` unmaintained via `uniffi-bindgen`; ignore in `deny.toml` with a reason or bump.)

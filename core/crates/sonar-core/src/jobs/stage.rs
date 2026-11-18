@@ -32,8 +32,9 @@ pub const META_VERSION: u32 = 2;
 /// the vector store (ADR-023); bump it also when
 /// [`crate::dsp::aspects::ASPECTS_VERSION`] changes. 6 (T5.3) stores the
 /// DSP + name `category` / `category_conf` / `category_source` (ADR-028);
-/// bump it also when [`crate::classify::CATEGORY_VERSION`] changes.
-pub const DSP_VERSION: u32 = 6;
+/// bump it also when [`crate::classify::CATEGORY_VERSION`] changes. 7
+/// (T10.1) `KEY_VERSION` 2: more filename key priors.
+pub const DSP_VERSION: u32 = 7;
 /// Version of the `embed` stage (T5.2, ADR-027): CLAP audio embedding of
 /// the first 10 s at the native rate resampled to 48 kHz, int8 audio tower,
 /// stored L2-normalised in the embedding store (`index/clap`). Bump it to

@@ -57,7 +57,6 @@ fn filename_prior_table() {
         ("Loop A 120.wav", "120? -"),
         // Negatives: letters/words that are not keys.
         ("A Kick.wav", "- -"),
-        ("Piano_C.wav", "- -"),
         ("FM Bass.wav", "- -"),
         ("EBM Kick -6dB.wav", "- -"),
         // Ambiguous: conflicting values give nothing.
@@ -73,6 +72,67 @@ fn filename_prior_table() {
         ("90 BPM/Pack/Keys/Rhodes Loop.wav", "- -"), // beyond PRIOR_DIR_LEVELS
         ("", "- -"),
         ("/", "- -"),
+    ];
+    for (path, want) in cases {
+        assert_eq!(
+            render(&filename_prior(Path::new(path))),
+            *want,
+            "path {path:?}"
+        );
+    }
+}
+
+/// T10.1: bracketed keys, trailing note letters in tonal names, lowercase
+/// keys with tempo context — and the names that must stay without a key.
+#[test]
+fn filename_key_context_table() {
+    let cases: &[(&str, &str)] = &[
+        // Bracketed keys.
+        ("ABTSRR2 - Tom Loop 08 (C)(120 BPM).wav", "120 C"),
+        ("Bass Loop [F#] 128bpm.wav", "128 F#"),
+        ("Pad (Am).wav", "- Am"),
+        ("Vocal Loop (E) 90bpm.wav", "90 E"),
+        ("Sub [G].wav", "- G"),
+        ("Rhodes Chords (D)(85 BPM).aif", "85 D"),
+        // Trailing note letter in a tonal one-shot name.
+        ("Piano_C.wav", "- C?"),
+        ("Sub Bass C.wav", "- C?"),
+        ("808_Long_02_G.wav", "- G?"),
+        ("Pluck - E.wav", "- E?"),
+        ("Dunun Low F.wav", "- F?"),
+        ("Surdo 3 A.wav", "- A?"),
+        ("Marimba_Hit_B", "- B?"),
+        ("SubBass_D.wav", "- D?"),
+        // Lowercase keys with a BPM or loop word.
+        ("bass_loop_120_am.wav", "120? Am?"),
+        ("synth loop 128bpm gm.wav", "128 Gm?"),
+        ("keys_loop_c#m.wav", "- C#m"),
+        ("pad_90bpm_eb.wav", "90 D#?"),
+        ("arp loop f#.wav", "- F#"),
+        ("loop_120_fm.wav", "120? Fm?"),
+        // Unchanged / negatives.
+        ("Fm_Bass.wav", "- Fm"),
+        ("Fm_Bass_Growl.wav", "- Fm"),
+        ("Kick -6dB.wav", "- -"),
+        ("Bass Loop -6 db 120bpm.wav", "120 -"),
+        ("fm_bass_loop_120.wav", "120? -"),
+        ("ebm kick loop 120bpm.wav", "120 -"),
+        ("am bass.wav", "- -"),
+        ("gm synth.wav", "- -"),
+        ("Kick B.wav", "- -"),
+        ("Snare E.wav", "- -"),
+        ("Vol A.wav", "- -"),
+        ("Take B.wav", "- -"),
+        ("Bass Take B.wav", "- -"),
+        ("Synth Vol A.wav", "- -"),
+        ("Kick (A).wav", "- -"),
+        ("Kick Loop (A) 120bpm.wav", "120 -"),
+        ("Bass E Long.wav", "- -"),
+        ("a bass e.wav", "- -"),
+        ("Bass_C_01.wav", "- -"),
+        ("Lead C2.wav", "- -"),
+        ("Pad Am (C).wav", "- Am"),
+        ("Bass (C)/Kick.wav", "- C@dir"),
     ];
     for (path, want) in cases {
         assert_eq!(

@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M10 honest key (M0–M7, M9 done; human-only: T3.7, T7.4, T8.1)
-- Next task: T10.1 (M10 honest key, founder request 2026-11-18, ADR-041)
+- Next task: T10.2 (M10 honest key, ADR-041)
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
@@ -46,6 +46,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-18 — T10.1: Filename key prior: bracketed `(C)`/`[F#]`/`(Am)`, trailing bare letter with a tonal word (bass, 808, tom, dunun, piano…), lowercase `am`/`gm` only with a BPM/loop word (`fm`/`db`/`ebm` only right after a BPM); new `text/key_context.rs`. 53 new table cases; `Piano_C.wav` deliberately moved from negative to positive. ANALYZER_VERSION 3, KEY_VERSION 2, DSP_VERSION 7 (libraries re-analyze). Fixtures eval unchanged; check.sh green; reviewer APPROVE r1. Later: 3 T10.1 items.
 - 2026-11-18 — T9.9: Reviewer design pass over all 26 snapshot screens × light/dark against DESIGN §6: APPROVE r1, no blockers. Fixed NITs: `surfaceContent` now behind every detail state (onboarding/error/duplicates were on window bg), onboarding drop hint `.secondary` (contrast), min window height 520 per §3. Lint pending list and its handling deleted. check.sh green. M9 done → ROADMAP COMPLETE. Later: 3 T9.9 items.
 - 2026-11-18 — T9.8: Onboarding, engine-failed, license gate/enter sheet, duplicates and all Settings tabs on tokens; onboarding/gate/engine-failed use `EmptyStateView` (now generic with an `extra` slot, `.contain` a11y, opt-in Return shortcut); new `StatusBadge` component (online/offline, exact/near), DESIGN §4.6/§4.10/§4.11. Lint pending list empty. 9 new snapshot screens (main-error, settings-*, license-gate, license-enter). check.sh green; reviewer APPROVE r1, 1 NIT fixed. Later: 3 T9.8 items.
-- 2026-11-18 — T9.7: Sidebar `.sidebar` list with `+` in Libraries/Collections section headers (fake Add rows gone), count badges, offline library dimmed with warning symbol; IndexingStatusView (progress bar + monospaced counter) and StatusBannerView (one 36 pt line on surfaceRaised, warning symbol, dismiss, no tint) on tokens and off the lint pending list (7 left); TrialBadgeView moved to its own file. Token `indexingProgressWidth`. Snapshots `main-indexing`, `main-indexing-paused`, `main-banner`. check.sh green; reviewer APPROVE r1, 1 NIT fixed. Later: 3 T9.7 items.

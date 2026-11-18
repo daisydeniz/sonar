@@ -96,6 +96,24 @@ fn tokenize_table() {
         ("Loop A 120", "loop a 120bpm|120"),
         // Bare note letter right after a BPM.
         ("Loop_120_C", "loop 120bpm|120 key:c|note:c|c"),
+        // T10.1: bracketed / trailing note letters, lowercase keys.
+        (
+            "ABTSRR2 - Tom Loop 08 (C)(120 BPM).wav",
+            "abtsrr 2 tom loop key:c|note:c|c 120bpm|120",
+        ),
+        ("Sub [G]", "sub key:g|note:g|g"),
+        ("Piano_C.wav", "piano key:c|note:c|c"),
+        ("Sub Bass C", "sub bass key:c|note:c|c"),
+        ("bass_loop_120_am", "bass loop 120bpm|120 key:am|note:a|am"),
+        (
+            "synth loop 128bpm gm",
+            "synth loop 128bpm|128 key:gm|note:g|gm",
+        ),
+        ("fm_bass_loop_120", "fm bass loop 120bpm|120"),
+        ("Bass Take B", "bass take b"),
+        ("Kick Loop (A) 120bpm", "kick loop a 120bpm|120"),
+        ("Snare E", "snare e"),
+        ("loop -6 db 120bpm", "loop 6 db 120bpm|120"),
         // Technical noise and versions.
         ("24bit 44.1kHz Kick", "kick"),
         ("Kick 48k", "kick"),

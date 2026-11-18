@@ -10,8 +10,8 @@
 //! - lowercase note letter: only with an unambiguous accidental (`#`, `♯`,
 //!   `♭`, `sharp`, `flat`) or a long mode (`min`, `maj`, …): `c#m`, `cmin`
 //!   are keys; `am`, `fm`, `eb`, `bb` are words;
-//! - a bare letter (`A`, `C`) is never a key on its own (see `tokenize` for
-//!   the context rule).
+//! - a bare letter (`A`, `C`) and the lowercase short forms (`am`, `eb`)
+//!   are never keys on their own (see `key_context` for the context rules).
 
 use std::fmt;
 

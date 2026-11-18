@@ -166,7 +166,7 @@ impl Tokenizer {
             };
             let raw = &text[u.start..u.end];
             match u.kind {
-                UnitKind::Noise | UnitKind::BareNote(_) => {}
+                UnitKind::Noise | UnitKind::BareNote(_) | UnitKind::LowerKey(_) => {}
                 UnitKind::Word => {
                     let w = fold(raw);
                     // Empty after folding: a lone combining mark.
@@ -261,15 +261,16 @@ const MEDIA_EXTENSIONS: &[&str] = &[
     "ogg", "opus", "rex", "rx2", "wav", "wave", "wv",
 ];
 
+/// True for a media file extension (`wav`, `AIFF`; no dot).
+pub(crate) fn is_media_extension(ext: &str) -> bool {
+    MEDIA_EXTENSIONS.iter().any(|e| e.eq_ignore_ascii_case(ext))
+}
+
 /// `name` without a trailing media extension (`Kick.Hard.wav` →
 /// `Kick.Hard`; `Loop 92.5 BPM` is unchanged).
 pub fn strip_audio_extension(name: &str) -> &str {
     match name.rsplit_once('.') {
-        Some((stem, ext))
-            if !stem.is_empty() && MEDIA_EXTENSIONS.iter().any(|e| e.eq_ignore_ascii_case(ext)) =>
-        {
-            stem
-        }
+        Some((stem, ext)) if !stem.is_empty() && is_media_extension(ext) => stem,
         _ => name,
     }
 }

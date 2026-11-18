@@ -12,13 +12,15 @@
 //!   candidate. `Kick 75` stays a number; `Bass Loop 128` is 128 BPM.
 //! - **Keys**: see [`super::music`]; a note followed by a mode word
 //!   (`A minor`, `F# Min`, `AMinor`) is a key in any case.
-//! - **Bare note letter** (`C`): a key only if uppercase, alone in its run,
-//!   directly after a BPM unit, and the segment has no strong key
-//!   (`Loop_120_C` → C; `A Kick`, `Kick A`, `Loop A 120` → words).
+//! - **Bare note letter** (`C`) and **lowercase keys** (`am`): keys only
+//!   with context, see [`super::key_context`] (`Loop_120_C`, `Bass_C`,
+//!   `Tom Loop (C)(120 BPM)`, `loop_120bpm_am` → keys; `A Kick`, `Kick A`,
+//!   `Loop A 120`, `Bass Take B`, `fm bass` → words).
 //! - **Noise**: zero-padded numbers (`01`, take/index numbers), versions
 //!   (`v2`, `V1.2`), a number with a technical unit (`24bit`, `44.1kHz`,
 //!   `48k`), common sample rates (`44100`).
 
+use super::key_context::resolve_keys;
 use super::lex::{Piece, PieceKind};
 use super::music::{
     is_bpm_marker, is_loop_word, is_sample_rate, is_tech_unit, parse_key_piece, parse_key_query,
@@ -46,6 +48,9 @@ pub(crate) enum UnitKind {
     },
     /// Lone uppercase note letter, pending the context rule.
     BareNote(Key),
+    /// Lowercase key spelling (`am`, `eb`) in a name, pending the context
+    /// rule (see [`super::key_context`]).
+    LowerKey(Key),
     Noise,
 }
 
@@ -197,9 +202,10 @@ impl Ctx<'_> {
                 upper_letter: true,
                 accidental: false,
             }) if self.standalone(i) => (UnitKind::BareNote(key), i),
-            _ => match self.rules.query.then(|| parse_key_query(raw)).flatten() {
-                Some(key) => (UnitKind::Key { key, bare: false }, i),
-                None => (UnitKind::Word, i),
+            _ => match parse_key_query(raw) {
+                Some(key) if self.rules.query => (UnitKind::Key { key, bare: false }, i),
+                Some(key) if self.standalone(i) => (UnitKind::LowerKey(key), i),
+                _ => (UnitKind::Word, i),
             },
         }
     }
@@ -272,14 +278,5 @@ fn resolve_segment(cx: &Ctx<'_>, units: &mut [Unit]) {
         }
     }
 
-    for k in 0..units.len() {
-        if let UnitKind::BareNote(key) = units[k].kind {
-            let after_bpm = k > 0 && matches!(units[k - 1].kind, UnitKind::Bpm { .. });
-            units[k].kind = if after_bpm && !strong_key {
-                UnitKind::Key { key, bare: true }
-            } else {
-                UnitKind::Word
-            };
-        }
-    }
+    resolve_keys(cx.text, units, strong_key);
 }

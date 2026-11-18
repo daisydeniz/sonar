@@ -18,6 +18,7 @@
 //! [`crate::search`]; the Tantivy wrapper is in [`crate::index`].
 //! Recognition rules: see `recognize.rs` and [`music`].
 
+mod key_context;
 mod lex;
 pub mod music;
 mod plural;
@@ -33,8 +34,9 @@ mod tokenize_tests;
 
 /// Version of the analysis chain. Bump whenever the tokens produced for a
 /// given input change: the text index is rebuilt on a mismatch (ADR-017).
-/// 1 = T2.1, 2 = plural folding (T2.2).
-pub const ANALYZER_VERSION: u32 = 2;
+/// 1 = T2.1, 2 = plural folding (T2.2), 3 = bracketed / trailing note
+/// letters and lowercase keys in names (T10.1).
+pub const ANALYZER_VERSION: u32 = 3;
 
 pub(crate) use lex::fold;
 pub use music::{Key, Mode};
