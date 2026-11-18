@@ -113,11 +113,7 @@ pub fn get_key_pitch(conn: &Connection, file_id: i64) -> Result<Option<KeyPitch>
     let Some((key, key_conf, source, pitch, pitch_conf)) = raw else {
         return Ok(None);
     };
-    let key_source = match source.as_deref() {
-        Some("detected") => Some(KeySource::Detected),
-        Some("filename") => Some(KeySource::Filename),
-        _ => None,
-    };
+    let key_source = source.as_deref().and_then(KeySource::parse);
     let pitch_midi = pitch
         .filter(|m| m.fract() == 0.0 && (0.0..=127.0).contains(m))
         .map(|m| m as u8);
@@ -192,6 +188,14 @@ mod tests {
             })
             .unwrap();
         assert_eq!(stored, "C#");
+        for source in [KeySource::Detected, KeySource::Filename, KeySource::Both] {
+            let v = KeyPitch {
+                key_source: Some(source),
+                ..row(None)
+            };
+            store.put_key_pitch(id, &v).unwrap();
+            assert_eq!(store.key_pitch(id).unwrap(), Some(v));
+        }
         store.put_key_pitch(id, &KeyPitch::default()).unwrap();
         assert_eq!(store.key_pitch(id).unwrap(), Some(KeyPitch::default()));
     }

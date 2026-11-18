@@ -3,7 +3,7 @@
 
 use super::profiles::{harmonic_expand, key_of_index, key_scores, rotated_correlation};
 use super::*;
-use crate::classify::{classify_kind, KindScores};
+use crate::classify::{classify_kind, KindScores, KindSource};
 use crate::decode::ANALYSIS_RATE;
 use crate::dsp::Analyzer;
 use crate::text::{Mode, PriorSource};
@@ -187,40 +187,102 @@ fn cadences_give_their_key_in_tune_and_detuned() {
 }
 
 #[test]
-fn untonal_input_has_no_key_unless_named() {
+fn untonal_input_gets_a_low_confidence_guess_or_the_name() {
     let n = SR as usize;
     let single = tone(69.0, &[1.0], 1.0, f64::INFINITY);
-    for x in [
-        noise(0.5, n),
-        vec![0.0; n],
-        Vec::new(),
-        single,
-        vec![f32::NAN; n],
-    ] {
+    let kicked = kick(160.0, 48.0, 0.03, 0.15, 0.5);
+    // Audible but not tonal: a best guess near confidence 0.
+    for x in [noise(0.5, n), single, kicked] {
+        let f = features(&x);
+        let k = estimate_key(&f, None).expect("best guess");
+        assert_eq!(k.source, KeySource::Detected);
+        assert!(k.confidence < 0.1, "{k:?}");
+        // A disagreeing (or agreeing) name outweighs it: low-medium.
+        let named = estimate_key(&f, Some(prior(2, Some(Mode::Minor), true))).expect("prior");
+        assert_eq!(named.key, key(2, Mode::Minor));
+        assert_eq!(named.source, KeySource::Filename);
+        assert!(
+            named.confidence <= NAME_CONF_EXPLICIT + 1e-6 && named.confidence > 0.4,
+            "{named:?}"
+        );
+    }
+    // No energy at all: nothing from the audio, only a name.
+    for x in [vec![0.0; n], Vec::new(), vec![f32::NAN; n]] {
         let f = features(&x);
         assert_eq!(estimate_key(&f, None), None);
         let named = estimate_key(&f, Some(prior(9, Some(Mode::Minor), true))).expect("prior");
-        assert_eq!(named.key, key(9, Mode::Minor));
         assert_eq!(
-            (named.source, named.confidence),
-            (KeySource::Filename, NAME_CONF_EXPLICIT)
+            (named.key, named.source, named.confidence),
+            (key(9, Mode::Minor), KeySource::Filename, NAME_CONF_EXPLICIT)
         );
     }
-    let bare = estimate_key(&features(&noise(0.5, n)), Some(prior(0, None, false))).unwrap();
+    let bare = estimate_key(&features(&vec![0.0; n]), Some(prior(0, None, false))).unwrap();
     assert_eq!((bare.key.mode, bare.confidence), (None, NAME_CONF_BARE));
+}
+
+#[test]
+fn tonality_factor_is_one_past_the_old_gates_and_zero_below_floors() {
+    let tc = |ratio: f32, classes: usize| TonalChroma {
+        chroma: std::array::from_fn(|i| if i < classes { 1.0 } else { 0.0 }),
+        tuning: 0.0,
+        tonal_ratio: ratio,
+    };
+    assert_eq!(tonality(&tc(0.6, 4), 0.7), 1.0);
+    assert!(is_tonal(&tc(0.6, 4)));
+    assert_eq!(tonality(&tc(0.2, 4), 0.7), 0.0);
+    assert_eq!(tonality(&tc(0.6, 1), 0.7), 0.0);
+    assert_eq!(tonality(&tc(0.6, 4), 0.2), 0.0);
+    assert!((tonality(&tc(0.375, 2), 0.7) - 0.25).abs() < 1e-6);
+    assert_eq!(tonality(&tc(f32::NAN, 4), f32::NAN), 0.0);
 }
 
 #[test]
 fn agreeing_prior_raises_confidence_and_wins_close_calls() {
     let f = features(&progression(&cadence(9, Mode::Minor), 0.6, 0.0));
     let plain = estimate_key(&f, None).expect("key");
+    assert_eq!(plain.source, KeySource::Detected);
     let agree = estimate_key(&f, Some(prior(9, None, true))).expect("key");
     assert_eq!(agree.key, plain.key);
+    assert_eq!(agree.source, KeySource::Both);
     assert!(agree.confidence > plain.confidence);
     // The relative major named in the file: the bonus outweighs a small
-    // margin only; a clear minor cadence stays minor.
+    // margin only; a clear minor cadence stays minor, at lower confidence.
     let other = estimate_key(&f, Some(prior(0, Some(Mode::Major), true))).expect("key");
     assert_eq!(other.key, key(9, Mode::Minor));
+    assert_eq!(other.source, KeySource::Detected);
+    assert!(other.confidence < plain.confidence, "{other:?} {plain:?}");
+}
+
+#[test]
+fn fusion_rule() {
+    let am = key(9, Mode::Minor);
+    let p = |explicit| Some(prior(9, Some(Mode::Minor), explicit));
+    let close = |a: f32, b: f32| (a - b).abs() < 1e-6;
+    // Agree: noisy-or; too weak audio leaves the value to the name.
+    let k = fuse::fuse(Some((am, 0.8)), p(true)).unwrap();
+    assert!(close(k.confidence, 0.9) && k.source == KeySource::Both);
+    let k = fuse::fuse(Some((am, 0.1)), p(true)).unwrap();
+    assert!(close(k.confidence, 0.5) && k.source == KeySource::Filename);
+    // A mode-less note on the named root takes the name's mode.
+    let k = fuse::fuse(
+        Some((
+            Key {
+                root: 9,
+                mode: None,
+            },
+            0.7,
+        )),
+        p(false),
+    )
+    .unwrap();
+    assert_eq!((k.key, k.source), (am, KeySource::Both));
+    // Disagree: the stronger wins, discounted by the other.
+    let c = key(0, Mode::Major);
+    let k = fuse::fuse(Some((c, 0.8)), p(true)).unwrap();
+    assert!(close(k.confidence, 0.4) && k.key == c && k.source == KeySource::Detected);
+    let k = fuse::fuse(Some((c, 0.2)), p(true)).unwrap();
+    assert!(close(k.confidence, 0.4) && k.key == am && k.source == KeySource::Filename);
+    assert_eq!(fuse::fuse(None, None), None);
 }
 
 #[test]
@@ -251,6 +313,11 @@ fn notes_of_sines_and_harmonic_tones_are_exact() {
     let n = tr.detect(&tone(60.3, &saw(), 1.0, 0.5)).unwrap().unwrap();
     assert_eq!(n.midi, 60);
     assert!((n.cents - 30.0).abs() < 3.0, "{n:?}");
+    // Confidence falls with |cents|: near 0 close to a quarter tone.
+    let in_tune = tr.detect(&tone(60.0, &saw(), 1.0, 0.5)).unwrap().unwrap();
+    let far = tr.detect(&tone(60.47, &saw(), 1.0, 0.5)).unwrap().unwrap();
+    assert!(in_tune.confidence > n.confidence && n.confidence > far.confidence);
+    assert!(far.confidence < 0.15, "{far:?}");
     assert_eq!((n.name(), n.pitch_class()), ("C4".to_owned(), 0));
     // 10 ms blip: shorter than a YIN frame.
     let blip = tone(81.0, &[1.0], 0.01, f64::INFINITY);
@@ -315,7 +382,8 @@ fn key_and_note_gating() {
     assert_eq!(k.key, key(9, Mode::Minor));
     assert!(k.confidence >= NAME_CONF_EXPLICIT);
     let other = key_and_note(&kind, &f, &pluck, &mut tr, Some(prior(2, None, true)));
-    assert_eq!(other.unwrap().key.unwrap().key.root, 9);
+    let other = other.unwrap().key.unwrap();
+    assert_eq!((other.key.root, other.source), (9, KeySource::Detected));
     // Loops get no note; a chord loop gets the chroma key.
     let x = progression(&cadence(7, Mode::Major), 0.5, 0.0);
     let fl = features(&x);
@@ -331,15 +399,16 @@ fn key_and_note_gating() {
         (kn.note, kn.key.map(|k| k.key)),
         (None, Some(key(7, Mode::Major)))
     );
-    // Silent fallback: only the name.
+    // Silence: no key, not even the name's.
     let silent = vec![0.0f32; 4000];
     let fs = features(&silent);
-    let fallback = result(Kind::OneShot, KindSource::Fallback);
+    let fallback = classify_kind(&fs, 0.2, None);
+    assert!(fallback.scores.silent);
     let kn = key_and_note(&fallback, &fs, &silent, &mut tr, None).unwrap();
     assert_eq!(kn, KeyNote::default());
     let p = Some(prior(4, Some(Mode::Minor), false));
     let kn = key_and_note(&fallback, &fs, &silent, &mut tr, p).unwrap();
-    assert_eq!(kn.key.map(|k| k.source), Some(KeySource::Filename));
+    assert_eq!(kn, KeyNote::default());
 }
 
 /// Release timing per 30 s file: `cargo test --release -p sonar-core

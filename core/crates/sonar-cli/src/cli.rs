@@ -173,10 +173,12 @@ pub enum Command {
         no_names: bool,
     },
 
-    /// Estimate the musical key (tonal chroma vs. key profiles, with a
-    /// lower-weight key from the names) and, for pitched one-shots, the
-    /// note (YIN). Drums, noise and silence get neither. Unreadable files
-    /// are reported and skipped; exits non-zero if any failed.
+    /// Estimate the musical key (tonal chroma vs. key profiles, fused with
+    /// a key from the names) with a graded confidence and its source
+    /// (detected / filename / both) and, for pitched one-shots, the note
+    /// (YIN). Drums and noise get a low-confidence best guess, silence
+    /// nothing. Unreadable files are reported and skipped; exits non-zero
+    /// if any failed.
     Key(crate::key_cmd::KeyArgs),
 
     /// Measure loop/one-shot, BPM, key and note accuracy against fixtures,

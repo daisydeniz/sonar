@@ -82,7 +82,8 @@ Location: `~/Library/Application Support/Sonar/` (override with
    peak_db, loudness_lufs)`
 - `analysis(file_id, kind, kind_conf, bpm, bpm_conf, bpm_source, key,
    key_conf, key_source, pitch_midi, pitch_conf, category, category_conf,
-   category_source)` — `*_source ∈ {filename, detected}`
+   category_source)` — `*_source ∈ {filename, detected}`; `key_source` also
+   `both` (audio and name agree, ADR-041, migration 0003)
 - User data (never touched by re-analysis):
   `overrides(file_id, field, value)`, `tags`, `file_tags`, `collections`,
   `collection_items`, `favorites`, `hidden`.

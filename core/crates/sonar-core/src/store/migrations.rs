@@ -41,6 +41,10 @@ pub(crate) const MIGRATIONS: &[Migration] = &[
         name: "0002_file_stages",
         sql: include_str!("migrations/0002_file_stages.sql"),
     },
+    Migration {
+        name: "0003_key_source_both",
+        sql: include_str!("migrations/0003_key_source_both.sql"),
+    },
 ];
 
 /// Latest schema version this build can create and read.
@@ -175,6 +179,52 @@ mod tests {
         assert_eq!(LATEST_VERSION, MIGRATIONS.len() as i64);
         assert_eq!(MIGRATIONS.first().map(|m| m.name), Some("0001_init"));
         assert_eq!(MIGRATIONS.get(1).map(|m| m.name), Some("0002_file_stages"));
+        assert_eq!(
+            MIGRATIONS.get(2).map(|m| m.name),
+            Some("0003_key_source_both")
+        );
+    }
+
+    /// 0003 rebuilds `analysis`: rows (and their cascade) survive, and
+    /// `key_source = 'both'` becomes valid.
+    #[test]
+    fn key_source_both_keeps_rows() {
+        let mut conn = mem();
+        assert_eq!(migrate(&mut conn, &MIGRATIONS[..2]).ok(), Some(2));
+        let both = "INSERT INTO analysis (file_id, key_source) VALUES (2, 'both')";
+        let seed = conn.execute_batch(
+            "INSERT INTO libraries (id, root_path, added_at) VALUES (1, '/l', 0);
+             INSERT INTO files (id, library_id, rel_path, size, mtime) VALUES (1, 1, 'a', 1, 0);
+             INSERT INTO files (id, library_id, rel_path, size, mtime) VALUES (2, 1, 'b', 1, 0);
+             INSERT INTO analysis (file_id, bpm, key, key_conf, key_source)
+               VALUES (1, 120.0, 'Am', 0.8, 'detected');",
+        );
+        assert!(seed.is_ok(), "{seed:?}");
+        assert!(conn.execute(both, []).is_err());
+        assert_eq!(migrate(&mut conn, MIGRATIONS).ok(), Some(1));
+        let row = conn.query_row(
+            "SELECT bpm, key, key_conf, key_source FROM analysis WHERE file_id = 1",
+            [],
+            |r| {
+                Ok((
+                    r.get::<_, f64>(0)?,
+                    r.get::<_, String>(1)?,
+                    r.get::<_, f64>(2)?,
+                    r.get::<_, String>(3)?,
+                ))
+            },
+        );
+        assert_eq!(
+            row.ok(),
+            Some((120.0, "Am".to_owned(), 0.8, "detected".to_owned()))
+        );
+        assert!(conn.execute(both, []).is_ok());
+        assert!(conn
+            .execute(
+                "INSERT INTO analysis (file_id, key_source) VALUES (3, 'x')",
+                []
+            )
+            .is_err());
     }
 
     #[test]

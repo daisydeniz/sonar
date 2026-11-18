@@ -21,7 +21,8 @@
 //!    808 does get one.
 //!
 //! **Confidence** = stable share × (1 − mean aperiodicity of the stable
-//! frames) × (1 − |deviation from the note| in semitones).
+//! frames) × `cos(π · deviation from the note in semitones)` (T10.2: falls
+//! to 0 at ±50 ct, where the nearest note is a coin flip).
 
 use serde::Serialize;
 
@@ -197,13 +198,20 @@ fn summarize(frames: &[YinFrame], scratch: &mut Vec<(f32, f32)>) -> Option<Note>
     }
     let dev = pitch - midi;
     let clarity = 1.0 - (ap_sum / w_sum).clamp(0.0, 1.0);
-    let confidence = (stable.min(1.0) * clarity * (1.0 - dev.abs())).clamp(0.0, 1.0);
+    let confidence = (stable.min(1.0) * clarity * cents_factor(dev)).clamp(0.0, 1.0);
     Some(Note {
         midi: midi as u8,
         cents: (dev * 100.0).clamp(-50.0, 50.0),
         f0_hz: 440.0 * 2f32.powf((pitch - 69.0) / 12.0),
         confidence,
     })
+}
+
+/// Confidence factor of a deviation `dev` (semitones, `−0.5..=0.5`) from the
+/// nearest note: `cos(π·dev)`, 1 in tune, ≈ 0.71 at ±25 ct and 0 at ±50 ct,
+/// where the nearest note is a coin flip (ADR-041).
+fn cents_factor(dev: f32) -> f32 {
+    (std::f32::consts::PI * dev.clamp(-0.5, 0.5)).cos().max(0.0)
 }
 
 /// Energy-weighted median of `(value, weight)` pairs (sorts in place).

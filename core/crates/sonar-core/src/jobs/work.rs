@@ -349,7 +349,8 @@ mod tests {
     /// The dsp stage stores kind + tempo + key + note: fixture loops get
     /// their BPM (names are neutral, so these are audio estimates),
     /// one-shots none; chord loops their key, tonal one-shots their note
-    /// (and its pitch class as key), noise and silence neither.
+    /// (and its pitch class as key), noise a low-confidence key and no
+    /// note, silence neither.
     #[test]
     fn dsp_stage_classifies_and_gates_tempo_key_and_note() {
         use crate::classify::Kind;
@@ -419,8 +420,13 @@ mod tests {
                     assert_eq!(kp.key.map(|k| k.root), Some(m % 12), "{}", f.path);
                     notes += 1;
                 }
-                (TruthKind::Noise | TruthKind::Silence, _) => {
+                (TruthKind::Silence, _) => {
                     assert_eq!(kp, KeyPitch::default(), "{}", f.path);
+                }
+                // ADR-041: a best-guess key at a low confidence, no note.
+                (TruthKind::Noise, _) => {
+                    assert!(kp.key.is_some() && kp.pitch_midi.is_none(), "{}", f.path);
+                    assert!(kp.key_conf.is_some_and(|c| c < 0.3), "{}", f.path);
                 }
                 _ => {}
             }

@@ -1262,3 +1262,11 @@ the engine fails to open).
   continuous opacity (unreadable at the low end, untokenized); filename
   keys only on top of audio (names are often right, but must be labelled
   as name-sourced).
+- **Implementation (T10.2)**: `key::fuse`. The ADR-022 gates are linear
+  confidence ramps (tonal ratio 0.25→0.5, pitch classes 1→3, correlation
+  0.25→0.5; 1 past the old gates). Audio `a` and name `n` (explicit 0.5,
+  bare 0.35) fuse as independent evidence: agree (with `a ≥ 0.2`) →
+  `1 − (1−a)(1−n)`, source `both`; disagree → stronger wins at `w·(1−l)`;
+  weak agreement = name alone. `key_source` stores `detected` (audio),
+  `filename` (name) or `both` (migration 0003). Note confidence × cos(π·dev).
+  Silence: no key even with a name.

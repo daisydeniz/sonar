@@ -20,6 +20,13 @@ final class FilterSearchTests: XCTestCase {
         (0..<model.resultCount).compactMap { model.pager.peek($0) }
     }
 
+    /// A stored key as its facet label: facets label major keys without a
+    /// suffix, so a detected `Amaj` and a mode-less `A` share the label `A`.
+    private func facetLabel(_ key: String?) -> String? {
+        guard let key, key.hasSuffix("maj") else { return key }
+        return String(key.dropLast(3))
+    }
+
     /// A model over the indexed fixtures library.
     private func indexedModel() async throws -> AppModel {
         let env = ProcessInfo.processInfo.environment
@@ -97,11 +104,11 @@ final class FilterSearchTests: XCTestCase {
         model.filters.keys = [key.value]
         await model.refreshResults()
         XCTAssertEqual(model.resultCount, Int(key.count))
-        XCTAssertTrue(rows(model).allSatisfy { $0.key == key.value })
+        XCTAssertTrue(rows(model).allSatisfy { facetLabel($0.key) == key.value })
         model.filters.compatibleKeys = true
         await model.refreshResults()
         XCTAssertGreaterThanOrEqual(model.resultCount, Int(key.count))
-        XCTAssertTrue(rows(model).contains { $0.key == key.value })
+        XCTAssertTrue(rows(model).contains { facetLabel($0.key) == key.value })
 
         // BPM range
         model.clearFilters()

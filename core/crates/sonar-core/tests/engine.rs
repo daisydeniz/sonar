@@ -235,14 +235,17 @@ fn user_data_set_through_the_engine_is_in_the_next_search() {
         ..Filters::default()
     };
     assert_eq!(hits(&engine, "", hat), ["mid_groove.wav"]);
-    let f_sharp_minor = Filters {
-        keys: vec![parse_key("F# minor").expect("key")],
+    // Drum loops carry a low-confidence best-guess key (ADR-041; the filter
+    // ignores confidence until T10.5), so use a key none of them guesses.
+    let d_sharp_minor = Filters {
+        keys: vec![parse_key("D# minor").expect("key")],
         ..Filters::default()
     };
+    assert!(hits(&engine, "", d_sharp_minor.clone()).is_empty());
     engine
-        .set_override(&[mid], OverrideField::Key, "f#m")
+        .set_override(&[mid], OverrideField::Key, "d#m")
         .expect("key");
-    assert_eq!(hits(&engine, "", f_sharp_minor), ["mid_groove.wav"]);
+    assert_eq!(hits(&engine, "", d_sharp_minor), ["mid_groove.wav"]);
 
     // Tags (user spelling kept in the tag list, filter ignores case).
     let tagged = Filters {
