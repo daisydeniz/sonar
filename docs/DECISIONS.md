@@ -1270,3 +1270,11 @@ the engine fails to open).
   weak agreement = name alone. `key_source` stores `detected` (audio),
   `filename` (name) or `both` (migration 0003). Note confidence × cos(π·dev).
   Silence: no key even with a name.
+- **Implementation (T10.3)**: `key::root`. Loops: onset segments (flux
+  peaks), YIN note per segment from 20 ms after its peak (`NoteTracker`);
+  segments shorter than 50 ms or unpitched count against every class. A
+  pitch class with ≥ 60 % of segment energy is a mode-less root, `c =
+  share × mean note confidence`. With the chroma key `(k, a)`: same tonic →
+  `1 − (1−a)(1−c)`, chroma mode kept only if `a ≥ 0.2`; else T10.2's
+  stronger-wins `w·(1−l)`; then fused with the name as before. Stored as a
+  mode-less `key` (as one-shot notes), no schema change; `KEY_VERSION` 4.

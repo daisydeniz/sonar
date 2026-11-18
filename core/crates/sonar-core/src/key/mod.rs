@@ -11,6 +11,9 @@
 //!   not a note). A one-shot with a note has the note's pitch class as its
 //!   key candidate, without a mode (a single note does not imply major or
 //!   minor), so the key filter finds bass/808 hits tuned to the song's key.
+//! - **Loop root** ([`root`], T10.3): YIN per onset segment; when one pitch
+//!   class holds most of the segment energy (tom, bass, 808 loops) it is a
+//!   mode-less candidate combined with the chroma key ([`root::combine`]).
 //! - **Filename prior** (optional; the eval hides names): fused with the
 //!   audio candidate as evidence ([`fuse`]): agreement raises, disagreement
 //!   lowers the confidence; [`KeySource`] records audio / name / both.
@@ -23,7 +26,10 @@ pub mod chroma;
 pub mod fuse;
 pub mod note;
 pub mod profiles;
+pub mod root;
 
+#[cfg(test)]
+mod root_tests;
 #[cfg(test)]
 mod tests;
 
@@ -36,6 +42,7 @@ pub use fuse::{
     PRESENT_FRACTION, TONAL_RATIO_FLOOR,
 };
 pub use note::{Note, NoteTracker};
+pub use root::{loop_root, Root, MIN_ROOT_SHARE};
 
 use crate::classify::{Kind, KindResult};
 use crate::dsp::Features;
@@ -45,8 +52,8 @@ use crate::Result;
 /// Version of the key/note definitions; bump when any changes so stored
 /// keys and notes are recomputed. 2 (T10.1): more filename key priors.
 /// 3 (T10.2): fused key with graded confidence, source `both`, note
-/// confidence falls with |cents|.
-pub const KEY_VERSION: u32 = 3;
+/// confidence falls with |cents|. 4 (T10.3): root note of pitched loops.
+pub const KEY_VERSION: u32 = 4;
 
 /// Where a [`KeyEstimate`] came from (`analysis.key_source`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
@@ -117,8 +124,9 @@ pub fn estimate_key(features: &Features, prior: Option<KeyPrior>) -> Option<KeyE
 
 /// Key and note of one file as the `dsp` stage stores them: one-shots get
 /// a note when they have a stable pitch (and then the note's pitch class as
-/// key candidate), everything else the chroma candidate; either is fused
-/// with the filename key. Silent audio gets neither. `samples` are the
+/// key candidate); loops get the chroma candidate combined with their root
+/// note ([`root`]); other one-shots the chroma candidate. Any of these is
+/// fused with the filename key. Silent audio gets neither. `samples` are the
 /// analysis window at the tracker's rate.
 ///
 /// # Errors
@@ -133,11 +141,14 @@ pub fn key_and_note(
     if kind.scores.silent {
         return Ok(KeyNote::default());
     }
-    let note = if kind.kind == Kind::OneShot {
-        tracker.detect(samples)?
-    } else {
-        None
-    };
+    if kind.kind == Kind::Loop {
+        let spec = &features.spectrogram;
+        let chroma = fuse::chroma_candidate(&tonal_chroma(spec), spec, prior);
+        let root = root::loop_root(features, samples, tracker)?;
+        let key = fuse::fuse(root::combine(root, chroma), prior);
+        return Ok(KeyNote { key, note: None });
+    }
+    let note = tracker.detect(samples)?;
     let key = match note {
         Some(n) => fuse::fuse(Some(note_candidate(&n)), prior),
         None => estimate_key(features, prior),
