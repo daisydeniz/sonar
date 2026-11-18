@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M10 honest key (M0–M7, M9 done; human-only: T3.7, T7.4, T8.1)
-- Next task: T10.5 (M10 honest key, ADR-041)
+- Next task: T10.4b (M10 honest key, ADR-041)
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
@@ -15,10 +15,8 @@ rustc/cargo 1.99.1 · cargo-deny 0.20.2 · claude 2.1.316 · gh: not installed (
 _(Agents list anything that requires the founder: decisions, credentials,
 manual tests, labeled data. Keep each item one line with the task id.)_
 - T10.4 Re-fit key tiers on real files: run `sonar eval --silver <dir>` (names carry keys); medium tier (60 % target) could not be validated on synthetic fixtures.
-- T9.9 `.claude/agents/swift-ui.md` lines 32–33 still say "remove the files you restyle from `scripts/design-lint-pending.txt`" (list deleted; the agent could not edit agent definitions). Delete that clause.
-- T9.1 `git push origin main` failed in the agent shell (2026-11-17: `could not read Username for 'https://github.com'`, no credential in the keychain for this shell). `main` is ahead of `origin/main` locally; run `git push origin main` once from your terminal.
 - T0.1 (optional) For `cargo` in a normal terminal / hand-started `claude`, add to ~/.zprofile: `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"` (scripts and autopilot already handle it). Optional: `brew install gh`.
-- T3.7 Golden set labeling: `sonar eval --init-golden <dir>` writes the labels.csv template; then set `SONAR_GOLDEN_DIR` (optional: `SONAR_SILVER_DIR` for name-labeled real files); optional `similar.jsonl` similarity judgements (format in EVAL.md) enable similarity tuning (T4.4)
+- T3.7 (optional) Golden set: `eval/golden/labels.csv` (299 files from `Samples/`) was pre-filled from the pack's own file/folder labels, not by ear; a 5-minute skim to fix or blank wrong cells makes it real golden. `scripts/eval-real.sh` runs silver + golden.
 - T8.1 End-to-end test by the founder (after M7)
 - T9.8 Manual check: on the welcome screen and the trial-ended gate, Return triggers the primary button; drop folders on the welcome screen → overlay; Settings tabs (Libraries online/offline badges, License, About) look right in light/dark.
 - T9.6 Manual check: Find Similar on a sample (also with a waveform region) → 72 pt target well above the selected waveform, its play button plays the target (region only), Space stops it; Esc/× removes the well; drag a .wav from Finder → overlay readable.
@@ -29,7 +27,6 @@ manual tests, labeled data. Keep each item one line with the task id.)_
 - T9.1 The `swift-ui` agent ran `brew install xcodegen` (2.46.0) because it was missing on this Mac; `scripts/bootstrap.sh` should have covered it. Nothing to do unless you want it removed.
 - T9.x Design direction check (optional, cheapest now): open `logs/ui/components-dark.png` / `-light.png` after `scripts/ui-snapshots.sh`; tell the loop if the teal accent or category hues should change (one-line token edits in `docs/DESIGN.md` §2.1).
 - T7.4 Apple Developer ID, notarization, payment provider, pricing. Release env vars for `scripts/release.sh` are listed in ADR-037 (signing identity, notarytool profile or API key, Sparkle keypair + feed URL); `--dry-run` builds a local-only DMG.
-- T5.2 (permissions) In the T5.2 session, running `scripts/*.sh` and `core/target/*/sonar` directly needed approval (cargo commands did not), so the check.sh gates were run one by one and build-core.sh/xcodebuild were skipped (sonar-ffi unchanged). Allow `scripts/check.sh` in the autopilot's permission settings.
 - T5.2 Model-dependent embed tests pass as no-ops without `models/` (weights not in git); run `scripts/fetch-models.sh` on any machine that runs check.sh, so the embed stage is actually exercised.
 - T7.5 Release: `sonar license keygen --out <secret file>` (keep the secret file private), set `SONAR_LICENSE_PUBLIC_KEY` (+ `SONAR_PURCHASE_URL`, the https store page) for `scripts/release.sh`; the payment provider's webhook mints keys with `sonar license issue` (ADR-038).
 - T7.5 Manual check: with a dev build, set `license.json` trial start > 14 days back (or wait) → gate shows; mint a dev key (`sonar license issue`, dev secret in `core/crates/sonar-core/dev/`) and paste it → gate gone; toolbar trial badge and Settings → License tab look right; Deactivate returns to trial/gate.
