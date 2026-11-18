@@ -94,7 +94,11 @@ final class AppModelTests: XCTestCase {
         await model.setFavorite(fileIds: [hit.fileId], on: true)
         model.sidebarSelection = .favorites
         await model.refreshResults()
-        XCTAssertEqual(loadedRows(model).map(\.fileId), [hit.fileId])
+        // The favourite write wakes the index poll, whose refresh can cancel
+        // this one in the core (latest wins); wait for the newest to apply.
+        try await waitUntil(timeout: 10, "favourites rows") {
+            loadedRows(model).map(\.fileId) == [hit.fileId]
+        }
         XCTAssertEqual(loadedRows(model).first?.favorite, true)
 
         // a collection selection shows its rows

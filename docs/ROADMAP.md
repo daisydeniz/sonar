@@ -123,7 +123,7 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 
 ## Later (not picked by the loop — founder triages after M8)
 - (from T10.5 review) `search/collect.rs` is 432 lines; move `SortValue`/`compare` or its tests to their own file.
-- (from T10.5) `AppModelTests.testShellFlow` failed once then passed unchanged (favourites step saw the stale "hit" rows): poll-vs-explicit-refresh race; make that step wait until its refresh is applied.
+- (from T10.5) `AppModelTests.testShellFlow` favourites step failed 2/3 runs (stale "hit" rows; likely the index poll refresh cancelling the explicit one in the core); test now waits for the rows. Confirm the cause and whether a user can see stale rows after toggling a favourite.
 - (from T10.4b) High key tier misses 90 % on real files (silver 79.7 %, golden 68.8 % at conf ≥ 0.9; golden medium 34.5 %; ECE 18.5 / 31.7 %): inspect high-confidence misses (relative/fifth vs label noise) and recalibrate `key::fuse`.
 - (from T10.4 review) `eval/metrics.rs` (466) and `eval/baseline.rs` (613 lines) exceed ~400 lines; split.
 - (from T10.3 review) Seeded pitched loops live in `key/root_tests.rs`, not `sonar fixtures`; eval does not report loop-root accuracy (T10.4 could add a root truth field).
