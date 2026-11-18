@@ -1230,3 +1230,35 @@ the engine fails to open).
 - **Not chosen**: keeping the bottom dock (waveform too small for region
   editing); region similarity in Swift (product logic belongs in core).
 
+
+## ADR-041 — Key: always a best guess, graded and honest (founder request)
+- **Why**: the founder (2026-11-18) compared with Sononym, which shows a key
+  for every sample; Sonar showed one for 598 of 1306 files of a percussion
+  pack. Causes: hard tonality gates (ADR-022) drop pitched percussion,
+  loops never get a note, and bracketed name keys (`Tom Loop 08 (C)`) are
+  not parsed (81 such files keyless). The goal is consistency and
+  readability: a value everywhere, but never one that looks more certain
+  than it is.
+- **Decision**: every non-silent file gets its best key candidate plus a
+  confidence that means something. Audio (chroma key, one-shot note, loop
+  root note) and the filename are fused as evidence; agreement raises and
+  disagreement lowers confidence; the source (audio / name / both) is
+  stored and shown. Confidence is calibrated on eval (names hidden) into
+  three tiers with fixed bounds from core (`KEY_TIER_HIGH/MEDIUM`): high
+  ≥ 90 % correct, medium ≥ 60 %. UI uses the tiers, not a continuous fade:
+  high = primary text, medium = secondary, low (incl. confidence 0) =
+  tertiary — three existing tokens, readable in light and dark and the same
+  in table, readout and inspector. Only silence/undecodable shows an en
+  dash. The key filter/facet use medium + high by default ("Include
+  uncertain" adds low), so a hi-hat never answers a `key:Am` filter.
+- **Cents (Sononym "E2 +32")**: the deviation is real information (tuning
+  before pitch-shifting; whole packs tuned to A=432 show ≈ −32 ct) and we
+  measure it already (`Note::cents`). But near ±50 ct the nearest note is a
+  coin flip, so note confidence falls with |cents|, and cents appear only in
+  the inspector (`E2 +32 ct`, "≈" past ±25 ct) — the table and the KEY
+  readout stay a plain key for scanning.
+- **Not chosen**: hard gates with blanks (inconsistent: a tom one-shot has a
+  key, the same tom in a loop not); a value without confidence (dishonest);
+  continuous opacity (unreadable at the low end, untokenized); filename
+  keys only on top of audio (names are often right, but must be labelled
+  as name-sourced).

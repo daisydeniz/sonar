@@ -3,9 +3,9 @@
 Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
-- Milestone: M0–M7 and M9 UI redesign done (`m9-done`); remaining tasks are human only: T3.7, T7.4, T8.1
-- Next task: none (founder: T8.1 end-to-end test; triage `## Later`)
-- Loop state: ROADMAP COMPLETE   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
+- Milestone: M10 honest key (M0–M7, M9 done; human-only: T3.7, T7.4, T8.1)
+- Next task: T10.1 (M10 honest key, founder request 2026-11-18, ADR-041)
+- Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
 macOS 26.7.2 arm64 · Xcode 26.5 · xcodegen 2.46.0 · rustup 1.29.3 (Homebrew) ·

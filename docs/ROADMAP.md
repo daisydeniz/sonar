@@ -106,6 +106,15 @@ Every T9 task: only `Theme` tokens, restyled files leave `scripts/design-lint-pe
 - [x] T9.8 (swift-ui) Secondary screens on tokens and `EmptyStateView`: onboarding, empty/error states, duplicates, settings tabs, license gate/sheet. AC: snapshots of each in light and dark; `scripts/design-lint-pending.txt` is empty. (1067b42)
 - [x] T9.9 (reviewer) Design pass over all snapshots against the DESIGN §6 checklist (alignment across bars, type steps, contrast, states); fix findings; delete the pending list and its handling if empty. AC: reviewer APPROVE on the full snapshot set. (a624246)
 
+## M10 — Honest, consistent key (added by the founder, 2026-11-18: competitors show a key for every sample, Sonar for ~46 %; goal is consistency and readability, not a value at any price — ADR-041)
+Order matters: T10.4 calibrates what T10.2/T10.3 produce; T10.6 displays the tiers T10.4 fixes. Every key/DSP change bumps `KEY_VERSION`/`DSP_VERSION` so libraries re-analyze.
+- [ ] T10.1 (search-ranking) Filename key prior: bracketed keys `(C)`, `[F#]`, `(Am)`, `(C)(120 BPM)`; bare letter at the end of a one-shot name with a tonal/pitched word (bass, 808, pluck, lead, keys, tom, dunun, surdo…); all-lowercase keys (`am`, `gm`) when the name has a BPM or loop word. Covers the T2.1 `## Later` items on bare letters and lowercase names. AC: ≥ 25 new table-driven tokenizer cases incl. `ABTSRR2 - Tom Loop 08 (C)(120 BPM).wav` → key C; no new false key on the existing negative cases (`-6dB`, `Fm_Bass` stays as today).
+- [ ] T10.2 (dsp-analysis) Fused key with graded confidence (ADR-041): every non-silent file gets its best key candidate; the tonality gates become confidence factors instead of cut-offs; audio candidate scores and the filename prior combine as evidence (agreement raises, disagreement lowers confidence; a name alone on non-tonal audio stays low-medium); `key_source` says audio / name / both (migration if the CHECK needs it); one-shot note confidence falls with |cents| (±50 ct → near 0). Silence/corrupt: no key. Covers the T3.5 gate `## Later` item. AC: fixtures key/note accuracy unchanged (16/16, 52/52 with names hidden); drum/noise fixtures get a key with confidence < the low-tier bound of T10.4's first cut (0.3); `tests/key.rs` covers agree / disagree / name-only / silence.
+- [ ] T10.3 (dsp-analysis) Root note for pitched loops: YIN per onset segment (reuse `NoteTracker`); when ≥ 60 % of onset energy agrees on one pitch class the loop gets it as a mode-less key (confidence from that share), fused with the chroma key (T10.2). Covers the T3.5 "loops never get a note" `## Later` item. AC: new seeded fixtures (tom/bass-like loops at known notes, a mixed-pitch loop) — root ≥ 90 % correct; mixed-pitch loop gets low confidence; drum-loop fixtures stay low.
+- [ ] T10.4 (eval) Key calibration: `sonar eval` reports key accuracy per confidence tier and expected calibration error on fixtures and `--silver` (names hidden); fit the two tier bounds (`KEY_TIER_HIGH`, `KEY_TIER_MEDIUM`, exported by core + FFI) so the high tier is ≥ 90 % correct and the medium tier ≥ 60 % on silver (fixtures when no silver dir); tiers must be monotone. Covers the T3.5 "validated only on synthetic" `## Later` item. AC: report table in EVAL.md + BASELINE; numbers in the STATUS entry.
+- [ ] T10.5 (search-ranking) Key filter honesty: by default the key filter and the key facet count only medium + high tier; `include_uncertain` option (CLI `--key-uncertain`, FFI field) adds the low tier; a mode-less key (`A`) matches both `A` and `Am` (covers the T3.5 review `## Later` item); sort by key puts low tier after the others. AC: filter/facet tests for each tier and the mode-less case; 500k search p95 budget unchanged.
+- [ ] T10.6 (swift-ui) Key display per ADR-041 / DESIGN: every key cell, the KEY readout and the inspector show the value in the tier's text colour (high primary, medium secondary, low tertiary — also confidence 0); silence/no value an en dash; inspector Analysis row adds source (Audio / Name / Audio + Name) and confidence word, and for one-shots the note with cents (`E2 +32 ct`, in secondary; "≈" prefix when |cents| > 25); when name and audio disagree the inspector shows both; Key popover gets an "Include uncertain" toggle (T10.5). DESIGN.md §4 updated. AC: snapshots (light/dark) with all three tiers, an en dash, a disagreement and a detuned one-shot; filter tests green.
+
 ## Future (do not start)
 v1.x: record-to-search, 2D map, tempo-synced preview, kit builder, `.als` project map.
 v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
@@ -116,9 +125,7 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T1.7c review) Loop guard against a loop that cannot happen today.
 - (from T1.7c) `cargo deny` advisories check failed once (not in check.sh, no deps changed); cause unconfirmed. (T1.7d: it is `basic-toml` unmaintained via `uniffi-bindgen`; ignore in `deny.toml` with a reason or bump.)
 - (from T1.7d) An intact AIFF whose writer over-declares `COMM` `numSampleFrames` is now `partial`; check AIFF `partial` counts on a real library / eval.
-- (from T2.1 review) Key prior for one-shots ending in a bare note letter (`KSHMR_Kick_08_C`, `Bass_C`) when the name has a tonal word (bass/808/pluck/lead/keys).
 - (from T2.1 review) `Fm_Bass_Growl` gets key prior F minor though "Fm" often means FM synthesis; check on silver set.
-- (from T2.1 review) All-lowercase names (`vox_chop_am_120`, `rnb_keys_loop_gm_90`) get no key prior; consider allowing with explicit BPM / loop word.
 - (from T2.1 review) `-6dB` emits stray `d`/`b` tokens from the camelCase split.
 - (from T2.1 review) Full-width digits (`１２０`) dropped as separators; NFKC folding would cover them.
 - (from T2.2) Synonym expansion for unfinished (prefix) words (`kic` → kick group), guarded so `bas` doesn't pull in `bassdrum`.
@@ -149,10 +156,6 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T3.4) `sonar-cli/src/cli.rs` is 508 lines; split argument definitions.
 - (from T3.4 review) User kind override `one_shot` on a detected loop still shows the analysis BPM in the index; skip it unless BPM is overridden.
 - (from T3.4 review) Tempo allocates per-file scratch buffers; reuse them like `Analyzer` if profiling shows pressure.
-- (from T3.5) Key validated only on 16 synthetic chord progressions; re-measure on silver/golden (T3.6/T3.7).
-- (from T3.5) One global key per 30 s window (no modulation); tonality gates (ratio 0.5, ≥ 3 pitch classes) untuned on real material.
-- (from T3.5 review) Mode-less stored keys (one-shot notes, e.g. `A`) are treated as major by the key filter, so `key:Am` misses an `A` 808; match both modes.
-- (from T3.5) Loops never get a note (e.g. bass-loop root); tonal material without a clear onset only gets a chroma key.
 - (from T3.5 review) `key::chroma` allocates per-file totals; reuse scratch if profiling shows pressure.
 - (from T3.6 review) No CLI test for `sonar eval --check` exiting non-zero on a regression (core logic is tested); add one with a temp baseline.
 - (from T4.1 review) Vector `append` bumps headers without fsyncing aspect rows: power loss can leave live all-zero vectors that are never re-queued; `sync_data` before `set_rows` or detect zero rows on open.
