@@ -72,9 +72,15 @@ fn filters_sort_and_facets_from_filename_priors() {
             "Lead 128 BPM Am.wav"
         ]
     );
+    // Keys from names alone are low tier (ADR-041): not matched unless
+    // `--key-uncertain`.
+    assert!(hit_names(&home, &["--key", "am", "--compatible"]).is_empty());
     // Am + Camelot neighbours (Dm, Em) + relative major (C).
     assert_eq!(
-        sorted(hit_names(&home, &["--key", "am", "--compatible"])),
+        sorted(hit_names(
+            &home,
+            &["--key", "am", "--compatible", "--key-uncertain"]
+        )),
         [
             "Chord Loop 126 BPM C.wav",
             "Lead 128 BPM Am.wav",
@@ -100,7 +106,14 @@ fn filters_sort_and_facets_from_filename_priors() {
 
     let out = ok(&sonar(
         &home,
-        &["search", "--json", "--facets", "--bpm", "100-"],
+        &[
+            "search",
+            "--json",
+            "--facets",
+            "--bpm",
+            "100-",
+            "--key-uncertain",
+        ],
     ));
     let v: serde_json::Value = serde_json::from_str(&out).expect("json");
     assert_eq!(v["total"], 3);
@@ -115,10 +128,16 @@ fn filters_sort_and_facets_from_filename_priors() {
             )
         })
         .collect();
-    assert_eq!(keys, [("Am", 1), ("C", 1), ("Cm", 1)]);
+    // The bare `C` of the chord loop has no mode: it counts for C and Cm.
+    assert_eq!(keys, [("Cm", 2), ("Am", 1), ("C", 1)]);
+    let text = ok(&sonar(
+        &home,
+        &["search", "--facets", "--key", "Cm", "--key-uncertain"],
+    ));
+    assert!(text.contains("2 of 2 results"), "{text}");
+    assert!(text.contains("key: Cm 2, Am 1, C 1, Em 1"), "{text}");
     let text = ok(&sonar(&home, &["search", "--facets", "--key", "Cm"]));
-    assert!(text.contains("1 of 1 results"), "{text}");
-    assert!(text.contains("key: Am 1, C 1, Cm 1, Em 1"), "{text}");
+    assert!(text.contains("0 of 0 results"), "{text}");
 
     let err = sonar(&home, &["search", "--key", "kick"]);
     assert!(!err.status.success());

@@ -173,6 +173,10 @@ pub struct SearchFilters {
     /// Also accept harmonically compatible keys.
     #[uniffi(default = false)]
     pub compatible_keys: bool,
+    /// Also low-tier (uncertain) keys in the key filter and key facet
+    /// (default: medium + high only, ADR-041; "Include uncertain").
+    #[uniffi(default = false)]
+    pub include_uncertain_keys: bool,
     /// Shortest duration (ms).
     #[uniffi(default = None)]
     pub duration_min_ms: Option<u64>,

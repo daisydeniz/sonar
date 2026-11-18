@@ -192,6 +192,7 @@ pub fn filters(f: Option<SearchFilters>) -> Result<Filters, FfiError> {
         bpm: range(f.bpm_min, f.bpm_max),
         keys,
         compatible_keys: f.compatible_keys,
+        include_uncertain_keys: f.include_uncertain_keys,
         duration_ms: range(f.duration_min_ms, f.duration_max_ms),
         libraries: f.library_ids,
         tags: f.tags,

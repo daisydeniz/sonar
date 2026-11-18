@@ -16,6 +16,7 @@ use tantivy::columnar::{Column, StrColumn};
 use tantivy::{DocId, Score, SegmentOrdinal, SegmentReader};
 
 use super::facets::RawFacets;
+use super::key_value::LOW_OFFSET;
 use super::sideways::{SegFacets, Sideways};
 use super::sort::{Sort, SortField};
 use crate::index::{ff, FILE_ID_FIELD};
@@ -33,6 +34,9 @@ pub(crate) enum Order {
         text: bool,
         /// Largest first.
         desc: bool,
+        /// Known values from this one on form a second group after the
+        /// others in both directions (low-tier keys, ADR-041).
+        tail_from: Option<u64>,
     },
 }
 
@@ -46,6 +50,7 @@ impl Order {
                     column: ff::NAME,
                     text: true,
                     desc: false,
+                    tail_from: None,
                 }
             }
             SortField::Name => (ff::NAME, true),
@@ -56,10 +61,12 @@ impl Order {
             SortField::Duration => (ff::DURATION, false),
             SortField::Library => (ff::LIBRARY, false),
         };
+        let tail_from = (sort.field == SortField::Key).then_some(LOW_OFFSET);
         Self::Field {
             column,
             text,
             desc: sort.descending,
+            tail_from,
         }
     }
 }
@@ -239,6 +246,8 @@ trait SortValue {
     fn missing(&self) -> bool;
     /// Order of two known values.
     fn cmp_known(&self, other: &Self) -> Ordering;
+    /// The numeric value, if any.
+    fn num(&self) -> Option<u64>;
 }
 
 /// Raw per-segment value (ordinal or number).
@@ -248,6 +257,9 @@ impl SortValue for Option<u64> {
     }
     fn cmp_known(&self, other: &Self) -> Ordering {
         self.cmp(other)
+    }
+    fn num(&self) -> Option<u64> {
+        *self
     }
 }
 
@@ -263,21 +275,37 @@ impl SortValue for Value {
             _ => Ordering::Equal,
         }
     }
+    fn num(&self) -> Option<u64> {
+        match self {
+            Value::Num(v) => Some(*v),
+            _ => None,
+        }
+    }
 }
 
 /// `a` before `b`? Score: higher first. Field: known values first (in
-/// both directions), then by value in the requested direction. Ties:
-/// lower file id first.
+/// both directions), then the tail group (`tail_from`), each by value in
+/// the requested direction. Ties: lower file id first.
 fn compare<V: SortValue>(order: Order, a: &Cand<V>, b: &Cand<V>) -> Ordering {
     let primary = match order {
         Order::Score => b.score.total_cmp(&a.score),
-        Order::Field { desc, .. } => match (a.value.missing(), b.value.missing()) {
-            (false, true) => Ordering::Less,
-            (true, false) => Ordering::Greater,
-            (true, true) => Ordering::Equal,
-            (false, false) if desc => b.value.cmp_known(&a.value),
-            (false, false) => a.value.cmp_known(&b.value),
-        },
+        Order::Field {
+            desc, tail_from, ..
+        } => {
+            let tail = |v: &V| tail_from.is_some_and(|t| v.num().is_some_and(|n| n >= t));
+            match (a.value.missing(), b.value.missing()) {
+                (false, true) => Ordering::Less,
+                (true, false) => Ordering::Greater,
+                (true, true) => Ordering::Equal,
+                (false, false) => tail(&a.value).cmp(&tail(&b.value)).then_with(|| {
+                    if desc {
+                        b.value.cmp_known(&a.value)
+                    } else {
+                        a.value.cmp_known(&b.value)
+                    }
+                }),
+            }
+        }
     };
     primary.then(a.file_id.cmp(&b.file_id))
 }
@@ -341,6 +369,7 @@ mod tests {
             column: ff::BPM,
             text: false,
             desc,
+            tail_from: None,
         };
         for desc in [false, true] {
             let mut top = TopK::new(10, field(desc));
@@ -354,6 +383,35 @@ mod tests {
             }
             let ids: Vec<u64> = top.into_sorted().iter().map(|c| c.file_id).collect();
             let want: [u64; 4] = if desc { [3, 2, 0, 1] } else { [2, 3, 0, 1] };
+            assert_eq!(ids, want, "desc {desc}");
+        }
+    }
+
+    #[test]
+    fn tail_group_sorts_after_the_others_both_ways() {
+        for desc in [false, true] {
+            let order = Order::Field {
+                column: ff::KEY,
+                text: false,
+                desc,
+                tail_from: Some(10),
+            };
+            let mut top = TopK::new(10, order);
+            for c in [
+                cand(Some(12), 1),
+                cand(None, 2),
+                cand(Some(3), 3),
+                cand(Some(10), 4),
+                cand(Some(7), 5),
+            ] {
+                top.push(c);
+            }
+            let ids: Vec<u64> = top.into_sorted().iter().map(|c| c.file_id).collect();
+            let want: [u64; 5] = if desc {
+                [5, 3, 1, 4, 2]
+            } else {
+                [3, 5, 4, 1, 2]
+            };
             assert_eq!(ids, want, "desc {desc}");
         }
     }

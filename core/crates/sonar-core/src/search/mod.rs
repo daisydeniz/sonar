@@ -15,7 +15,11 @@
 //! [`Filters`] narrow on effective values (category, kind, BPM range,
 //! keys with optional Camelot-compatible expansion, duration range,
 //! libraries, tags, favourites; hidden files are left out by default).
-//! [`Sort`] orders by relevance or a field (unknown values last). Empty
+//! Key filter and facet use only medium/high-tier keys unless
+//! [`Filters::include_uncertain_keys`]; a mode-less key matches both
+//! modes (ADR-041, [`key_value`]).
+//! [`Sort`] orders by relevance or a field (unknown values last; low-tier
+//! keys after the other keys). Empty
 //! text + filters browses every matching file (by name). [`Facets`] count
 //! values over the matching set with multi-select semantics.
 //!
@@ -29,6 +33,7 @@ mod collect;
 mod facets;
 mod filters;
 pub mod hybrid;
+pub(crate) mod key_value;
 pub mod keys;
 mod parse;
 pub mod semantic;
@@ -41,6 +46,8 @@ mod synonyms;
 mod facet_tests;
 #[cfg(test)]
 mod filter_tests;
+#[cfg(test)]
+mod key_tier_tests;
 #[cfg(test)]
 mod tests;
 

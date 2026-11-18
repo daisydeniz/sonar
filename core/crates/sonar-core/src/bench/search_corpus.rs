@@ -13,13 +13,14 @@
 //! kinds, BPMs and keys are unknown to the analysis, some loops carry the
 //! BPM only in the name (filename prior), a few files have a category
 //! override, tags, favourite / hidden flags, or are `missing` (not
-//! indexed).
+//! indexed). Detected keys carry a confidence in every tier (ADR-041).
 
 use std::fs;
 use std::path::Path;
 
 use rusqlite::params;
 
+use crate::key::{KEY_TIER_HIGH, KEY_TIER_MEDIUM};
 use crate::search::keys::{key_label, KEY_CODES};
 use crate::{Error, Result, Store};
 
@@ -302,8 +303,8 @@ pub fn generate_store(store: &Store, root: &Path, files: usize, seed: u64) -> Re
              VALUES (?1, ?2, ?3, ?4, 0, ?5, 1)",
         )?;
         let mut analysis = tx.prepare(
-            "INSERT INTO analysis (file_id, kind, bpm, bpm_source, key, key_source, category, category_source) \
-             VALUES (?1, ?2, ?3, 'detected', ?4, 'detected', ?5, 'detected')",
+            "INSERT INTO analysis (file_id, kind, bpm, bpm_source, key, key_conf, key_source, category, category_source) \
+             VALUES (?1, ?2, ?3, 'detected', ?4, ?5, 'detected', ?6, 'detected')",
         )?;
         let mut meta = tx.prepare(
             "INSERT INTO audio_meta (file_id, duration_ms, sample_rate, channels, bit_depth) \
@@ -328,7 +329,15 @@ pub fn generate_store(store: &Store, root: &Path, files: usize, seed: u64) -> Re
                 size as i64,
                 status
             ])?;
-            analysis.execute(params![id, row.kind, row.bpm, row.key, row.category])?;
+            let key_conf = row.key.as_ref().map(|_| key_conf(i));
+            analysis.execute(params![
+                id,
+                row.kind,
+                row.bpm,
+                row.key,
+                key_conf,
+                row.category
+            ])?;
             meta.execute(params![id, row.duration_ms as i64])?;
             for &t in &row.tags {
                 tag.execute(params![id, tag_ids[t]])?;
@@ -350,6 +359,17 @@ pub fn generate_store(store: &Store, root: &Path, files: usize, seed: u64) -> Re
         missing,
         libraries,
     })
+}
+
+/// Stored key confidence of file `i` (ADR-041 tiers): 40 % high, 30 %
+/// medium, 30 % low, spread evenly over the corpus.
+fn key_conf(i: usize) -> f64 {
+    let c = match i % 10 {
+        0..=3 => KEY_TIER_HIGH,
+        4..=6 => KEY_TIER_MEDIUM,
+        _ => KEY_TIER_MEDIUM / 2.0,
+    };
+    f64::from(c)
 }
 
 #[cfg(test)]

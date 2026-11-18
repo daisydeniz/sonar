@@ -18,7 +18,9 @@ pub enum SortField {
     Name,
     /// Effective tempo.
     Bpm,
-    /// Effective key, by root then mode: `C`, `Cm`, `C#`, `C#m`, …, `Bm`.
+    /// Effective key, by root then mode: `C`, `Cm`, `C#`, `C#m`, …, `Bm`
+    /// (a mode-less key between the two modes of its root). Low-tier keys
+    /// (ADR-041) come after the others in both directions, then unknown.
     Key,
     /// Duration.
     Duration,

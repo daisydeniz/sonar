@@ -8,6 +8,11 @@
 //! dimension (its value is what selecting it would add); a doc failing two
 //! or more is ignored. One pass, exact multi-select counts (the Lucene
 //! `DrillSideways` idea). Tags are counted on hits only.
+//!
+//! Keys: without [`Filters::include_uncertain_keys`] a low-tier key value
+//! counts as no value (neither matches nor is counted); raw key values are
+//! turned into key codes at harvest, a mode-less key counting for both
+//! modes ([`super::key_value`]).
 
 use std::collections::HashMap;
 
@@ -16,6 +21,7 @@ use tantivy::{DocId, SegmentReader};
 
 use super::facets::RawFacets;
 use super::filters::Filters;
+use super::key_value::{facet_codes, LOW_OFFSET};
 use crate::index::ff;
 
 /// Drill-sideways dimensions: category, kind, key, library, favourite
@@ -31,6 +37,7 @@ pub(crate) struct Sideways {
     keys: Option<Vec<u64>>,
     libraries: Option<Vec<u64>>,
     favorites_only: bool,
+    include_uncertain_keys: bool,
 }
 
 impl Sideways {
@@ -41,9 +48,10 @@ impl Sideways {
         Self {
             categories: some(f.category_values()),
             kinds: some(f.kind_values()),
-            keys: some(f.key_codes()),
+            keys: some(f.key_values()),
             libraries: some(f.library_values()),
             favorites_only: f.favorites_only,
+            include_uncertain_keys: f.include_uncertain_keys,
         }
     }
 }
@@ -92,6 +100,8 @@ struct Dim {
     values: Option<Column<u64>>,
     /// Accepted values, sorted; `None` = not filtered.
     allowed: Option<Vec<u64>>,
+    /// Values from this one on count as no value (low-tier keys).
+    ceiling: u64,
     counts: Counter,
 }
 
@@ -102,7 +112,14 @@ impl Dim {
             counts: Counter::new(bound),
             values: col,
             allowed: allowed.cloned(),
+            ceiling: u64::MAX,
         }
+    }
+
+    /// Value of `doc`, `None` if unknown or hidden by the ceiling.
+    fn value(&self, doc: DocId) -> Option<u64> {
+        let v = self.values.as_ref()?.first(doc)?;
+        (v < self.ceiling).then_some(v)
     }
 
     /// A string dimension: filter values are mapped to this segment's
@@ -126,6 +143,7 @@ impl Dim {
         Ok(Self {
             values: col.map(|c| c.ords().clone()),
             allowed,
+            ceiling: u64::MAX,
             counts: Counter::new(bound),
         })
     }
@@ -149,10 +167,14 @@ impl SegFacets {
         let kinds = fast.str(ff::KIND)?;
         let tags = fast.str(ff::TAGS)?;
         let fav_allowed = s.favorites_only.then(|| vec![1]);
+        let mut key = Dim::num(fast.column_opt(ff::KEY)?, s.keys.as_ref());
+        if !s.include_uncertain_keys {
+            key.ceiling = LOW_OFFSET;
+        }
         let dims = [
             Dim::text(categories.as_ref(), s.categories.as_ref())?,
             Dim::text(kinds.as_ref(), s.kinds.as_ref())?,
-            Dim::num(fast.column_opt(ff::KEY)?, s.keys.as_ref()),
+            key,
             Dim::num(fast.column_opt(ff::LIBRARY)?, s.libraries.as_ref()),
             Dim::num(fast.column_opt(ff::FAVORITE)?, fav_allowed.as_ref()),
         ];
@@ -171,7 +193,7 @@ impl SegFacets {
     pub(crate) fn collect(&mut self, doc: DocId) -> bool {
         let mut failed = None;
         for (i, d) in self.dims.iter().enumerate() {
-            let v = d.values.as_ref().and_then(|c| c.first(doc));
+            let v = d.value(doc);
             self.vals[i] = v;
             let pass = match &d.allowed {
                 None => true,
@@ -209,7 +231,7 @@ impl SegFacets {
         RawFacets {
             categories: labels(self.categories.as_ref(), cat.counts),
             kinds: labels(self.kinds.as_ref(), kind.counts),
-            keys: to_map(key.counts),
+            keys: key_codes(key.counts),
             libraries: to_map(lib.counts),
             tags: labels(self.tags.as_ref(), self.tag_counts),
             favorites: fav
@@ -221,6 +243,17 @@ impl SegFacets {
                 .sum(),
         }
     }
+}
+
+/// Key index value counts → key code counts (mode-less in both modes).
+fn key_codes(counts: Counter) -> HashMap<u64, usize> {
+    let mut out = HashMap::new();
+    for (v, n) in counts.into_counts() {
+        for code in facet_codes(v) {
+            *out.entry(code).or_default() += n;
+        }
+    }
+    out
 }
 
 /// Ordinal counts → string counts.

@@ -6,6 +6,11 @@
 //! kind, BPM and key are effective values (ADR-018): a user override wins
 //! (also an explicit NULL, which clears the value), else the analysis
 //! column, else — BPM and key only — the filename prior (ADR-016).
+//!
+//! Key tier (ADR-041, T10.5): a key override is certain (the user said
+//! so); an analysed key has the tier of its stored `key_conf` (missing
+//! confidence = low); a filename-prior key of a not yet analysed file has
+//! the tier the key fusion gives a name alone (low with today's bounds).
 
 use std::path::Path;
 
@@ -13,7 +18,9 @@ use rusqlite::{params, Row};
 use tantivy::TantivyDocument;
 
 use super::schema::Fields;
-use crate::search::keys::{key_code, parse_key};
+use crate::key::{fuse, key_tier, KeyTier};
+use crate::search::key_value::index_value;
+use crate::search::keys::parse_key;
 use crate::text::{filename_prior, fold, strip_audio_extension, Key};
 use crate::{Result, Store};
 
@@ -37,8 +44,11 @@ pub struct IndexDoc {
     pub library_id: i64,
     /// Effective tempo in BPM, if known.
     pub bpm: Option<f64>,
-    /// Effective key, if known (mode `None` is filtered as major).
+    /// Effective key, if known (mode `None` matches both modes).
     pub key: Option<Key>,
+    /// The key is low tier (ADR-041): left out of the key filter and facet
+    /// unless uncertain keys are asked for, sorted after certain keys.
+    pub key_uncertain: bool,
     /// Duration in milliseconds (`audio_meta`), if measured.
     pub duration_ms: Option<u64>,
     /// In the user's favourites.
@@ -101,8 +111,15 @@ impl IndexDoc {
                 doc.add_text(ff.tags, tag);
             }
         }
+        // ff_key stores only the low / certain split: medium and high are both
+        // written as `KeyTier::High`, so the medium tier cannot be read back.
         if let Some(k) = self.key {
-            doc.add_u64(ff.key, u64::from(key_code(k)));
+            let tier = if self.key_uncertain {
+                KeyTier::Low
+            } else {
+                KeyTier::High
+            };
+            doc.add_u64(ff.key, index_value(k, tier));
         }
         if let Some(centi) = self.bpm.and_then(bpm_centi) {
             doc.add_u64(ff.bpm, centi);
@@ -188,7 +205,9 @@ const SELECT: &str = concat!(
     effective_or_cleared!("key"),
     ", m.duration_ms, ",
     "EXISTS (SELECT 1 FROM favorites fv WHERE fv.file_id = f.id), ",
-    "EXISTS (SELECT 1 FROM hidden h WHERE h.file_id = f.id)",
+    "EXISTS (SELECT 1 FROM hidden h WHERE h.file_id = f.id), ",
+    "EXISTS (SELECT 1 FROM overrides o WHERE o.file_id = f.id AND o.field = 'key'), ",
+    "a.key_conf",
     " FROM files f JOIN libraries l ON l.id = f.library_id ",
     "LEFT JOIN analysis a ON a.file_id = f.id ",
     "LEFT JOIN audio_meta m ON m.file_id = f.id ",
@@ -220,9 +239,23 @@ fn from_row(row: &Row<'_>) -> rusqlite::Result<IndexDoc> {
         None if doc.kind.as_deref() == Some("one_shot") => None,
         None => prior.and_then(|p| p.bpm).map(|b| f64::from(b.bpm)),
     };
-    doc.key = match key {
-        Some(v) => parse_key(&v),
-        None => prior.and_then(|p| p.key).map(|k| k.key),
+    let key_overridden: bool = row.get(12)?;
+    let key_conf: Option<f64> = row.get(13)?;
+    (doc.key, doc.key_uncertain) = match key {
+        Some(v) if key_overridden => (parse_key(&v), false),
+        Some(v) => {
+            #[allow(clippy::cast_possible_truncation)] // a 0..1 confidence
+            let conf = key_conf.map_or(0.0, |c| c as f32);
+            (parse_key(&v), key_tier(conf) == KeyTier::Low)
+        }
+        None => match prior.and_then(|p| p.key) {
+            Some(p) => {
+                let est = fuse::fuse(None, Some(p));
+                let conf = est.map_or(0.0, |e| e.confidence);
+                (Some(p.key), key_tier(conf) == KeyTier::Low)
+            }
+            None => (None, false),
+        },
     };
     let duration: Option<i64> = row.get(9)?;
     doc.duration_ms = duration.and_then(|d| u64::try_from(d).ok());

@@ -36,11 +36,14 @@ fn facet_counts_without_filters() {
         [
             ("Am", 1),
             ("C", 1),
+            ("Cm", 1),
             ("Dm", 1),
             ("Em", 1),
             ("F#m", 1),
-            ("G", 1)
-        ]
+            ("G", 1),
+            ("Gm", 1)
+        ],
+        "docs 4 and 9 have mode-less keys (C, G): counted in both modes"
     );
     let libs: Vec<(i64, usize)> = f
         .libraries
@@ -106,7 +109,7 @@ fn facets_ignore_their_own_any_of_filter() {
     };
     let (hits, f) = facets(&ix, "", am);
     assert_eq!(hits, ids(&[3, 4, 5, 8]));
-    assert_eq!(f.keys.len(), 6, "key chips ignore the key filter");
+    assert_eq!(f.keys.len(), 8, "key chips ignore the key filter");
     assert_eq!(counts(&f.kinds), [("loop", 2), ("one_shot", 1)]);
 }
 

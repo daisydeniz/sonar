@@ -163,7 +163,7 @@ fn filter_values_are_effective_values() {
             fav,
         ),
         (
-            "INSERT INTO analysis (file_id, key) VALUES (?1, 'G minor')",
+            "INSERT INTO analysis (file_id, key, key_conf) VALUES (?1, 'G minor', 0.95)",
             fav,
         ),
     ] {
@@ -183,10 +183,16 @@ fn filter_values_are_effective_values() {
         keys: vec![parse_key(k).expect("key")],
         ..Filters::default()
     };
-    assert_eq!(filter(&ix, key("Am"), by), [prior]);
-    assert_eq!(filter(&ix, key("Cm"), by), [detected]);
+    // Filename-prior keys are low tier (ADR-041): only with uncertain keys.
+    let uncertain = |k| Filters {
+        include_uncertain_keys: true,
+        ..key(k)
+    };
+    assert!(filter(&ix, key("Am"), by).is_empty(), "name only: low tier");
+    assert_eq!(filter(&ix, uncertain("Am"), by), [prior]);
+    assert_eq!(filter(&ix, uncertain("Cm"), by), [detected]);
     assert!(
-        filter(&ix, key("F#m"), by).is_empty(),
+        filter(&ix, uncertain("F#m"), by).is_empty(),
         "cleared by override"
     );
     assert_eq!(filter(&ix, key("Gm"), by), [fav]);

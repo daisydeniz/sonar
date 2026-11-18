@@ -165,6 +165,12 @@ weights} }`.
    effective category/kind/BPM/key/duration/library/tags/favourite in
    `ff_*` fields; compatible keys via Camelot; hidden excluded; facet
    counts drill-sideways in one collector pass; unknown values sort last).
+   Key (ADR-041, T10.5): `ff_key` holds root × {major, mode-less, minor}
+   plus a low-tier offset (`search::key_value`); filter and facet use
+   medium + high tier and overrides unless `include_uncertain_keys`
+   (CLI `--key-uncertain`); a mode-less key (`A`) answers `A` and `Am`;
+   sort by key puts the low tier after the others. Typed key words
+   (`Am` → `key:am`) stay a text match on names, not a key filter.
 2. **Text** → BM25 over tokenized name/path/tags + synonyms; exclusions.
 3. **Semantic** → CLAP text embedding of the positive words → exact cosine
    kNN over the current CLAP audio vectors of the allowed set (filters

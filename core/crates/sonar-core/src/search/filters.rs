@@ -7,6 +7,10 @@
 //!   `None`.
 //! - A file whose value is unknown never matches an active filter on it.
 //! - Hidden files are excluded unless [`Filters::include_hidden`].
+//! - Keys (ADR-041): only medium/high-tier keys (and user overrides)
+//!   match unless [`Filters::include_uncertain_keys`]; a mode-less key
+//!   (`A`, a note or loop root) matches both `A` and `Am` (see
+//!   [`super::key_value`]).
 //! - Strings match after the same folding as the index (lowercase, no
 //!   diacritics): `--category Kick` = `kick`.
 
@@ -19,6 +23,7 @@ use tantivy::query::{
 use tantivy::schema::{Field, IndexRecordOption};
 use tantivy::Term;
 
+use super::key_value::accepted_values;
 use super::keys::{compatible_codes, key_code};
 use crate::index::{bpm_centi, facet_value, Fields};
 use crate::text::Key;
@@ -49,11 +54,16 @@ pub struct Filters {
     pub kinds: Vec<String>,
     /// Effective tempo in BPM within this range.
     pub bpm: Option<ValueRange<f64>>,
-    /// Effective key is one of these (mode `None` = major).
+    /// Effective key is one of these (mode `None` = major). Files whose
+    /// key has no mode match either mode of its root.
     pub keys: Vec<Key>,
     /// Also accept the harmonically compatible keys of [`Filters::keys`]
     /// (Camelot wheel, see [`super::keys`]).
     pub compatible_keys: bool,
+    /// Also let low-tier keys (confidence below
+    /// [`crate::key::KEY_TIER_MEDIUM`]) answer the key filter and count in
+    /// the key facet (default: medium + high only, ADR-041).
+    pub include_uncertain_keys: bool,
     /// Duration in milliseconds within this range.
     pub duration_ms: Option<ValueRange<u64>>,
     /// In one of these libraries (`libraries.id`).
@@ -94,6 +104,12 @@ impl Filters {
         codes.sort_unstable();
         codes.dedup();
         codes
+    }
+
+    /// Index values ([`super::key_value`]) the key filter accepts; empty =
+    /// no key filter.
+    pub(crate) fn key_values(&self) -> Vec<u64> {
+        accepted_values(&self.key_codes(), self.include_uncertain_keys)
     }
 
     /// Folded category values.
@@ -157,7 +173,7 @@ impl Filters {
             if !kinds.is_empty() {
                 must(text_set(ff.kind, &kinds));
             }
-            let keys = self.key_codes();
+            let keys = self.key_values();
             if !keys.is_empty() {
                 must(u64_set(ff.key, &keys));
             }

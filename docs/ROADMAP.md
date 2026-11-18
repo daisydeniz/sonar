@@ -122,6 +122,8 @@ v1.x: record-to-search, 2D map, tempo-synced preview, kit builder, `.als` projec
 v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 
 ## Later (not picked by the loop — founder triages after M8)
+- (from T10.5 review) `search/collect.rs` is 432 lines; move `SortValue`/`compare` or its tests to their own file.
+- (from T10.5) `AppModelTests.testShellFlow` failed once then passed unchanged (favourites step saw the stale "hit" rows): poll-vs-explicit-refresh race; make that step wait until its refresh is applied.
 - (from T10.4b) High key tier misses 90 % on real files (silver 79.7 %, golden 68.8 % at conf ≥ 0.9; golden medium 34.5 %; ECE 18.5 / 31.7 %): inspect high-confidence misses (relative/fifth vs label noise) and recalibrate `key::fuse`.
 - (from T10.4 review) `eval/metrics.rs` (466) and `eval/baseline.rs` (613 lines) exceed ~400 lines; split.
 - (from T10.3 review) Seeded pitched loops live in `key/root_tests.rs`, not `sonar fixtures`; eval does not report loop-root accuracy (T10.4 could add a root truth field).
@@ -129,7 +131,6 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T10.2 review) Agreeing name is counted twice (NAME_BONUS inside audio score `a`, then noisy-or with `n`); compute `a` without the bonus — T10.4 calibration should account for it.
 - (from T10.2 review) `tests/key.rs` checks key/note accuracy by threshold (≥90/95 %), not exact 16/16, 52/52; fixtures eval holds it today.
 - (from T10.2 review) `is_tonal` is now only used by tests; remove or document as diagnostics. `ChromaMap::new` rebuilt per call on the noise path.
-- (from T10.2) Until T10.5 the key filter ignores confidence, so `key:F#m` also returns drum loops with a low-confidence guess.
 - (from toolbar-header fix) Fixed ToolbarSpacers stay when the trial badge / indexing status is hidden; tie each spacer to its item's condition if the gap is visible.
 - (from T10.1 review) Trailing-letter/bracket key rules also fire on queries (`Piano C` → `key:c|note:c|c`); consider limiting to filenames.
 - (from T10.1 review) `top`/`ride` drum words block a bracketed key without a tonal word (`Top Line Loop (C)`).

@@ -10,8 +10,9 @@ use super::analyzer::TOKENIZER_NAME;
 /// Version of the schema below. Bump on any field or option change; with
 /// [`crate::text::ANALYZER_VERSION`] it decides whether an on-disk index
 /// is reused or rebuilt (ADR-017).
-/// 1 = T2.2 text fields, 2 = T2.3 filter/sort/facet fields.
-pub const SCHEMA_VERSION: u32 = 2;
+/// 1 = T2.2 text fields, 2 = T2.3 filter/sort/facet fields, 3 = T10.5
+/// `ff_key` values carry mode-less and low-tier keys.
+pub const SCHEMA_VERSION: u32 = 3;
 
 /// Name of the `file_id` field (u64 fast field; `files.id`).
 pub(crate) const FILE_ID: &str = "file_id";
@@ -29,7 +30,8 @@ pub(crate) mod ff {
     pub const KIND: &str = "ff_kind";
     /// User tags, one value each (string, multi-valued, indexed + fast).
     pub const TAGS: &str = "ff_tags";
-    /// Effective key as a [`crate::search::keys`] code (u64, indexed + fast).
+    /// Effective key with its mode-less flag and tier, as a
+    /// `search::key_value` index value (u64, indexed + fast).
     pub const KEY: &str = "ff_key";
     /// Effective BPM × 100, rounded (u64, fast; range filter on the column).
     pub const BPM: &str = "ff_bpm";

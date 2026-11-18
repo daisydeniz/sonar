@@ -27,6 +27,17 @@ final class FilterSearchTests: XCTestCase {
         return String(key.dropLast(3))
     }
 
+    /// Does a row's stored key answer the key facet `label`? Its own label,
+    /// or a mode-less key of the same root, which matches both modes
+    /// (ADR-041, T10.5: a mode-less `A` answers `A` and `Am`).
+    /// The raw key is compared for the mode-less case, so `Amaj` never
+    /// answers `Am`.
+    private func answers(_ key: String?, facet label: String) -> Bool {
+        guard let key else { return false }
+        let root = label.hasSuffix("m") ? String(label.dropLast()) : label
+        return facetLabel(key) == label || key == root
+    }
+
     /// A model over the indexed fixtures library.
     private func indexedModel() async throws -> AppModel {
         let env = ProcessInfo.processInfo.environment
@@ -104,11 +115,11 @@ final class FilterSearchTests: XCTestCase {
         model.filters.keys = [key.value]
         await model.refreshResults()
         XCTAssertEqual(model.resultCount, Int(key.count))
-        XCTAssertTrue(rows(model).allSatisfy { facetLabel($0.key) == key.value })
+        XCTAssertTrue(rows(model).allSatisfy { answers($0.key, facet: key.value) })
         model.filters.compatibleKeys = true
         await model.refreshResults()
         XCTAssertGreaterThanOrEqual(model.resultCount, Int(key.count))
-        XCTAssertTrue(rows(model).contains { facetLabel($0.key) == key.value })
+        XCTAssertTrue(rows(model).contains { answers($0.key, facet: key.value) })
 
         // BPM range
         model.clearFilters()

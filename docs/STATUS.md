@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M10 honest key (M0–M7, M9 done; human-only: T3.7, T7.4, T8.1)
-- Next task: T10.5 (M10 honest key, ADR-041)
+- Next task: T10.6 (M10 honest key, ADR-041)
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
@@ -43,6 +43,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-18 — T10.5: Key filter/facet honest by default: only medium + high tier (overrides count as certain); `--key-uncertain` / FFI `include_uncertain_keys` adds low. Mode-less `A` answers `A` and `Am` (also via compatible keys); sort by key puts low tier after the rest. `ff_key` = root·3+mode (+36 low), index SCHEMA_VERSION 3 (rebuild). Note: name-only keys of not-yet-analysed files are low tier, so they leave the default key filter until analysis. 500k p95 30.6 ms (budget 50). Fixtures eval green; no analysis change → no eval-real. check.sh green; reviewer APPROVE r1. Later: 2 T10.5 items.
 - 2026-11-18 — T10.4b: Key tiers re-fitted on real files (`scripts/eval-real.sh`, names hidden): `KEY_TIER_HIGH` 0.90 / `KEY_TIER_MEDIUM` 0.60 (was 0.75/0.30 from fixtures). Silver (344 keys): high 79.7 %, medium 61.5 %, low 31.7 %, ECE 18.5 %, key exact/MIREX 30.0/34.2 %. Golden (88): 68.8/34.5/34.9 %, ECE 31.7 %, exact/MIREX 30.5/37.9 %. 90 % high target unreachable by any bound (best band 79.7 %) → best monotone bounds, documented. Fixtures 100/100/0 %; ECE docs corrected to 15 bins. check.sh green; reviewer APPROVE r2. Later: 1 T10.4b item.
 - 2026-11-18 — T10.4: Key calibration: `sonar eval` prints accuracy per tier + 10-bin ECE (fixtures and `--silver`, names hidden; any key on drum/noise = wrong, mode-less matches on pitch class). Bounds `KEY_TIER_HIGH` 0.75 / `KEY_TIER_MEDIUM` 0.30 in `key/tier.rs`, FFI `key_tier_high()/medium()`. Fixtures: high 68/68 100 %, medium empty, low 0/36, ECE 3.74 %, monotone. Silver not readable from agent shell. New tracked `key.tier_high_acc_pct`. check.sh green; reviewer APPROVE r1. Later: 2 T10.4 items.
-- 2026-11-18 — T10.3: Loop root note (`key/root.rs`): onset segments → YIN note per segment (unpitched <50 ms sustain), ≥ 60 % energy on one pitch class → mode-less key, conf = share × note conf; fused with chroma (same tonic noisy-or, else T10.2 rule). Seeded loops: root 16/16, mixed max conf 0.24, drum loops 0.09, clicks 0; fixtures key 16/16, note 52/52 unchanged. ~10 ms per 30 s loop. KEY_VERSION 4, DSP_VERSION 9, no migration. check.sh green; reviewer APPROVE r1. Later: 2 T10.3 items.

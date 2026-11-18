@@ -47,6 +47,10 @@ pub struct FilterFlags {
     /// wheel: ±1 and relative major/minor).
     #[arg(long, requires = "key")]
     pub compatible: bool,
+    /// Also low-tier (uncertain) keys in the key filter and key facet
+    /// (default: medium + high confidence only, ADR-041).
+    #[arg(long)]
+    pub key_uncertain: bool,
     /// Duration range in seconds (`0-2`, `0.5-`, `-1.5`), or in
     /// milliseconds with an `ms` suffix (`0-2000ms`). Inclusive.
     #[arg(long, value_name = "RANGE", allow_hyphen_values = true, value_parser = parse_duration)]
@@ -86,6 +90,7 @@ impl FilterFlags {
             bpm: self.bpm,
             keys: self.key.clone(),
             compatible_keys: self.compatible,
+            include_uncertain_keys: self.key_uncertain,
             duration_ms: self.duration,
             libraries,
             tags: self.tag.clone(),
