@@ -29,7 +29,6 @@ struct InspectorView: View {
                 .padding(.horizontal, Theme.Space.s12)
                 .padding(.bottom, Theme.Space.s16)
             }
-            .background(Theme.Color.surfaceContent)
         } else {
             EmptyStateView(
                 symbol: "sidebar.trailing", title: "No selection",

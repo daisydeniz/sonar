@@ -31,12 +31,27 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220)
         } detail: {
             detail
-                .inspector(isPresented: $showInspector) {
-                    InspectorView(model: model, row: model.selectedRow,
-                        onToggleFavorite: { _ in Task { await model.toggleFavoriteOfSelection() } },
-                        onFindSimilar: { model.findSimilar(to: $0) })
-                    .inspectorColumnWidth(min: 240, ideal: 280, max: 400)
+                .toolbar {
+                    ToolbarItem { TrialBadgeView(license: license) }
+                    if #available(macOS 26, *) { ToolbarSpacer(.fixed) }
+                    ToolbarItem { IndexingStatusView(model: model) }
+                    // While the inspector is hidden its toolbar is gone, so the
+                    // toggle moves to the trailing edge of the detail column.
+                    if !showInspector {
+                        if #available(macOS 26, *) { ToolbarSpacer(.flexible) }
+                        ToolbarItem { inspectorToggle }
+                    }
                 }
+        }
+        .inspector(isPresented: $showInspector) {
+            InspectorView(model: model, row: model.selectedRow,
+                onToggleFavorite: { _ in Task { await model.toggleFavoriteOfSelection() } },
+                onFindSimilar: { model.findSimilar(to: $0) })
+            .inspectorColumnWidth(min: 240, ideal: 280, max: 400)
+            .toolbar {
+                if #available(macOS 26, *) { ToolbarSpacer(.flexible) }
+                ToolbarItem { inspectorToggle }
+            }
         }
         .searchable(text: $model.searchText, prompt: "Search samples")
         .onChange(of: model.searchText) { model.searchTextChanged() }
@@ -70,23 +85,21 @@ struct ContentView: View {
         .onSubmit(of: .search) { _ = model.keyboard.focusResults?() }
         .onAppear { searchMonitor.install(actions: model.keyboard) }
         .onDisappear { searchMonitor.remove() }
-        .toolbar {
-            ToolbarItem { TrialBadgeView(license: license) }
-            if #available(macOS 26, *) { ToolbarSpacer(.fixed) }
-            ToolbarItem { IndexingStatusView(model: model) }
-            if #available(macOS 26, *) { ToolbarSpacer(.fixed) }
-            ToolbarItem {
-                Button { showInspector.toggle() } label: { Label("Inspector", systemImage: "sidebar.trailing") }
-                    .help("Show or hide the inspector")
-            }
-        }
-        .alert("Sonar", isPresented: Binding(
-            get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })
-        ) {
+        .alert("Sonar", isPresented: errorShown) {
             Button("OK") { model.errorMessage = nil }
         } message: {
             Text(model.errorMessage ?? "")
         }
+    }
+
+    /// Shows or hides the inspector column; also View > Show Inspector (⌃⌘I).
+    private var inspectorToggle: some View {
+        Button { showInspector.toggle() } label: { Label("Inspector", systemImage: "sidebar.trailing") }
+            .help("Show or hide the inspector (⌃⌘I)")
+    }
+
+    private var errorShown: Binding<Bool> {
+        Binding(get: { model.errorMessage != nil }, set: { if !$0 { model.errorMessage = nil } })
     }
 
     private var detail: some View {

@@ -43,7 +43,7 @@ struct WaveformView: View {
                         Divider()
                         Button("Clear Selection") { model.clearRegion() }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Image(systemName: "ellipsis")
                     }
                     .menuStyle(.borderlessButton)
                     .menuIndicator(.hidden)

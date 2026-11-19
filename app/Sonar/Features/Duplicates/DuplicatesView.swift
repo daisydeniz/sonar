@@ -112,7 +112,7 @@ struct DuplicateRowView: View {
                 .frame(width: 70, alignment: .trailing)
             Button { model.selectDuplicate(member, in: group) } label: { Image(systemName: "play.fill") }
                 .help("Preview").accessibilityLabel("Preview \(member.row.name)")
-            Button { model.revealDuplicate(member) } label: { Image(systemName: "magnifyingglass") }
+            Button { model.revealDuplicate(member) } label: { Image(systemName: "folder") }
                 .help("Reveal in Finder").accessibilityLabel("Reveal \(member.row.name) in Finder")
             Button("Keep This") { Task { await model.keepOnly(member, in: group) } }
                 .help("Keep this file, hide the others in the group (nothing is deleted)")

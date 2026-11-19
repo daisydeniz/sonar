@@ -20,6 +20,7 @@ struct SonarApp: App {
                 .task { if !Self.isTesting { await license.refresh() } }
         }
         .commands {
+            InspectorCommands()
             CommandGroup(after: .appInfo) {
                 Button("Check for Updates…") { updater.checkForUpdates() }
                     .disabled(!updater.isEnabled)

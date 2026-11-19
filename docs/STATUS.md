@@ -4,8 +4,8 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M11 Logic Pro-style filters and tags (founder request 2026-11-20); human-only: T3.7, T7.4, T8.1
-- Next task: T11.3 Platform pass on macOS 27 (reviewer)
-- Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
+- Next task: none — all non-human tasks done (M11 complete, tag m11-done)
+- Loop state: ROADMAP COMPLETE   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (updated 2026-11-20; T0.1 was macOS 26.7.2 / Xcode 26.5)
 macOS 27.2.1 arm64 · Xcode 27.2 · xcodegen 2.46.0 · rustup 1.29.3 (Homebrew) ·
@@ -14,6 +14,7 @@ rustc/cargo 1.100.0 · cargo-deny 0.21.0 · claude 2.1.328 · gh: not installed 
 ## Needs human
 _(Agents list anything that requires the founder: decisions, credentials,
 manual tests, labeled data. Keep each item one line with the task id.)_
+- T11.3 Manual check (snapshots have no window toolbar): the inspector toggle sits at the trailing edge over the inspector, stays reachable when the inspector is hidden, and ⌃⌘I / View > Show Inspector toggles it; the inspector background matches with and without a selection.
 - T11.1 Manual check: click Filters → popover (glass on macOS 26+, height sensible, scrolls when long); Tab between sections, arrows between chips, Space toggles, Esc closes; chips apply at once; bar chip × removes one value, chip body reopens the panel; Key Any/Major/Minor maps roots to `A` / `Am`.
 - T10.7 Golden labels: 3 BPM labels in `eval/golden/labels.csv` are wrong by file length ("How Long" kit stems are 122 not 120; Kick Loop 14 + Darbuka Loop 10 are 120 not 122; see ADR-021 addendum T10.7); fixing them takes golden BPM ±1 to 90.2 %. Re-run `scripts/eval-real.sh`. Libraries re-analyse once (DSP_VERSION 11).
 - T0.1 (optional) For `cargo` in a normal terminal / hand-started `claude`, add to ~/.zprofile: `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"` (scripts and autopilot already handle it). Optional: `brew install gh`.
@@ -47,6 +48,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-20 — T11.3: macOS 27 platform pass over all 66 snapshots. Fixed: inspector attached to the split view with its toggle over the inspector column (in the detail toolbar while hidden) + View > Show Inspector ⌃⌘I; no custom background behind the inspector; Duplicates Reveal uses `folder`; waveform More uses `ellipsis`. UI only, no eval. check.sh green; reviewer APPROVE r2. Later: 7 T11.3 items. M11 done.
 - 2026-11-20 — T11.2: removable tag chips in the inspector and the Edit Tags sheet use `SonarChip(hue: .tag)` (`facetTag`), like the panel's Tags section; tag editor list rows unchanged. `main` snapshot now shows inspector tags. UI only, no eval. check.sh green; reviewer APPROVE r1 (NIT fixed).
 - 2026-11-20 — T11.1: one Filters button + system popover panel (Category by family, Key mode Any/Major/Minor + 12 roots + include toggles, Tempo/Duration min–max + single-select quick ranges, Tags) as hued chip clouds with counts and Show More; bar shows one hued active chip per value with ×. 10 colour sets (facet hues + 8 deep fills, white ≥ 4.5:1 tested), `SonarChip(hue:)`, `FilterPanelModel` + 8 tests, snapshots `main-filter-panel` / `main-filters`. UI only, no eval. check.sh green; reviewer APPROVE r1. Later: 5 T11.1 items.
-- 2026-11-20 — T11.0 (founder request): design direction after the move to macOS 27 / Xcode 27: Logic Pro browser is the main visual reference (DESIGN §1, local screenshot in git-ignored `design/reference/`); spec for one Filters panel with hued chip sections + one active chip per value (§3), hued chips with deep fill (§2.1, §4.2), glass only in the control layer (§5); BAMA `mac-design` / `ux-design` / `design-from-app` skills vendored in `.claude/skills/` (MIT). ADR-042, M11 (T11.1–T11.3). Docs only.
