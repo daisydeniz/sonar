@@ -110,6 +110,7 @@ impl Decoder {
             sample_rate: target,
             source,
             truncated_for_analysis: num_frames > window.window_frames,
+            window_start_s: 0.0,
             partial: outcome.partial,
             problem: outcome.problem,
         };

@@ -54,7 +54,7 @@ fn prior(bpm: f32) -> Option<BpmPrior> {
 #[test]
 fn whole_click_loops_snap_to_exact_tempo() {
     for (bpm, beats) in [
-        (70.0, 8u32),
+        (76.0, 8u32),
         (87.5, 8),
         (120.0, 16),
         (133.0, 16),
@@ -73,12 +73,23 @@ fn whole_click_loops_snap_to_exact_tempo() {
 #[test]
 fn free_running_click_trains_within_one_bpm() {
     // Half a beat off a whole count: no loop snap, the comb peak decides.
-    for bpm in [72.0, 87.5, 101.0, 133.0, 160.0, 175.0] {
+    for bpm in [76.0, 87.5, 101.0, 133.0, 160.0, 175.0] {
         let secs = 14.5 * 60.0 / bpm;
         let t = tempo_of(&clicks(bpm, secs, 4), secs, None).expect("tempo");
         assert!((f64::from(t.bpm) - bpm).abs() <= 1.0, "{bpm}: {t:?}");
         assert_eq!(t.beats, None, "{bpm}");
     }
+}
+
+#[test]
+fn tactus_prior_reads_very_slow_click_trains_double_time() {
+    // Known limit (ADR-021 addendum T10.7): below ~75 BPM the tactus prior
+    // outweighs the 2:1 clock fit of a bare click train.
+    let secs = 8.0 * 60.0 / 70.0;
+    let t = tempo_of(&clicks(70.0, secs, 4), secs, None).expect("tempo");
+    assert!((t.bpm - 140.0).abs() < 0.01, "{t:?}");
+    assert!(tactus_prior(120.0) == 1.0 && tactus_prior(85.0) > tactus_prior(60.0));
+    assert!((tactus_prior(85.0) - tactus_prior(170.0)).abs() < 0.01);
 }
 
 #[test]
@@ -88,6 +99,18 @@ fn truncated_window_uses_linear_autocorrelation() {
         let t = tempo_of(&clicks(bpm, 40.0, 4), 40.0, None).expect("tempo");
         assert!((f64::from(t.bpm) - bpm).abs() <= 1.0, "{bpm}: {t:?}");
         assert_eq!(t.beats, None);
+    }
+}
+
+#[test]
+fn long_bar_aligned_stem_keeps_its_tempo_unsnapped() {
+    // A 64 s stem: 128 beats at 120 (32 bars), 30 s analysed. The
+    // loop-length prior weights the on-grid tempo; no snap (the window is
+    // not the whole file).
+    for (bpm, secs) in [(120.0, 64.0), (122.0, 240.0 * 60.0 / 122.0)] {
+        let t = tempo_of(&clicks(bpm, secs, 4), secs, None).expect("tempo");
+        assert!((f64::from(t.bpm) - bpm).abs() <= 0.5, "{bpm}: {t:?}");
+        assert_eq!(t.beats, None, "{bpm}");
     }
 }
 

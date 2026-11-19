@@ -30,4 +30,6 @@ pub use scores::{kind_scores, KindScores};
 
 /// Version of the loop/one-shot definitions (scores, weights, hint words);
 /// bump when any changes so stored `kind` values are recomputed.
-pub const KIND_VERSION: u32 = 1;
+/// 2 (T10.7): long-file, sustained-end and several-attacks terms
+/// ([`kind::W_LONG`], [`kind::W_SUSTAIN`], [`kind::W_EVENTS`]).
+pub const KIND_VERSION: u32 = 2;

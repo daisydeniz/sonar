@@ -513,6 +513,21 @@ Accepted. `sonar_core::classify` (`classify_kind`, `kind_scores`,
   names hidden.
 - **Cost**: 0.6 ms per 30 s window on top of the analyzer (3.2 ms), 1
   thread, release, M-series. Not yet wired into jobs/store (pipeline task).
+- **Addendum T10.7** (`KIND_VERSION` 2, real loops): three terms join `z`.
+  *Long file* +1.5 when the file outlasts the window and holds ≥ 2 onsets
+  (stems/vocal takes; no labeled one-shot exceeds 12 s). *Sustained end*
+  +1.5 replaces the tail term for files ≥ 4 s with ≥ 2 onsets and a tail
+  within 6 dB of the peak (a loop is cut on the bar grid while sounding;
+  impacts/transitions decay to < −34 dB). *Several attacks* +1 for ≥ 4
+  onsets with pulse ≥ 1 dB (fills too short for periodicity; onset-rate
+  descriptor). The 2-onset gates keep held notes, pads and the 5 min pad
+  fixture one-shots. Long files are analysed from their first sound
+  (`decode::lead`: stems that enter at bar 17). Loop→one-shot: silver
+  234 → 49 of 1010 (4.9 %), golden 42 → 3 of 287; fixtures 100 %. The
+  pack's tempo-synced risers/downlifters/noise are labeled loops while the
+  identical "Transition & Reverse"/"Impact" FX are labeled one-shots, so
+  23 of the 49 remaining silver misses are label convention, not audio;
+  17 are short (1–4 s) decaying fills, 8 single-onset stems.
 
 ## ADR-021 — Loop tempo (BPM) and kind/tempo storage (T3.4)
 Accepted. `sonar_core::tempo` (`estimate_tempo`, `loop_tempo`),
@@ -565,6 +580,24 @@ Accepted. `sonar_core::tempo` (`estimate_tempo`, `loop_tempo`),
   0.6–1.0 ms per 30 s window (analyzer 3.4 ms). `bench analyze --stages
   dsp`: 8776 → 5804 files/s (14 threads, warm cache) with analyzer +
   classify + tempo wired in.
+- **Addendum T10.7** (`TEMPO_VERSION` 2, real loops). *Octave*: the
+  clock-fit alternatives are weighted by a tactus prior (log-Gaussian,
+  120 BPM, σ 0.6 octave; van Noorden & Moelants 1999, Moelants & McKinney
+  2004; between Klapuri 2006's 0.4 and Ellis 2007's ≈ 1–1.4) instead of the
+  broad family prior: on real percussion the ×2 grid fits nearly as well
+  as the beat. σ 0.7/0.75 or fit² cost more octave errors on real loops
+  than they fix; the price is that ≤ 72 BPM material reads double-time
+  (fixture `loop_000`, a 70 BPM backbeat, now reads 140 like its
+  half-time twin `loop_008`; fixtures stay 33/34). *Bar weight*: 4·2ᵏ beats
+  1, 3·2ᵏ 0.6, other multiples of 3/4 0.5, other 0.35. *Loop-length prior
+  on long files too* (stems are exported on the song's bar grid; snapping
+  stays whole-file only). Silver BPM ±1 25.3 → 81.2 %, golden 32.0 →
+  88.9 %. Label noise measured from file lengths: the "How Long (… 120BPM)"
+  kit is 122 BPM (its MASTER is named 122BPM; 118.033 s = 240 beats @122),
+  Kick Loop 14 / Darbuka Loop 10 "(122 BPM)" are 4.000 s = 8 beats @120,
+  Guira Loop 04/05 "(120 BPM)" are 32 beats @122 — 25 silver and 3 golden
+  misses; with them golden is 90.2 %, silver 84.3 %. The rest of silver:
+  rhythm-less FX/textures, 1–2 s fills and a cappella vocal takes.
 
 ## ADR-022 — Key and one-shot note, key/pitch storage (T3.5)
 Accepted. `sonar_core::key` (`estimate_key`, `key_and_note`,

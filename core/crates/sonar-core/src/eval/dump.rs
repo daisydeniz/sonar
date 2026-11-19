@@ -56,3 +56,38 @@ pub(crate) fn write(
     }
     out.flush().map_err(io)
 }
+
+/// `sonar eval --tempo-dump <file>`: one JSON line per analysed file with a
+/// kind or BPM label: `id`, truth `kind`/`bpm`, observed `obs_kind`/`obs_bpm`
+/// (for auditing the loop/one-shot and tempo estimators, T10.7).
+///
+/// # Errors
+/// The file cannot be written.
+pub(crate) fn write_tempo(
+    path: &Path,
+    items: &[Item],
+    analysed: &[std::result::Result<Analysed, String>],
+) -> Result<()> {
+    let io = |source| Error::Io {
+        path: path.to_path_buf(),
+        source,
+    };
+    let mut out = std::io::BufWriter::new(std::fs::File::create(path).map_err(io)?);
+    for (item, r) in items.iter().zip(analysed) {
+        let l = &item.labels;
+        let Ok(a) = r else { continue };
+        if l.kind.is_none() && l.bpm.is_none() {
+            continue;
+        }
+        let line = serde_json::json!({
+            "id": item.id,
+            "path": item.path,
+            "kind": l.kind,
+            "bpm": l.bpm,
+            "obs_kind": a.obs.kind,
+            "obs_bpm": a.obs.bpm,
+        });
+        writeln!(out, "{line}").map_err(io)?;
+    }
+    out.flush().map_err(io)
+}

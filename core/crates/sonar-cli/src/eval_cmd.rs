@@ -53,6 +53,10 @@ pub struct EvalArgs {
     /// classifier, ADR-028).
     #[arg(long, value_name = "FILE", hide = true)]
     pub category_dump: Option<PathBuf>,
+    /// Write per-file loop/one-shot and BPM truth and decisions (JSON
+    /// lines) to FILE (for auditing the tempo estimator).
+    #[arg(long, value_name = "FILE", hide = true)]
+    pub tempo_dump: Option<PathBuf>,
     /// Exit non-zero when a tracked metric regressed against the baseline
     /// (a percentage dropped by more than 1 point, or a must-be-zero count
     /// rose). Only tiers present in the baseline are compared.
@@ -103,6 +107,7 @@ pub fn run(args: &EvalArgs) -> Result<()> {
         similar_sweep: args.similar_sweep,
         clap,
         category_dump: args.category_dump.clone(),
+        tempo_dump: args.tempo_dump.clone(),
         text_encoder,
     };
     let mut tiers = Vec::new();

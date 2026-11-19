@@ -60,6 +60,8 @@ fn analyze(
     use_names: bool,
 ) -> sonar_core::Result<Done> {
     let decoded = decoder.decode(file, opts)?;
+    // The `dsp` stage's window (stems that enter late).
+    let decoded = decoder.skip_leading_silence(file, opts, decoded)?;
     let features = analyzer.analyze(&decoded.samples)?;
     let duration = decoded.source.duration_s;
     let (hint, prior) = if use_names {
@@ -88,6 +90,8 @@ fn to_json(file: &Path, r: &sonar_core::Result<Done>) -> serde_json::Value {
             "kind": d.kind.kind,
             "kind_confidence": d.kind.confidence,
             "kind_source": d.kind.source,
+            "kind_audio_logit": d.kind.audio_logit,
+            "kind_scores": d.kind.scores,
             "tempo": d.tempo,
             "tempo_ms": d.tempo_ms,
         }),

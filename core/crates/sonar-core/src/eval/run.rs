@@ -77,9 +77,15 @@ pub(crate) struct Analysed {
 fn analyze(item: &Item, with_aspects: bool, opts: &EvalOptions) -> Result<Analysed, String> {
     let run = quiet_panic::guarded(|| {
         let a = with_workers(|w| {
+            let opts = DecodeOptions::default();
             let decoded = w
                 .decoder
-                .decode(&item.path, &DecodeOptions::default())
+                .decode(&item.path, &opts)
+                .map_err(|e| e.to_string())?;
+            // As the `dsp` stage: stems that enter late from the first sound.
+            let decoded = w
+                .decoder
+                .skip_leading_silence(&item.path, &opts, decoded)
                 .map_err(|e| e.to_string())?;
             analyze_window(w, &decoded, NameHints::default(), with_aspects)
                 .map_err(|e| e.to_string())
@@ -148,6 +154,8 @@ pub struct EvalOptions {
     /// Write per-file category evidence (JSON lines) here (diagnostics for
     /// tuning the classifier, ADR-028).
     pub category_dump: Option<PathBuf>,
+    /// Write per-file kind/BPM truth and decisions (JSON lines) here.
+    pub tempo_dump: Option<PathBuf>,
     /// CLAP text tower for the semantic / hybrid text-search metrics
     /// (with [`EvalOptions::clap`]; `None` = BM25 only).
     pub text_encoder: Option<Arc<Mutex<TextEncoder>>>,
@@ -176,6 +184,11 @@ pub fn evaluate_with(ds: &Dataset, opts: EvalOptions) -> TierReport {
         let bank = opts.clap.as_ref().map(|c| &c.bank);
         if let Err(e) = super::dump::write(path, &ds.items, &analysed, bank) {
             notes.push(format!("category dump not written: {e}"));
+        }
+    }
+    if let Some(path) = &opts.tempo_dump {
+        if let Err(e) = super::dump::write_tempo(path, &ds.items, &analysed) {
+            notes.push(format!("tempo dump not written: {e}"));
         }
     }
     for (item, result) in ds.items.iter().zip(&analysed) {

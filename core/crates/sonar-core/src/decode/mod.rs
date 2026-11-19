@@ -32,6 +32,7 @@ mod aiff;
 mod gapless;
 mod header;
 mod inner;
+pub mod lead;
 mod mix;
 mod resample;
 pub mod source;
@@ -39,6 +40,8 @@ pub mod stream;
 
 #[cfg(test)]
 mod header_tests;
+#[cfg(test)]
+mod lead_tests;
 #[cfg(test)]
 mod length_tests;
 #[cfg(test)]
@@ -129,16 +132,19 @@ pub struct SourceInfo {
 /// Result of decoding one file.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Decoded {
-    /// Mono samples at [`Decoded::sample_rate`], first
-    /// `max_analysis_secs` of the file only.
+    /// Mono samples at [`Decoded::sample_rate`]: `max_analysis_secs` of
+    /// the file from [`Decoded::window_start_s`].
     pub samples: Vec<f32>,
     /// Rate of `samples` (= the requested target rate).
     pub sample_rate: u32,
     /// Stored format and true duration.
     pub source: SourceInfo,
     /// The file is longer than the analysis window (`samples` covers only
-    /// its start).
+    /// part of it).
     pub truncated_for_analysis: bool,
+    /// Where `samples` start in the file (s): 0, unless
+    /// [`Decoder::skip_leading_silence`] moved the window.
+    pub window_start_s: f64,
     /// Decoding stopped early or skipped damaged packets (truncated or
     /// corrupt file); `samples` and `num_frames` cover what was readable.
     pub partial: bool,

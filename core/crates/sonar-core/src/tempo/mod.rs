@@ -14,17 +14,28 @@
 //! 3. **Octave correction**: the ×¼…×4 alternatives of that peak are
 //!    re-scored by **clock fit** ([`clock`]; Povel & Essens 1985) — the
 //!    autocorrelation alone ranks the half-bar of a backbeat above the beat.
-//! 4. **Weights** (steps 2 and 3): a log-Gaussian tempo prior around
+//! 4. **Weights** (steps 2 and 3): a broad log-Gaussian tempo prior around
 //!    [`PRIOR_CENTER_BPM`] ([`PRIOR_SIGMA_OCT`] octaves, Ellis 2007 §3.1
-//!    weights the autocorrelation the same way); a **loop-length prior**
-//!    when the window holds the whole file — a loop is a whole number of
+//!    weights the autocorrelation the same way) for the family, the
+//!    narrower **tactus prior** ([`tactus_prior`], preferred beat near
+//!    120 BPM) for the octave — on real percussion loops the clock fit of
+//!    the ×2 grid is often as good as the beat's, so the octave is a
+//!    near-tie that the perceptual preference decides; a **loop-length
+//!    prior** on the file's true duration — a loop is a whole number of
 //!    beats, usually whole 4/4 bars, so `b·duration/60 ≈ n` with `n` a power
-//!    of two times 4 ([`bar_weight`]; off-grid tempi get
-//!    [`OFF_GRID_WEIGHT`]); an optional filename BPM ([`NAME_WEIGHT`] within
-//!    [`NAME_TOL_REL`]).
-//! 5. **Refinement**: a winner that fits the loop length is snapped to
-//!    exactly `n·60/duration` (sub-integer precision for free); otherwise
-//!    the parabolic estimate stands.
+//!    of two times 4 ([`bar_weight`]; it cannot tell ×2 octaves apart — 4
+//!    bars at 120 are 8 bars at 240 — but it penalizes 5:4 / 3:4 errors;
+//!    off-grid tempi get [`OFF_GRID_WEIGHT`]). It also applies to files
+//!    longer than the window (T10.7): construction-kit stems and vocal takes
+//!    are exported on the song's bar grid (a 118.03 s stem is exactly 240
+//!    beats at 122 BPM), and on such long files the grid tolerance
+//!    ([`SNAP_MAX_BEATS`] ≈ ±0.15 BPM at 80 s) only admits a tempo that was
+//!    estimated almost exactly; an optional filename BPM ([`NAME_WEIGHT`]
+//!    within [`NAME_TOL_REL`]).
+//! 5. **Refinement**: when the window holds the whole file, a winner that
+//!    fits the loop length is snapped to exactly `n·60/duration`
+//!    (sub-integer precision for free); otherwise the parabolic estimate
+//!    stands.
 //!
 //! The filename prior is optional (the eval hides names): it breaks octave
 //! ties, and supplies the value (source [`TempoSource::Filename`]) when
@@ -50,7 +61,9 @@ use crate::text::BpmPrior;
 
 /// Version of the tempo definitions (salience, priors, weights); bump when
 /// any changes so stored BPMs are recomputed.
-pub const TEMPO_VERSION: u32 = 1;
+/// 2 (T10.7): [`tactus_prior`] for the octave decision, revised
+/// [`bar_weight`], loop-length prior also on files longer than the window.
+pub const TEMPO_VERSION: u32 = 2;
 /// Slowest tempo searched.
 pub const MIN_BPM: f32 = 40.0;
 /// Fastest tempo searched.
@@ -61,6 +74,10 @@ pub const GRID_STEP_BPM: f32 = 0.1;
 pub const PRIOR_CENTER_BPM: f32 = 110.0;
 /// Width of the tempo prior (octaves).
 pub const PRIOR_SIGMA_OCT: f32 = 1.5;
+/// Centre of the tactus prior of the octave decision (BPM).
+pub const TACTUS_CENTER_BPM: f32 = 120.0;
+/// Width of the tactus prior (octaves).
+pub const TACTUS_SIGMA_OCT: f32 = 0.6;
 /// Candidates need at least this comb salience.
 pub const MIN_SALIENCE: f32 = 0.05;
 /// Salience at which detection strength saturates (confidence factor 1).
@@ -208,11 +225,12 @@ fn detect(features: &Features, duration_s: f64, prior_bpm: Option<f32>) -> Optio
         n as f32
     };
     let per = Periodicity::new(&env[..n], fps, whole)?;
-    let weight = |bpm: f32| -> f32 {
-        let mut w = tempo_prior(bpm);
-        if whole {
-            w *= loop_fit(bpm, loop_s).map_or(OFF_GRID_WEIGHT, |(n, _)| bar_weight(n));
-        }
+    // `prior`: [`tempo_prior`] for the family search, [`tactus_prior`] for
+    // the octave decision.
+    let weighted = |bpm: f32, prior: fn(f32) -> f32| -> f32 {
+        // Loop-length prior on the true duration, also for long files.
+        let mut w =
+            prior(bpm) * loop_fit(bpm, loop_s).map_or(OFF_GRID_WEIGHT, |(n, _)| bar_weight(n));
         if prior_bpm.is_some_and(|p| (bpm - p).abs() <= NAME_TOL_REL * p) {
             w *= NAME_WEIGHT;
         }
@@ -240,7 +258,7 @@ fn detect(features: &Features, duration_s: f64, prior_bpm: Option<f32>) -> Optio
         cands.push(Candidate {
             bpm,
             salience,
-            score: salience * weight(bpm),
+            score: salience * weighted(bpm, tempo_prior),
         });
     }
     let family = *cands.iter().max_by(|a, b| a.score.total_cmp(&b.score))?;
@@ -263,7 +281,7 @@ fn detect(features: &Features, duration_s: f64, prior_bpm: Option<f32>) -> Optio
         alts.push(Candidate {
             bpm,
             salience,
-            score: fit * weight(bpm),
+            score: fit * weighted(bpm, tactus_prior),
         });
     }
     let best = *alts.iter().max_by(|a, b| a.score.total_cmp(&b.score))?;
@@ -297,6 +315,28 @@ pub fn tempo_prior(bpm: f32) -> f32 {
     (-0.5 * oct * oct).exp()
 }
 
+/// Log-Gaussian **tactus** prior of the octave decision (1 at
+/// [`TACTUS_CENTER_BPM`], [`TACTUS_SIGMA_OCT`] octaves wide): listeners
+/// and annotators place the beat near 120 BPM (a 0.5 s period) when the
+/// metrical levels are otherwise ambiguous — van Noorden & Moelants,
+/// "Resonance in the perception of musical pulse" (J. New Music Research
+/// 28(1), 1999); Moelants & McKinney, "Tempo perception and musical
+/// content" (ICMPC 2004); Ellis 2007 centres his tempo weighting at the
+/// same 0.5 s. The width sits between Klapuri et al. 2006 (tactus period
+/// log-normal, σ = 0.28 ln ≈ 0.4 octave) and Ellis 2007 / librosa
+/// (≈ 1–1.4 octaves); being centred at 120, octave pairs are weighted
+/// equally at 85 / 170 BPM. Down to a 75 / 150 pair the prior ratio stays
+/// below 2 — the clock-fit ratio of a beat grid over its ×2 grid with
+/// empty off-beat ticks — so clear clock fit still decides there; slower
+/// material (≤ 72 BPM, even a bare click train) reads double-time. A
+/// wider prior (0.7–0.75) or a sharper clock fit (fit²) cost real loops
+/// more octave errors than they fix (`docs/DECISIONS.md` ADR-021 addendum
+/// T10.7).
+pub fn tactus_prior(bpm: f32) -> f32 {
+    let oct = (bpm / TACTUS_CENTER_BPM).log2() / TACTUS_SIGMA_OCT;
+    (-0.5 * oct * oct).exp()
+}
+
 /// Whole beats `n` and the exact tempo `n·60/loop_s` when `bpm` fits a
 /// loop of `loop_s` seconds (see [`SNAP_MAX_BEATS`], [`SNAP_MAX_REL`]).
 pub fn loop_fit(bpm: f32, loop_s: f32) -> Option<(u32, f32)> {
@@ -315,16 +355,17 @@ pub fn loop_fit(bpm: f32, loop_s: f32) -> Option<(u32, f32)> {
 
 /// Loop-length weight of a whole number of beats: whole 4/4 bars in a
 /// power-of-two count (1, 2, 4, 8 … bars) are the norm for sample loops,
-/// other whole 4/4 bars and whole 3/4 bars are common, anything else is
-/// rare.
+/// then a power-of-two count of 3/4 bars (3·2ᵏ beats); other whole bar
+/// counts (5 or 7 bars of 4/4 — what a 5:4 or 7:8 tempo error of a 4- or
+/// 8-bar loop looks like) are rare, anything else rarer still.
 pub fn bar_weight(beats: u32) -> f32 {
     if beats.is_multiple_of(4) && (beats / 4).is_power_of_two() {
         1.0
-    } else if beats.is_multiple_of(4) {
-        0.85
-    } else if beats.is_multiple_of(3) {
-        0.7
+    } else if beats.is_multiple_of(3) && (beats / 3).is_power_of_two() {
+        0.6
+    } else if beats.is_multiple_of(4) || beats.is_multiple_of(3) {
+        0.5
     } else {
-        0.4
+        0.35
     }
 }

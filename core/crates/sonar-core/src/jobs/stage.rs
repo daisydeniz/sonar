@@ -36,8 +36,11 @@ pub const META_VERSION: u32 = 2;
 /// (T10.1) `KEY_VERSION` 2: more filename key priors. 8 (T10.2)
 /// `KEY_VERSION` 3: fused key with graded confidence (ADR-041). 9 (T10.3)
 /// `KEY_VERSION` 4: root note of pitched loops. 10 (T10.6) `KEY_VERSION` 5:
-/// stores the note's cents (`analysis.pitch_cents`).
-pub const DSP_VERSION: u32 = 10;
+/// stores the note's cents (`analysis.pitch_cents`). 11 (T10.7)
+/// `KIND_VERSION` 2 / `TEMPO_VERSION` 2: long-file kind term, tactus prior
+/// for the tempo octave, and the analysis window of a long file skips its
+/// leading silence ([`crate::decode::lead`]).
+pub const DSP_VERSION: u32 = 11;
 /// Version of the `embed` stage (T5.2, ADR-027): CLAP audio embedding of
 /// the first 10 s at the native rate resampled to 48 kHz, int8 audio tower,
 /// stored L2-normalised in the embedding store (`index/clap`). Bump it to

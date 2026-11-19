@@ -25,7 +25,8 @@ fn silver_and_golden_use_labels_but_hide_names_from_the_analyzer() {
         .fixtures
         .iter()
         .filter(|f| f.path.starts_with("loops/") && f.truth.kind == Some(TruthKind::Loop))
-        .filter(|f| f.truth.bpm.is_some_and(|b| b < 140.0))
+        // Unambiguous octave (the 70 / 140 pair reads 140, ADR-021 T10.7).
+        .filter(|f| f.truth.bpm.is_some_and(|b| b > 70.0 && b < 140.0))
         .take(3)
         .collect();
     assert_eq!(loops.len(), 3);

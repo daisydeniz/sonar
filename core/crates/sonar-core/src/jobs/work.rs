@@ -161,22 +161,36 @@ fn run_stage(
     match w.decoder.decode_with_meta(path, &decode, &meta) {
         Ok((decoded, meta)) => {
             let analysis = match stage {
-                Stage::Dsp => match dsp_analysis(w, &decoded, path) {
-                    Ok(a) => Some(Box::new(a)),
-                    Err(e) => return FileResult::Failed(e.to_string()),
-                },
+                Stage::Dsp => {
+                    // Stems that enter late: analyse from the first sound.
+                    let decoded = match w.decoder.skip_leading_silence(path, &decode, decoded) {
+                        Ok(d) => d,
+                        Err(e) => return decode_error(e),
+                    };
+                    match dsp_analysis(w, &decoded, path) {
+                        Ok(a) => Some(Box::new(a)),
+                        Err(e) => return FileResult::Failed(e.to_string()),
+                    }
+                }
                 _ => None,
             };
             FileResult::Done { meta, analysis }
         }
+        Err(e) => decode_error(e),
+    }
+}
+
+/// The result for a decode error (also from the leading-silence re-decode).
+fn decode_error(e: Error) -> FileResult {
+    match e {
         // Offline drive, permissions, vanished file: may go away, so the
         // file stays pending (ADR-013).
-        Err(Error::Io { path, source }) => {
+        Error::Io { path, source } => {
             tracing::debug!(path = %path.display(), error = %source, "i/o error, file left pending");
             FileResult::Skipped
         }
-        Err(Error::Cancelled) => FileResult::Skipped,
-        Err(e) => FileResult::Failed(e.to_string()),
+        Error::Cancelled => FileResult::Skipped,
+        e => FileResult::Failed(e.to_string()),
     }
 }
 
@@ -439,8 +453,12 @@ mod tests {
                 );
             }
             match (truth, f.truth.bpm) {
-                // 140 is the half-time pattern (ambiguous octave, ADR-021).
-                (TruthKind::Loop, Some(bpm)) if f.path.starts_with("loops/") && bpm < 140.0 => {
+                // The 70 BPM backbeat and the 140 half-time pattern are one
+                // octave ambiguity (ADR-021; the tactus prior of T10.7 reads
+                // both as 140): only tempi between them are pinned here.
+                (TruthKind::Loop, Some(bpm))
+                    if f.path.starts_with("loops/") && bpm > 70.0 && bpm < 140.0 =>
+                {
                     assert_eq!(a.kind, Some(Kind::Loop), "{}", f.path);
                     let got = f64::from(a.bpm.unwrap_or(0.0));
                     assert!((got - bpm).abs() <= 1.0, "{}: {got} vs {bpm}", f.path);

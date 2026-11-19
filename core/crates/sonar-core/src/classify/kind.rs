@@ -2,7 +2,8 @@
 //! [`KindScores`] evidence plus an optional filename hint.
 //!
 //! `z = W_PERIODICITY·(P_eff − P_CENTER) + duration_term + tail_term
-//! (+ ±W_HINT)`, `p_loop = 1 / (1 + e^(−z))`, Loop iff `z > 0`, where
+//! + long_term + events_term (+ ±W_HINT)`, `p_loop = 1 / (1 + e^(−z))`,
+//! Loop iff `z > 0`, where
 //! - `P_eff = periodicity · min(1, pulse_db / PULSE_REF_DB)`: rhythm is the
 //!   primary cue and must be strong in absolute terms (steady noise has a
 //!   faint, unstructured flux; a steady tone almost none);
@@ -13,7 +14,32 @@
 //!   TAIL_MIN, TAIL_MAX)`: a sound that has died out well before its end
 //!   leans one-shot; a sustained end is no evidence either way
 //!   (`TAIL_MAX` = 0: steady tones are sustained too); 0 when the tail is
-//!   unknown (truncated window).
+//!   unknown (truncated window). Exception (T10.7): a file of at least
+//!   [`SUSTAIN_MIN_S`] (two 4/4 bars at 120 BPM) with
+//!   [`PART_MIN_ONSETS`] onsets or more whose tail is within
+//!   [`SUSTAIN_DB`] of its peak gets `+W_SUSTAIN` instead — a loop is cut
+//!   on the bar grid while it sounds (it must join its own start), while
+//!   one-shots that long (impacts, transitions, reverse FX) decay to their
+//!   end (silver/golden: every labeled one-shot ≥ 4 s has a tail below
+//!   −34 dB). The onset gate keeps a single held note or pad a one-shot;
+//! - `long_term = W_LONG` when the file outlasts the 30 s analysis window
+//!   and the window holds [`PART_MIN_ONSETS`] onsets or more (a single
+//!   sustained sound — drone, pad — is not a part played in time), else
+//!   0: one-shots that long are rare in sample libraries (none of the 195
+//!   labeled one-shots of the silver pack exceeds 12 s), while
+//!   construction-kit stems and full vocal takes — tempo-locked parts
+//!   whose onsets (sung syllables, pads) give only weak periodicity — are
+//!   minutes long (T10.7). With the duration term (+1) it outweighs the
+//!   rhythm term of a window with no measurable pulse (−2.4), so such a
+//!   long multi-event file leans loop;
+//! - `events_term = W_EVENTS` when the window holds [`EVENTS_MIN_ONSETS`]
+//!   onsets or more and a pulse of at least [`PULSE_REF_DB`], else 0:
+//!   several strong, distinct attacks are a played phrase (a fill, a
+//!   short loop) rather than one hit, even when the window is too short
+//!   for two beat periods and periodicity is unmeasurable — the onset
+//!   rate / event density of rhythm descriptor sets (Bello et al. 2005 for
+//!   the onsets; e.g. the `OnsetRate` descriptor of Bogdanov et al.,
+//!   "Essentia", ISMIR 2013 — concept only) (T10.7).
 //!
 //! Weights are hand-set from the fixture distributions (`docs/DECISIONS.md`
 //! ADR-020), so `p_loop` is only *calibrated-ish*: ≈ 0.5 means the evidence
@@ -49,6 +75,22 @@ pub const TAIL_SCALE_DB: f32 = 8.0;
 pub const TAIL_MIN: f32 = -1.0;
 /// Upper clamp of the tail term.
 pub const TAIL_MAX: f32 = 0.0;
+/// Logit added when the file outlasts the analysis window (see the module
+/// docs).
+pub const W_LONG: f32 = 1.5;
+/// Onset peaks a window needs to count as a part rather than one sustained
+/// sound (gates [`W_LONG`] and [`W_SUSTAIN`]).
+pub const PART_MIN_ONSETS: u32 = 2;
+/// Shortest file whose sustained end is loop evidence (s).
+pub const SUSTAIN_MIN_S: f32 = 4.0;
+/// A tail at least this loud (dB re peak) is sustained.
+pub const SUSTAIN_DB: f32 = -6.0;
+/// Tail term of a sustained end (replaces the clamped tail term).
+pub const W_SUSTAIN: f32 = 1.5;
+/// Onset peaks that make a window a phrase of several attacks …
+pub const EVENTS_MIN_ONSETS: u32 = 4;
+/// … and the logit they add (with a pulse of at least [`PULSE_REF_DB`]).
+pub const W_EVENTS: f32 = 1.0;
 /// Logit added (Loop) or subtracted (OneShot) by a filename hint.
 pub const W_HINT: f32 = 2.0;
 
@@ -139,10 +181,21 @@ pub fn audio_logit(s: &KindScores) -> f32 {
     let rhythm = W_PERIODICITY * (p_eff - P_CENTER);
     let dur = s.duration_s.max(1e-3) / DUR_CENTER_S;
     let duration = (DUR_SLOPE * dur.log2()).clamp(DUR_MIN, DUR_MAX);
+    let part = s.onsets >= PART_MIN_ONSETS;
     let tail = s.tail_db.map_or(0.0, |t| {
-        ((t - TAIL_CENTER_DB) / TAIL_SCALE_DB).clamp(TAIL_MIN, TAIL_MAX)
+        if part && s.duration_s >= SUSTAIN_MIN_S && t >= SUSTAIN_DB {
+            W_SUSTAIN
+        } else {
+            ((t - TAIL_CENTER_DB) / TAIL_SCALE_DB).clamp(TAIL_MIN, TAIL_MAX)
+        }
     });
-    let z = rhythm + duration + tail;
+    let long = if s.truncated && part { W_LONG } else { 0.0 };
+    let events = if s.onsets >= EVENTS_MIN_ONSETS && s.pulse_db >= PULSE_REF_DB {
+        W_EVENTS
+    } else {
+        0.0
+    };
+    let z = rhythm + duration + tail + long + events;
     if z.is_finite() {
         z
     } else {

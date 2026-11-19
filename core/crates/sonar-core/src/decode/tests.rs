@@ -337,6 +337,7 @@ fn decoded_reports_analysis_secs() {
             duration_s: 0.5,
         },
         truncated_for_analysis: false,
+        window_start_s: 0.0,
         partial: false,
         problem: None,
     };

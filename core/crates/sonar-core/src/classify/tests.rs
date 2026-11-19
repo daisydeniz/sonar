@@ -4,7 +4,7 @@
 use std::f64::consts::TAU;
 use std::path::Path;
 
-use super::kind::{audio_logit, W_HINT};
+use super::kind::{audio_logit, W_EVENTS, W_HINT};
 use super::*;
 use crate::decode::ANALYSIS_RATE;
 use crate::dsp::{Analyzer, Features};
@@ -159,6 +159,51 @@ fn long_file_has_unknown_tail() {
     assert!(r.scores.truncated && r.scores.tail_db.is_none(), "{r:?}");
     assert_eq!(r.scores.duration_s, 240.0);
     assert_eq!(r.kind, Kind::Loop);
+}
+
+/// Evidence of a rhythm-less window (rhythm term −2.4).
+fn flat(duration_s: f32, onsets: u32, tail_db: Option<f32>) -> KindScores {
+    KindScores {
+        duration_s,
+        analysis_s: duration_s.min(30.0),
+        truncated: duration_s > 30.0,
+        onsets,
+        tail_db,
+        ..KindScores::default()
+    }
+}
+
+#[test]
+fn sustained_end_of_a_multi_event_part_leans_loop() {
+    // 8 s riser / texture with several onsets, still loud at its end.
+    assert!(audio_logit(&flat(8.0, 5, Some(-2.0))) > 0.0);
+    // Same length but decaying (impact, transition): one-shot.
+    assert!(audio_logit(&flat(8.0, 5, Some(-40.0))) < 0.0);
+    // One held note or pad (a single onset): one-shot.
+    assert!(audio_logit(&flat(8.0, 1, Some(0.0))) < 0.0);
+    // Short sustained sounds are no evidence (steady test tones).
+    assert!(audio_logit(&flat(2.0, 5, Some(0.0))) < 0.0);
+}
+
+#[test]
+fn long_multi_event_file_leans_loop_single_sound_does_not() {
+    // A 90 s stem with sparse events and no measurable pulse.
+    assert!(audio_logit(&flat(90.0, 3, None)) > 0.0);
+    // A 5 min drone (one onset): one-shot, as the long pad fixture.
+    assert!(audio_logit(&flat(300.0, 1, None)) < 0.0);
+}
+
+#[test]
+fn several_strong_attacks_add_the_events_term() {
+    // A 1 s fill: too short for two beat periods (periodicity 0).
+    let fill = |onsets, pulse_db| KindScores {
+        pulse_db,
+        ..flat(1.0, onsets, Some(-50.0))
+    };
+    let d = audio_logit(&fill(5, 2.0)) - audio_logit(&fill(5, 0.5));
+    assert!((d - W_EVENTS).abs() < 1e-6, "{d}");
+    // Below the onset count: no term.
+    assert_eq!(audio_logit(&fill(3, 2.0)), audio_logit(&fill(3, 0.5)));
 }
 
 #[test]

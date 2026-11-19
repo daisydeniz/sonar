@@ -30,6 +30,8 @@ pub fn analyze_file(path: &Path, cancel: Option<Arc<AtomicBool>>) -> Result<Aspe
     let run = quiet_panic::guarded(|| {
         with_workers(|w| {
             let decoded = w.decoder.decode(path, &opts)?;
+            // The `dsp` stage's window (stems that enter late).
+            let decoded = w.decoder.skip_leading_silence(path, &opts, decoded)?;
             window_aspects(w, &decoded)
         })
     });
