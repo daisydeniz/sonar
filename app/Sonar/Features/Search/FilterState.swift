@@ -9,6 +9,8 @@ struct FilterState: Equatable, Sendable {
     var keys: Set<String> = []
     /// Also match keys compatible with the selected ones (core-side).
     var compatibleKeys = false
+    /// Also low-tier (uncertain) keys in the key filter and facet (ADR-041).
+    var includeUncertainKeys = false
     var tags: Set<String> = []
     /// Libraries chosen with chips (any-of); ignored while the sidebar
     /// selects a single library.
@@ -43,6 +45,7 @@ struct FilterState: Equatable, Sendable {
         f.kinds = kinds.sorted()
         f.keys = keys.sorted()
         f.compatibleKeys = compatibleKeys && !keys.isEmpty
+        f.includeUncertainKeys = includeUncertainKeys
         f.tags = tags.sorted()
         if base.libraryIds.isEmpty { f.libraryIds = libraryIds.sorted() }
         f.favoritesOnly = base.favoritesOnly || favoritesOnly

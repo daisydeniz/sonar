@@ -64,6 +64,8 @@ const SCHEMA: &[(&str, &[&str])] = &[
             "category",
             "category_conf",
             "category_source",
+            "pitch_cents",
+            "key_audio",
         ],
     ),
     ("overrides", &["file_id", "field", "value"]),

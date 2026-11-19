@@ -82,8 +82,12 @@ struct FilterBarView: View {
             title: "Key",
             summary: FilterState.summary(of: model.filters.keys).map {
                 model.filters.compatibleKeys ? "\($0) ≈" : $0
-            },
-            onClear: { model.filters.keys = []; model.filters.compatibleKeys = false }
+            } ?? (model.filters.includeUncertainKeys ? "Uncertain" : nil),
+            onClear: {
+                model.filters.keys = []
+                model.filters.compatibleKeys = false
+                model.filters.includeUncertainKeys = false
+            }
         ) {
             VStack(alignment: .leading, spacing: Theme.Space.s8) {
                 FacetListView(
@@ -94,6 +98,10 @@ struct FilterBarView: View {
                     .toggleStyle(.checkbox)
                     .font(Theme.Font.row)
                     .disabled(model.filters.keys.isEmpty)
+                Toggle("Include uncertain", isOn: $model.filters.includeUncertainKeys)
+                    .toggleStyle(.checkbox)
+                    .font(Theme.Font.row)
+                    .help("Also list keys the analysis is unsure about (low confidence)")
             }
         }
     }

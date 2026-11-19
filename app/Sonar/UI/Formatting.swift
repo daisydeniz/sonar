@@ -39,6 +39,39 @@ enum Format {
     /// Text for a table cell: empty when unknown.
     static func cellText(_ s: String?) -> String { s ?? "" }
 
+    /// Key for a table cell or readout: an en dash when there is none
+    /// (silence, undecodable, not analysed yet; ADR-041).
+    static func keyText(_ key: String?) -> String {
+        guard let key, !key.isEmpty else { return "\u{2013}" }
+        return key
+    }
+
+    /// Where a key came from: "Audio", "Name", "Audio + Name", "You" (override).
+    static func keySource(_ source: String?) -> String? {
+        switch source {
+        case "detected": "Audio"
+        case "filename": "Name"
+        case "both": "Audio + Name"
+        case "user": "You"
+        default: nil
+        }
+    }
+
+    /// "Audio + Name · High" (source and confidence word); nil without key.
+    static func keyDetail(source: String?, tier: Theme.KeyTier) -> String? {
+        keySource(source).map { "\($0) · \(tier.word)" }
+    }
+
+    /// One-shot note with its tuning: "E2 +32 ct", "≈E2 -31 ct" past ±25 ct
+    /// (the nearest note is uncertain there). Without cents just the name.
+    static func note(name: String?, cents: Float?) -> String? {
+        guard let name, !name.isEmpty else { return nil }
+        guard let cents, cents.isFinite else { return name }
+        let ct = Int(cents.rounded())
+        let sign = ct < 0 ? "-" : "+"
+        return "\(abs(cents) > 25 ? "≈" : "")\(name) \(sign)\(abs(ct)) ct"
+    }
+
     /// "kick" -> "Kick" (first letter capitalised); empty when unknown.
     static func categoryTitle(_ category: String?) -> String {
         guard let category, !category.isEmpty else { return "" }

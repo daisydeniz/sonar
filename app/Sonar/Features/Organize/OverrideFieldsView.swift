@@ -23,11 +23,38 @@ struct OverrideFieldsView: View {
     private var category: CommonValue<String> { CommonValue(targets.map(\.category), forceMixed: partial) }
     private var kind: CommonValue<String> { CommonValue(targets.map(\.kind), forceMixed: partial) }
 
+    /// One sample selected: key provenance and note are per file.
+    private var single: Bool { targets.count == 1 && !partial }
+
+    /// Source and confidence word, the name's key when it disagrees with the
+    /// audio, and a one-shot's note with its tuning (ADR-041).
+    @ViewBuilder private var keyDetailRows: some View {
+        if let detail = Format.keyDetail(source: row.keySource, tier: Theme.KeyTier.of(row)) {
+            detailRow("Key source", detail)
+        }
+        if let name = row.keyName { detailRow("Name says", name) }
+        if let audio = row.keyAudio { detailRow("Audio says", audio) }
+        if let note = Format.note(name: row.noteName, cents: row.noteCents) {
+            detailRow("Note", note)
+        }
+    }
+
+    private func detailRow(_ label: String, _ value: String) -> some View {
+        PropertyRow(label) {
+            Text(value)
+                .font(Theme.Font.rowNumeric).foregroundStyle(.secondary)
+                .textSelection(.enabled)
+        }
+    }
+
     var body: some View {
         VStack(spacing: Theme.Space.s2) {
             SectionLabel("Analysis")
             textRow("BPM", text: $bpmDraft, field: .bpm, mixed: bpm.isMixed)
-            textRow("Key", text: $keyDraft, field: .key, mixed: key.isMixed)
+            textRow(
+                "Key", text: $keyDraft, field: .key, mixed: key.isMixed,
+                color: single ? Theme.KeyTier.of(row).color : Theme.KeyTier.high.color)
+            if single { keyDetailRows }
             popupRow("Category", common: category, options: model.organizeState.categories, field: .category)
             popupRow("Kind", common: kind, options: ["loop", "one_shot"], field: .kind)
             if let error = model.organizeState.overrideError {
@@ -52,13 +79,21 @@ struct OverrideFieldsView: View {
         keyDraft = key.value ?? ""
     }
 
-    private func textRow(_ title: String, text: Binding<String>, field: OverrideField, mixed: Bool) -> some View {
+    private func textRow(_ title: String, text: Binding<String>, field: OverrideField, mixed: Bool,
+        color: Color = Theme.KeyTier.high.color
+    ) -> some View {
         PropertyRow(title) {
             HStack(spacing: Theme.Space.s4) {
+                // Plain style: the bordered style ignores the text colour,
+                // and the Key value's colour is its tier (ADR-041).
                 TextField(title, text: text, prompt: Text(mixed ? "Mixed" : "\u{2013}"))
-                    .textFieldStyle(.roundedBorder)
+                    .textFieldStyle(.plain)
                     .controlSize(.small)
                     .multilineTextAlignment(.trailing)
+                    .foregroundStyle(color)
+                    .padding(.horizontal, Theme.Space.s6)
+                    .padding(.vertical, Theme.Space.s2)
+                    .background(Theme.Color.surfaceWell, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
                     .onSubmit { commit(field, text.wrappedValue) }
                 revert(title, field)
             }

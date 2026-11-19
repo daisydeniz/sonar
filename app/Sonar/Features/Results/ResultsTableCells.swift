@@ -186,10 +186,13 @@ final class ValueCellView: ResultCellView {
     override func configure(_ file: FileRow, libraryName: String?) {
         switch value {
         case .bpm: label.stringValue = Format.cellBPM(file.bpm)
-        case .key: label.stringValue = Format.cellText(file.key)
+        case .key: label.stringValue = Format.keyText(file.key)
         case .duration: label.stringValue = Format.cellDuration(ms: file.durationMs)
         case .library: label.stringValue = Format.cellText(libraryName)
         }
         super.configure(file, libraryName: libraryName)
+        if value == .key, !file.hidden {
+            label.textColor = file.key.map { _ in Theme.KeyTier.of(file).nsColor } ?? .tertiaryLabelColor
+        }
     }
 }

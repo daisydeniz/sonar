@@ -122,6 +122,7 @@ pub(crate) fn fuse(audio: Option<(Key, f32)>, prior: Option<KeyPrior>) -> Option
         key,
         confidence: finite01(confidence),
         source,
+        audio: None,
     };
     let name_key = |p: &KeyPrior| Key {
         root: p.key.root % 12,
@@ -146,7 +147,12 @@ pub(crate) fn fuse(audio: Option<(Key, f32)>, prior: Option<KeyPrior>) -> Option
             } else if a > n {
                 est(k, a * (1.0 - n), KeySource::Detected)
             } else {
-                est(name_key(&p), n * (1.0 - a), KeySource::Filename)
+                // The name outweighed a disagreeing audio key: keep the
+                // audio's key so the UI can show both.
+                KeyEstimate {
+                    audio: Some(k),
+                    ..est(name_key(&p), n * (1.0 - a), KeySource::Filename)
+                }
             })
         }
     }

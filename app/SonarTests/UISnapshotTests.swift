@@ -324,6 +324,36 @@ final class UISnapshotTests: XCTestCase {
         try snapshot("license-enter", sheet, dir: dir, size: CGSize(width: 440, height: 260))
     }
 
+    /// Key display (ADR-041): the first eight rows show high / medium / low /
+    /// confidence 0 / en dash / disagreement / two detuned one-shots. The
+    /// inspector shows the audio-vs-name disagreement.
+    func testMainKeyDisagreement() async throws {
+        let dir = try outputDir()
+        let model = try await populated(rows: SnapshotFixtures.keyRows())
+        try snapshot("main-key", contentView(model), dir: dir, emphasis: true, selectRow: 5)
+    }
+
+    /// Inspector of a detuned one-shot: `E2 +32 ct`.
+    func testMainKeyNote() async throws {
+        let dir = try outputDir()
+        let model = try await populated(rows: SnapshotFixtures.keyRows())
+        try snapshot("main-key-note", contentView(model), dir: dir, emphasis: true, selectRow: 6)
+    }
+
+    /// Inspector of a quarter-tone-off one-shot: `≈A#1 -41 ct`.
+    func testMainKeyNoteApprox() async throws {
+        let dir = try outputDir()
+        let model = try await populated(rows: SnapshotFixtures.keyRows())
+        try snapshot("main-key-note-approx", contentView(model), dir: dir, emphasis: true, selectRow: 7)
+    }
+
+    /// Inspector when the name outweighed the audio: both keys, source Name.
+    func testMainKeyNameWins() async throws {
+        let dir = try outputDir()
+        let model = try await populated(rows: SnapshotFixtures.keyRows())
+        try snapshot("main-key-namewins", contentView(model), dir: dir, emphasis: true, selectRow: 8)
+    }
+
     func testComponents() async throws {
         let dir = try outputDir()
         try snapshot("components", ComponentsGallery(), dir: dir)

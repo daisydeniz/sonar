@@ -25,10 +25,15 @@ pub struct KeyPitch {
     pub key_conf: Option<f32>,
     /// Where `key` came from.
     pub key_source: Option<KeySource>,
+    /// The audio's key when the filename outweighed a disagreeing one.
+    pub key_audio: Option<Key>,
     /// MIDI note of a pitched one-shot (whole number).
     pub pitch_midi: Option<u8>,
     /// Confidence of `pitch_midi` (`0..=1`).
     pub pitch_conf: Option<f32>,
+    /// Deviation of the measured pitch from `pitch_midi` (cents,
+    /// `-50..=50`); `None` for rows analysed before T10.6.
+    pub pitch_cents: Option<f32>,
 }
 
 impl KeyPitch {
@@ -38,8 +43,10 @@ impl KeyPitch {
             key: kn.key.map(|k| k.key),
             key_conf: kn.key.map(|k| k.confidence),
             key_source: kn.key.map(|k| k.source),
+            key_audio: kn.key.and_then(|k| k.audio),
             pitch_midi: kn.note.map(|n| n.midi),
             pitch_conf: kn.note.map(|n| n.confidence),
+            pitch_cents: kn.note.map(|n| n.cents),
         }
     }
 }
@@ -57,25 +64,32 @@ fn conf(v: Option<f32>) -> Option<f64> {
 /// [`crate::Error::Sqlite`], e.g. a foreign-key violation when `file_id`
 /// has no `files` row.
 pub fn upsert_key_pitch(conn: &Connection, file_id: i64, v: &KeyPitch) -> Result<()> {
-    let key = v.key.map(|k| {
+    let text = |k: Key| {
         Key {
             root: k.root % 12,
             mode: k.mode,
         }
         .to_string()
-    });
+    };
+    let key = v.key.map(text);
+    let key_audio = key.as_ref().and(v.key_audio).map(text);
     let (key_conf, key_source) = match key {
         Some(_) => (conf(v.key_conf), v.key_source.map(KeySource::as_str)),
         None => (None, None),
     };
     let pitch = v.pitch_midi.filter(|&m| m <= 127);
     let pitch_conf = pitch.and(conf(v.pitch_conf));
+    let cents = pitch
+        .and(v.pitch_cents)
+        .filter(|c| c.is_finite())
+        .map(|c| f64::from(c.clamp(-50.0, 50.0)));
     conn.prepare_cached(
-        "INSERT INTO analysis (file_id, key, key_conf, key_source, pitch_midi, pitch_conf) \
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6) \
+        "INSERT INTO analysis (file_id, key, key_conf, key_source, pitch_midi, pitch_conf, \
+         pitch_cents, key_audio) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8) \
          ON CONFLICT (file_id) DO UPDATE SET \
            key = excluded.key, key_conf = excluded.key_conf, key_source = excluded.key_source, \
-           pitch_midi = excluded.pitch_midi, pitch_conf = excluded.pitch_conf",
+           pitch_midi = excluded.pitch_midi, pitch_conf = excluded.pitch_conf, \
+           pitch_cents = excluded.pitch_cents, key_audio = excluded.key_audio",
     )?
     .execute(params![
         file_id,
@@ -84,6 +98,8 @@ pub fn upsert_key_pitch(conn: &Connection, file_id: i64, v: &KeyPitch) -> Result
         key_source,
         pitch.map(f64::from),
         pitch_conf,
+        cents,
+        key_audio,
     ])?;
     Ok(())
 }
@@ -101,16 +117,28 @@ pub fn get_key_pitch(conn: &Connection, file_id: i64) -> Result<Option<KeyPitch>
         Option<String>,
         Option<f64>,
         Option<f64>,
+        Option<f64>,
+        Option<String>,
     );
     let raw: Option<Raw> = conn
         .query_row(
-            "SELECT key, key_conf, key_source, pitch_midi, pitch_conf FROM analysis \
-             WHERE file_id = ?1",
+            "SELECT key, key_conf, key_source, pitch_midi, pitch_conf, pitch_cents, key_audio \
+             FROM analysis WHERE file_id = ?1",
             [file_id],
-            |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?)),
+            |r| {
+                Ok((
+                    r.get(0)?,
+                    r.get(1)?,
+                    r.get(2)?,
+                    r.get(3)?,
+                    r.get(4)?,
+                    r.get(5)?,
+                    r.get(6)?,
+                ))
+            },
         )
         .optional()?;
-    let Some((key, key_conf, source, pitch, pitch_conf)) = raw else {
+    let Some((key, key_conf, source, pitch, pitch_conf, cents, audio)) = raw else {
         return Ok(None);
     };
     let key_source = source.as_deref().and_then(KeySource::parse);
@@ -122,8 +150,10 @@ pub fn get_key_pitch(conn: &Connection, file_id: i64) -> Result<Option<KeyPitch>
         key: key.as_deref().and_then(parse_key),
         key_conf: f(key_conf),
         key_source,
+        key_audio: audio.as_deref().and_then(parse_key),
         pitch_midi,
         pitch_conf: f(pitch_conf),
+        pitch_cents: pitch_midi.and(f(cents)),
     }))
 }
 
@@ -168,8 +198,13 @@ mod tests {
             key: Some(Key { root: 1, mode }),
             key_conf: Some(0.75),
             key_source: Some(KeySource::Detected),
+            key_audio: Some(Key {
+                root: 9,
+                mode: Some(Mode::Minor),
+            }),
             pitch_midi: Some(49),
             pitch_conf: Some(0.5),
+            pitch_cents: Some(-32.5),
         }
     }
 
@@ -215,13 +250,19 @@ mod tests {
             key_conf: Some(f32::NAN),
             pitch_midi: Some(200),
             pitch_conf: Some(2.0),
+            pitch_cents: Some(80.0),
             ..row(Some(Mode::Minor))
         };
         store.put_key_pitch(id, &bad).unwrap();
         let got = store.key_pitch(id).unwrap().unwrap();
         assert_eq!(
-            (got.key_conf, got.pitch_midi, got.pitch_conf),
-            (None, None, None)
+            (
+                got.key_conf,
+                got.pitch_midi,
+                got.pitch_conf,
+                got.pitch_cents
+            ),
+            (None, None, None, None)
         );
         let (kind, bpm): (String, f64) = store
             .conn()

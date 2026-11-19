@@ -122,6 +122,9 @@ v1.x: record-to-search, 2D map, tempo-synced preview, kit builder, `.als` projec
 v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 
 ## Later (not picked by the loop — founder triages after M8)
+- (from T10.6 review) `engine/rows.rs` `KeyInfo::load` adds per-row queries for key_audio/pitch_cents; fold into the main row query.
+- (from T10.6 review) `index/source.rs:246` a silent file still falls back to the filename key; ADR-041 says silence gets no key.
+- (from T10.6) `scripts/ui-snapshots.sh` hung after writing all PNGs (killed at 20 min); find the test that never finishes.
 - (from T10.5 review) `search/collect.rs` is 432 lines; move `SortValue`/`compare` or its tests to their own file.
 - (from T10.5) `AppModelTests.testShellFlow` favourites step failed 2/3 runs (stale "hit" rows; likely the index poll refresh cancelling the explicit one in the core); test now waits for the rows. Confirm the cause and whether a user can see stale rows after toggling a favourite.
 - (from T10.4b) High key tier misses 90 % on real files (silver 79.7 %, golden 68.8 % at conf ≥ 0.9; golden medium 34.5 %; ECE 18.5 / 31.7 %): inspect high-confidence misses (relative/fifth vs label noise) and recalibrate `key::fuse`.

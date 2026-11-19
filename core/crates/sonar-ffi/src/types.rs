@@ -252,6 +252,26 @@ pub struct FileRow {
     pub bpm: Option<f64>,
     /// Key (`C#m`), if known.
     pub key: Option<String>,
+    /// Confidence of `key` (`0..=1`; overrides are 1); compare with
+    /// `keyTierHigh()` / `keyTierMedium()`. `nil` without key.
+    #[uniffi(default = None)]
+    pub key_conf: Option<f32>,
+    /// What decided `key`: `detected` (audio), `filename`, `both`, `user`.
+    #[uniffi(default = None)]
+    pub key_source: Option<String>,
+    /// The filename's key when it disagrees with `key` (the audio won).
+    #[uniffi(default = None)]
+    pub key_name: Option<String>,
+    /// The audio's key when the filename outweighed it (`keySource`
+    /// `filename`).
+    #[uniffi(default = None)]
+    pub key_audio: Option<String>,
+    /// Note name of a pitched one-shot (`E2`).
+    #[uniffi(default = None)]
+    pub note_name: Option<String>,
+    /// Cents of the measured pitch from `note_name` (`-50...50`).
+    #[uniffi(default = None)]
+    pub note_cents: Option<f32>,
     /// Duration (ms), once indexed.
     pub duration_ms: Option<u64>,
     /// Sample rate (Hz), once indexed.

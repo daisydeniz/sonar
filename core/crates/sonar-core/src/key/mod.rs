@@ -55,7 +55,8 @@ use crate::Result;
 /// keys and notes are recomputed. 2 (T10.1): more filename key priors.
 /// 3 (T10.2): fused key with graded confidence, source `both`, note
 /// confidence falls with |cents|. 4 (T10.3): root note of pitched loops.
-pub const KEY_VERSION: u32 = 4;
+/// 5 (T10.6): the note's cents and a losing audio key are stored.
+pub const KEY_VERSION: u32 = 5;
 
 /// Where a [`KeyEstimate`] came from (`analysis.key_source`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
@@ -102,6 +103,9 @@ pub struct KeyEstimate {
     pub confidence: f32,
     /// What decided the value.
     pub source: KeySource,
+    /// The audio's own key when the filename outweighed a disagreeing audio
+    /// candidate (`source` is [`KeySource::Filename`]); `None` otherwise.
+    pub audio: Option<Key>,
 }
 
 /// Key and note of one file.

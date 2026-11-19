@@ -45,6 +45,10 @@ pub(crate) const MIGRATIONS: &[Migration] = &[
         name: "0003_key_source_both",
         sql: include_str!("migrations/0003_key_source_both.sql"),
     },
+    Migration {
+        name: "0004_pitch_cents",
+        sql: include_str!("migrations/0004_pitch_cents.sql"),
+    },
 ];
 
 /// Latest schema version this build can create and read.
@@ -183,6 +187,7 @@ mod tests {
             MIGRATIONS.get(2).map(|m| m.name),
             Some("0003_key_source_both")
         );
+        assert_eq!(MIGRATIONS.get(3).map(|m| m.name), Some("0004_pitch_cents"));
     }
 
     /// 0003 rebuilds `analysis`: rows (and their cascade) survive, and
@@ -201,7 +206,7 @@ mod tests {
         );
         assert!(seed.is_ok(), "{seed:?}");
         assert!(conn.execute(both, []).is_err());
-        assert_eq!(migrate(&mut conn, MIGRATIONS).ok(), Some(1));
+        assert_eq!(migrate(&mut conn, MIGRATIONS).ok(), Some(2));
         let row = conn.query_row(
             "SELECT bpm, key, key_conf, key_source FROM analysis WHERE file_id = 1",
             [],

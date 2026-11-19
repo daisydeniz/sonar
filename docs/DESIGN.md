@@ -189,10 +189,20 @@ system control when one exists; write a component only for the things below.
 - Columns: favorite (heart; outline only on hover or when set) · Name
   (`row`, primary, middle truncation) · Category (dot in category hue + name)
   · Kind (symbol + text, secondary) · BPM, Duration (`rowNumeric`,
-  right-aligned) · Key (`row`, left-aligned) · Library (secondary). A
-  missing value shows nothing, not "-".
+  right-aligned) · Key (`row`, left-aligned, in its tier colour, see "Key tiers" below) ·
+  Library (secondary). A missing value shows nothing, not "-"; the one
+  exception is Key, which shows an en dash in tertiary (silence / no value,
+  ADR-041).
 - Hidden files: whole row at tertiary. Loading rows: a short neutral skeleton
   bar in the Name column, not the word "Loading…".
+
+**Key tiers (ADR-041, T10.6).** A key's text colour is its certainty tier
+(`Theme.KeyTier`, `DesignSystem/KeyTier.swift`): high = primary, medium =
+secondary, low (also confidence 0 and no confidence) = tertiary. The bounds
+come from the core (`keyTierHigh()` / `keyTierMedium()`), never from Swift
+literals. The same mapping colours the table cell, the KEY readout and the
+inspector's Key field; no value is an en dash in tertiary everywhere. Cents
+never appear in the table or readout.
 
 ### 4.2 Chip (`SonarChip`)
 Height 22, radius `small`, `row` font, 8 pt horizontal padding. States:
@@ -205,7 +215,7 @@ filter bar's popover chips).
 ### 4.3 Readout (`Readout`)
 A value with a caption above it: caption in `label`, value in 15 pt medium
 monospaced digits. Used in the player header (BPM, KEY, LENGTH, PITCH). Missing
-value: an en dash in tertiary.
+value: an en dash in tertiary. The KEY value takes its tier style (§4.1).
 
 ### 4.4 Waveform
 Bars in `accent` on `surfaceWell`, radius `medium`. Played part full accent,
@@ -255,7 +265,15 @@ Inspector grid row, at least 24 pt high: label in `row` secondary on the left
 (`Theme.Size.propertyLabelWidth`, 72), value or editor right-aligned in the
 rest. Read-only values are selectable `row` text (monospaced digits for
 numbers); missing value: an en dash in tertiary. Sections are a `SectionLabel`
-plus rows with 2 pt between them. Removable tags are `SonarChip`s with a
+plus rows with 2 pt between them. The Analysis "Key" value uses its tier
+colour; below it (one sample selected) read-only secondary rows give
+"Key source" (`Audio` / `Name` / `Audio + Name` / `You`, then the
+confidence word `High` / `Medium` / `Low`, e.g. `Audio · High`), "Name says"
+(the filename's key, only when it disagrees with the audio key), "Audio says"
+(the audio's key, only when the name outweighed a disagreeing audio key) and "Note"
+for one-shots (`E2 +18 ct`, prefixed `≈` when |cents| > 25, e.g.
+`≈A#1 -41 ct`). The Key filter popover has "Include uncertain" (low-tier
+keys) next to "Include compatible keys". Removable tags are `SonarChip`s with a
 trailing `xmark`.
 
 ### 4.10 Status badge (`StatusBadge`)

@@ -94,7 +94,9 @@ struct PlayerHeaderView: View {
             pitch
             HStack(spacing: Theme.Space.s16) {
                 Readout("BPM", value: row?.bpm.map(Format.bpm))
-                Readout("KEY", value: row?.key.flatMap { $0.isEmpty ? nil : $0 })
+                Readout(
+                    "KEY", value: row?.key.flatMap { $0.isEmpty ? nil : $0 },
+                    style: row.map { Theme.KeyTier.of($0).style } ?? .primary)
                 Readout("LENGTH", value: row?.durationMs.map { Format.duration(ms: $0) })
             }
             .padding(.leading, Theme.Space.s8)
