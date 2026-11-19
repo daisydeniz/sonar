@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M10 honest key (M0–M7, M9 done; human-only: T3.7, T7.4, T8.1)
-- Next task: T10.6 (M10 honest key, ADR-041)
+- Next task: T10.7 (M10 honest key, BPM/kind on real loops)
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
@@ -43,5 +43,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-19 — T10.6: Key display per tier: cells, KEY readout and inspector Key in tier colour (high primary / medium secondary / low + conf 0 tertiary), en dash for none; inspector Key source + confidence word, one-shot note with cents (≈ when |cents| > 25), "Name says"/"Audio says" on disagreement; Key popover "Include uncertain". Migration 0004 (`pitch_cents`, `key_audio`), KEY_VERSION 5, DSP_VERSION 10. Eval-real unchanged vs T10.4b (silver key high/medium 79.7/61.5 %, MIREX 34.2 %; golden 68.8/34.5 %, MIREX 37.9 %). check.sh green; reviewer APPROVE r2. Later: 3 T10.6 items (incl. ui-snapshots.sh hang).
 - 2026-11-18 — T10.5: Key filter/facet honest by default: only medium + high tier (overrides count as certain); `--key-uncertain` / FFI `include_uncertain_keys` adds low. Mode-less `A` answers `A` and `Am` (also via compatible keys); sort by key puts low tier after the rest. `ff_key` = root·3+mode (+36 low), index SCHEMA_VERSION 3 (rebuild). Note: name-only keys of not-yet-analysed files are low tier, so they leave the default key filter until analysis. 500k p95 30.6 ms (budget 50). Fixtures eval green; no analysis change → no eval-real. check.sh green; reviewer APPROVE r1. Later: 2 T10.5 items.
 - 2026-11-18 — T10.4b: Key tiers re-fitted on real files (`scripts/eval-real.sh`, names hidden): `KEY_TIER_HIGH` 0.90 / `KEY_TIER_MEDIUM` 0.60 (was 0.75/0.30 from fixtures). Silver (344 keys): high 79.7 %, medium 61.5 %, low 31.7 %, ECE 18.5 %, key exact/MIREX 30.0/34.2 %. Golden (88): 68.8/34.5/34.9 %, ECE 31.7 %, exact/MIREX 30.5/37.9 %. 90 % high target unreachable by any bound (best band 79.7 %) → best monotone bounds, documented. Fixtures 100/100/0 %; ECE docs corrected to 15 bins. check.sh green; reviewer APPROVE r2. Later: 1 T10.4b item.
