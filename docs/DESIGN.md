@@ -294,6 +294,19 @@ list plus a button row. Sheets (Enter License) are standard sheets with a
 `title` heading, a `surfaceWell` text well with a hairline border, and
 Cancel / default-action buttons.
 
+**Tag editor sheet (T10.9, `TagEditorView`).** Row context menu / Edit menu
+"Edit Tags…" and the inspector's tag button. A `tag` symbol + `title`
+heading; a token box (`surfaceWell`, hairline, radius `medium`) holding the
+tags every target file has as `SonarChip`s with `×` and a borderless inline
+"Add tag" field at the end of the flow; below, a `surfaceContent` list of the
+library's tags filtered by the typed text (checkmark when chosen, name, file
+count in `caption` secondary, `selection` tint on the highlighted row, a
+"Create “x”" row first when there is no exact match). Keys: ↓/↑ highlight,
+Return toggles / creates, comma or Tab commits the text, ⌫ on an empty field
+removes the last chip, Esc cancels, ⌘Return (or Return on an empty field) saves (disabled without a
+change). Save applies the added / removed diff to all targets in one refresh;
+with several files, tags only some have are neither shown nor removed.
+
 ## 5. Rules
 
 Do

@@ -324,6 +324,19 @@ final class UISnapshotTests: XCTestCase {
         try snapshot("license-enter", sheet, dir: dir, size: CGSize(width: 440, height: 260))
     }
 
+    /// Tag editor sheet: two chips, text "a" filtering the library list.
+    func testTagEditor() async throws {
+        let dir = try outputDir()
+        let library = [("dark", 42), ("club", 31), ("analog", 18), ("acid", 12), ("ambient", 9), ("punchy", 7), ("vintage", 5)]
+            .map { TagInfo(name: $0.0, files: UInt64($0.1)) }
+        var state = TagEditorState(library: library, common: ["dark", "analog"])
+        state.text = "a"
+        state.moveHighlight(by: 1)
+        let sheet = TagEditorView(state: state, fileCount: 3, onSave: { _, _ in }, onCancel: {})
+            .background(Color(nsColor: .windowBackgroundColor))
+        try snapshot("tag-editor", sheet, dir: dir, size: CGSize(width: 460, height: 440))
+    }
+
     /// Key display (ADR-041): the first eight rows show high / medium / low /
     /// confidence 0 / en dash / disagreement / two detuned one-shots. The
     /// inspector shows the audio-vs-name disagreement.

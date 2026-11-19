@@ -26,7 +26,7 @@ extension AppModel {
             title: unhide ? "Unhide" : "Hide",
             action: { [weak self] in Task { await self?.setHidden(fileIds: ids, on: !unhide) } }))
         entries.append(RowMenuEntry(
-            title: "Add Tag…", action: { [weak self] in self?.organizeState.ask(.addTag(ids)) }))
+            title: "Edit Tags…", action: { [weak self] in self?.editTags(ids: ids) }))
         var collectionItems = collections.map { c in
             RowMenuEntry(
                 title: c.name,

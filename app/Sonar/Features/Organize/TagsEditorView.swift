@@ -75,22 +75,10 @@ struct TagsEditorView: View {
                     .onSubmit(commit)
                     .onChange(of: row.fileId) { draft = "" }
                     .accessibilityLabel("Add tag")
-                let suggestions = model.organizeState.tags.filter { !shownTags.contains($0.name) }
-                if !suggestions.isEmpty {
-                    Menu {
-                        ForEach(suggestions, id: \.name) { info in
-                            Button("\(info.name) (\(info.files))") {
-                                Task { await model.addTags(names: [info.name]) }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "tag")
-                    }
-                    .menuStyle(.borderlessButton).fixedSize()
-                    .controlSize(.small)
-                    .help("Existing tags")
-                    .accessibilityLabel("Existing tags")
-                }
+                Button { model.editTags() } label: { Image(systemName: "tag") }
+                    .buttonStyle(.borderless).controlSize(.small)
+                    .help("Edit tags")
+                    .accessibilityLabel("Edit tags")
             }
         }
     }

@@ -100,6 +100,32 @@ extension AppModel {
         await organize { try await $0.removeTags(fileIds: ids, tags: [tag]) }
     }
 
+    /// Opens the tag editor for these files (the context menu's clicked rows,
+    /// or the selection).
+    func editTags(ids: [Int64]? = nil) {
+        let ids = ids ?? organizeTargetIDs
+        guard !ids.isEmpty else { return }
+        organizeState.tagEditorTargets = ids
+    }
+
+    /// Initial editor state: the tags every target has. Rows that are not
+    /// cached cannot be compared, so then nothing counts as common.
+    func tagEditorState(for ids: [Int64]) -> TagEditorState {
+        let rows = ids.compactMap { id in pager.index(ofFileId: id).flatMap { pager.peek($0) } }
+        let common = rows.count == ids.count ? commonTags(rows.map(\.tags)) : []
+        return TagEditorState(library: organizeState.tags, common: common)
+    }
+
+    /// Save in the tag editor: one refresh for the added and removed tags.
+    func applyTagEdit(ids: [Int64], added: [String], removed: [String]) async {
+        organizeState.tagEditorTargets = nil
+        guard !ids.isEmpty, !(added.isEmpty && removed.isEmpty) else { return }
+        await organize { bridge in
+            if !added.isEmpty { try await bridge.addTags(fileIds: ids, tags: added) }
+            if !removed.isEmpty { try await bridge.removeTags(fileIds: ids, tags: removed) }
+        }
+    }
+
     // MARK: Collections
 
     /// Creates a collection and adds `fileIds` to it. Returns its id.
@@ -146,7 +172,6 @@ extension AppModel {
         let text = organizeState.promptText
         organizeState.prompt = nil
         switch prompt {
-        case .addTag(let ids): await addTags(text, to: ids)
         case .newCollection(let ids): await createCollection(name: text, adding: ids)
         case .renameCollection(let id): await renameCollection(id: id, name: text)
         }

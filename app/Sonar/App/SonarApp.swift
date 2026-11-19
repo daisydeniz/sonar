@@ -39,7 +39,7 @@ struct SonarApp: App {
                 Button("Hide / Unhide") { Task { await model.toggleHiddenOfSelection() } }
                     .keyboardShortcut("h", modifiers: [.command, .shift])
                     .disabled(model.selectedRow == nil)
-                Button("Add Tag…") { model.organizeState.ask(.addTag(model.organizeTargetIDs)) }
+                Button("Edit Tags…") { model.editTags() }
                     .disabled(model.selectedRow == nil)
             }
             CommandGroup(after: .toolbar) {

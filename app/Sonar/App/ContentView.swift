@@ -55,6 +55,18 @@ struct ContentView: View {
         } message: {
             Text(model.organizeState.prompt?.message ?? "")
         }
+        .sheet(isPresented: Binding(
+            get: { model.organizeState.tagEditorTargets != nil },
+            set: { if !$0 { model.organizeState.tagEditorTargets = nil } })
+        ) {
+            let ids = model.organizeState.tagEditorTargets ?? []
+            TagEditorView(
+                state: model.tagEditorState(for: ids), fileCount: ids.count,
+                onSave: { added, removed in
+                    model.organizeState.tagEditorTargets = nil
+                    Task { await model.applyTagEdit(ids: ids, added: added, removed: removed) } },
+                onCancel: { model.organizeState.tagEditorTargets = nil })
+        }
         .onSubmit(of: .search) { _ = model.keyboard.focusResults?() }
         .onAppear { searchMonitor.install(actions: model.keyboard) }
         .onDisappear { searchMonitor.remove() }

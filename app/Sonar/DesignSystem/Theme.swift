@@ -66,6 +66,13 @@ enum Theme {
         static let popoverWidth: CGFloat = 240
         static let popoverListMaxHeight: CGFloat = 240
         static let rangeField: CGFloat = 64
+        /// Tag editor sheet (DESIGN §4.11): width, token-box minimum height,
+        /// inline field width, suggestion list height, checkmark column.
+        static let tagEditorWidth: CGFloat = 420
+        static let tagBoxMinHeight: CGFloat = 56
+        static let tagFieldWidth: CGFloat = 96
+        static let tagListHeight: CGFloat = 200
+        static let tagCheckWidth: CGFloat = 14
         /// Progress bar of the toolbar indexing status.
         static let indexingProgressWidth: CGFloat = 100
     }
