@@ -52,18 +52,35 @@ enum KeyLabel {
         _ parts: Parts?, font: NSFont = Theme.NSFonts.row, color: NSColor = .labelColor,
         superscriptColor: NSColor = .secondaryLabelColor, missingColor: NSColor = .tertiaryLabelColor
     ) -> NSAttributedString {
+        // One line, cut at the end: without a paragraph style an attributed
+        // label wraps the superscript onto a second line in a narrow column.
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byTruncatingTail
         guard let parts else {
-            return NSAttributedString(string: dash, attributes: [.font: font, .foregroundColor: missingColor])
+            return NSAttributedString(string: dash, attributes: [
+                .font: font, .foregroundColor: missingColor, .paragraphStyle: paragraph,
+            ])
         }
         let result = NSMutableAttributedString(
-            string: parts.main, attributes: [.font: font, .foregroundColor: color])
+            string: parts.main, attributes: [.font: font, .foregroundColor: color, .paragraphStyle: paragraph])
         if let sup = parts.superscript {
             result.append(NSAttributedString(string: sup, attributes: [
                 .font: Theme.NSFonts.superscript, .foregroundColor: superscriptColor,
-                .baselineOffset: Theme.Size.superscriptBaseline,
+                .baselineOffset: Theme.Size.superscriptBaseline, .paragraphStyle: paragraph,
             ]))
         }
         return result
+    }
+
+    /// Width of the widest value (`G#4` + `+50`, `A#4` + `−45`, `C#m`) in `font`, rounded
+    /// up: the results table's Key column never gets narrower than this
+    /// plus its cell insets, so a detuned note always fits on one line.
+    static func widestWidth(font: NSFont = Theme.NSFonts.row) -> CGFloat {
+        let samples = [
+            Parts(main: "G#4", superscript: "+50"), Parts(main: "A#4", superscript: "\u{2212}45"),
+            Parts(main: "C#m", superscript: nil),
+        ]
+        return samples.map { attributed($0, font: font).size().width }.max().map { $0.rounded(.up) } ?? 0
     }
 
     /// SwiftUI rendering as one `Text` (so it truncates and aligns like text).

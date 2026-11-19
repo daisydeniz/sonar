@@ -89,6 +89,12 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
             column.headerCell = header
             column.width = spec.width
             column.minWidth = 40
+            if spec.id == "key" {
+                // Never narrower than a detuned note (`A#4⁻⁴⁵`) plus the cell insets.
+                let keyMin = KeyLabel.widestWidth() + 2 * Theme.Space.s8
+                column.minWidth = keyMin
+                column.width = max(spec.width, keyMin)
+            }
             if spec.id == Self.favoriteColumnID {
                 column.minWidth = spec.width
                 column.maxWidth = spec.width

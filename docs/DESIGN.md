@@ -206,7 +206,9 @@ an en dash in tertiary. Main text is primary, the superscript secondary
 All values share one colour: certainty is not coloured. The tier
 (`Theme.KeyTier`, bounds from the core `keyTierHigh()` / `keyTierMedium()`)
 only appears as the inspector's confidence word and in the "Include
-uncertain" filter.
+uncertain" filter. The value is one line (tail truncation, never wrapped);
+the table's Key column min width is the widest value (`G#4` + `+50`, `A#4` + `−45`,
+`KeyLabel.widestWidth()`) plus the two `s8` cell insets.
 
 ### 4.2 Chip (`SonarChip`)
 Height 22, radius `small`, `row` font, 8 pt horizontal padding. States:

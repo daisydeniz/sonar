@@ -96,4 +96,18 @@ final class KeyDisplayTests: XCTestCase {
         XCTAssertTrue(state.apply(to: SearchFilters()).includeUncertainKeys)
         XCTAssertTrue(state.isActive, "an active toggle counts as a filter (Clear all resets it)")
     }
+
+    /// A detuned note stays on one line and the Key column cannot get
+    /// narrower than it (founder screenshot 2026-11-19: `C#2` wrapped `−4`).
+    func testKeyColumnFitsADetunedNoteOnOneLine() {
+        let text = KeyLabel.attributed(KeyLabel.Parts(main: "G#4", superscript: "+50"))
+        let style = text.attribute(.paragraphStyle, at: 0, effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertEqual(style?.lineBreakMode, .byTruncatingTail)
+        let width = text.size().width
+        let controller = ResultsTableController(pager: ResultsPager(pageSize: 10))
+        let column = controller.tableView.tableColumn(withIdentifier: NSUserInterfaceItemIdentifier("key"))
+        XCTAssertNotNil(column)
+        XCTAssertGreaterThanOrEqual(column?.minWidth ?? 0, width + 2 * Theme.Space.s8)
+        XCTAssertGreaterThanOrEqual(column?.width ?? 0, column?.minWidth ?? .infinity)
+    }
 }
