@@ -4,7 +4,7 @@ import Foundation
 extension SnapshotFixtures {
     /// Rows 0...7 cover every key display case (ADR-041): high / medium /
     /// low / confidence 0 / en dash / name-audio disagreement / detuned
-    /// one-shots (E2 +32 ct, ≈ past 25 ct); the rest are the usual fixtures.
+    /// one-shots (E2 +35, A#1 −41); the rest are the usual fixtures.
     static func keyRows() -> [FileRow] {
         var rows = rows()
         func set(
@@ -37,7 +37,7 @@ extension SnapshotFixtures {
             source: "detected", keyName: "Am")
         set(
             6, name: "Key_808_Detuned", kind: "one_shot", category: "bass", key: "E", conf: 0.93,
-            source: "detected", note: "E2", cents: 18)
+            source: "detected", note: "E2", cents: 35)
         set(
             7, name: "Key_808_Quarter_Tone", kind: "one_shot", category: "bass", key: "A#", conf: 0.64,
             source: "detected", note: "A#1", cents: -41)

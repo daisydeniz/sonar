@@ -21,6 +21,8 @@ extension Theme {
         static let label = SwiftUI.Font.system(size: 10, weight: .semibold)
         /// 15 medium, monospaced digits: `Readout` values.
         static let readoutValue = SwiftUI.Font.system(size: 15, weight: .medium).monospacedDigit()
+        /// 9 regular, monospaced digits: the cents superscript of a note (`KeyLabel`).
+        static let superscript = SwiftUI.Font.system(size: 9).monospacedDigit()
     }
 
     /// `NSFont` twins for the AppKit table. Computed: `NSFont` is not `Sendable`.
@@ -31,6 +33,8 @@ extension Theme {
         static var rowNumeric: NSFont { .monospacedDigitSystemFont(ofSize: 12, weight: .regular) }
         static var label: NSFont { .systemFont(ofSize: 10, weight: .semibold) }
         static var caption: NSFont { .systemFont(ofSize: 11) }
+        /// Cents superscript of a note (`KeyLabel`).
+        static var superscript: NSFont { .monospacedDigitSystemFont(ofSize: 9, weight: .regular) }
     }
 }
 

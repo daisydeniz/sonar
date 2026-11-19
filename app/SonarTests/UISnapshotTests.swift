@@ -333,7 +333,7 @@ final class UISnapshotTests: XCTestCase {
         try snapshot("main-key", contentView(model), dir: dir, emphasis: true, selectRow: 5)
     }
 
-    /// Inspector of a detuned one-shot: `E2 +32 ct`.
+    /// Inspector of a detuned one-shot: `E2` with superscript +35.
     func testMainKeyNote() async throws {
         let dir = try outputDir()
         let model = try await populated(rows: SnapshotFixtures.keyRows())

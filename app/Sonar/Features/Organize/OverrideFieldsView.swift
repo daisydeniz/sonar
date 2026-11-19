@@ -10,6 +10,8 @@ struct OverrideFieldsView: View {
     let row: FileRow
     @State private var bpmDraft = ""
     @State private var keyDraft = ""
+    @State private var editingKey = false
+    @FocusState private var keyFocused: Bool
 
     /// Rows the edits apply to (the multi-selection, else the focused row).
     private var targets: [FileRow] {
@@ -27,16 +29,13 @@ struct OverrideFieldsView: View {
     private var single: Bool { targets.count == 1 && !partial }
 
     /// Source and confidence word, the name's key when it disagrees with the
-    /// audio, and a one-shot's note with its tuning (ADR-041).
+    /// audio (ADR-041); a one-shot's note is in the Key row itself.
     @ViewBuilder private var keyDetailRows: some View {
         if let detail = Format.keyDetail(source: row.keySource, tier: Theme.KeyTier.of(row)) {
             detailRow("Key source", detail)
         }
         if let name = row.keyName { detailRow("Name says", name) }
         if let audio = row.keyAudio { detailRow("Audio says", audio) }
-        if let note = Format.note(name: row.noteName, cents: row.noteCents) {
-            detailRow("Note", note)
-        }
     }
 
     private func detailRow(_ label: String, _ value: String) -> some View {
@@ -51,9 +50,7 @@ struct OverrideFieldsView: View {
         VStack(spacing: Theme.Space.s2) {
             SectionLabel("Analysis")
             textRow("BPM", text: $bpmDraft, field: .bpm, mixed: bpm.isMixed)
-            textRow(
-                "Key", text: $keyDraft, field: .key, mixed: key.isMixed,
-                color: single ? Theme.KeyTier.of(row).color : Theme.KeyTier.high.color)
+            keyRow
             if single { keyDetailRows }
             popupRow("Category", common: category, options: model.organizeState.categories, field: .category)
             popupRow("Kind", common: kind, options: ["loop", "one_shot"], field: .kind)
@@ -79,22 +76,56 @@ struct OverrideFieldsView: View {
         keyDraft = key.value ?? ""
     }
 
-    private func textRow(_ title: String, text: Binding<String>, field: OverrideField, mixed: Bool,
-        color: Color = Theme.KeyTier.high.color
+    /// Key row: the rendered label (note + superscript cents for a one-shot,
+    /// else the key) until it is clicked, then the text field; Return commits,
+    /// losing focus cancels. "Mixed" selections show the field directly.
+    @ViewBuilder private var keyRow: some View {
+        if editingKey || key.isMixed {
+            textRow("Key", text: $keyDraft, field: .key, mixed: key.isMixed, focus: $keyFocused) {
+                editingKey = false
+            }
+            .onAppear { if editingKey { Task { keyFocused = true } } }
+            .onChange(of: keyFocused) { if !keyFocused { editingKey = false; syncDrafts() } }
+        } else {
+            PropertyRow("Key") {
+                HStack(spacing: Theme.Space.s4) {
+                    KeyLabelView(parts: keyParts)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                        .contentShape(Rectangle())
+                        .onTapGesture { editingKey = true }
+                        .accessibilityAddTraits(.isButton)
+                        .accessibilityAction { editingKey = true }
+                        .help("Click to edit the key")
+                    revert("Key", .key)
+                }
+            }
+        }
+    }
+
+    private var keyParts: KeyLabel.Parts? {
+        single
+            ? KeyLabel.parts(row)
+            : KeyLabel.parts(key: key.value, noteName: nil, noteCents: nil)
+    }
+
+    private func textRow(
+        _ title: String, text: Binding<String>, field: OverrideField, mixed: Bool,
+        focus: FocusState<Bool>.Binding? = nil, onCommit: (() -> Void)? = nil
     ) -> some View {
         PropertyRow(title) {
             HStack(spacing: Theme.Space.s4) {
-                // Plain style: the bordered style ignores the text colour,
-                // and the Key value's colour is its tier (ADR-041).
                 TextField(title, text: text, prompt: Text(mixed ? "Mixed" : "\u{2013}"))
                     .textFieldStyle(.plain)
                     .controlSize(.small)
                     .multilineTextAlignment(.trailing)
-                    .foregroundStyle(color)
                     .padding(.horizontal, Theme.Space.s6)
                     .padding(.vertical, Theme.Space.s2)
                     .background(Theme.Color.surfaceWell, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
-                    .onSubmit { commit(field, text.wrappedValue) }
+                    .modifier(OptionalFocus(focus: focus))
+                    .onSubmit {
+                        commit(field, text.wrappedValue)
+                        onCommit?()
+                    }
                 revert(title, field)
             }
         }
@@ -148,5 +179,13 @@ struct OverrideFieldsView: View {
         Task {
             if await !model.setOverride(field, value: value) { syncDrafts() }
         }
+    }
+}
+
+/// Applies `.focused` only when a binding is given.
+private struct OptionalFocus: ViewModifier {
+    let focus: FocusState<Bool>.Binding?
+    func body(content: Content) -> some View {
+        if let focus { content.focused(focus) } else { content }
     }
 }

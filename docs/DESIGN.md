@@ -189,20 +189,24 @@ system control when one exists; write a component only for the things below.
 - Columns: favorite (heart; outline only on hover or when set) · Name
   (`row`, primary, middle truncation) · Category (dot in category hue + name)
   · Kind (symbol + text, secondary) · BPM, Duration (`rowNumeric`,
-  right-aligned) · Key (`row`, left-aligned, in its tier colour, see "Key tiers" below) ·
+  right-aligned) · Key (`row`, left-aligned, note + superscript cents or key, see "Key / note text" below) ·
   Library (secondary). A missing value shows nothing, not "-"; the one
   exception is Key, which shows an en dash in tertiary (silence / no value,
   ADR-041).
 - Hidden files: whole row at tertiary. Loading rows: a short neutral skeleton
   bar in the Name column, not the word "Loading…".
 
-**Key tiers (ADR-041, T10.6).** A key's text colour is its certainty tier
-(`Theme.KeyTier`, `DesignSystem/KeyTier.swift`): high = primary, medium =
-secondary, low (also confidence 0 and no confidence) = tertiary. The bounds
-come from the core (`keyTierHigh()` / `keyTierMedium()`), never from Swift
-literals. The same mapping colours the table cell, the KEY readout and the
-inspector's Key field; no value is an en dash in tertiary everywhere. Cents
-never appear in the table or readout.
+**Key / note text (ADR-041, T10.8; `KeyLabel`).** One rendering everywhere
+(table cell, KEY readout, inspector Key row). A pitched one-shot without a key override shows its
+note with octave ("E2") followed by the rounded cents as a small superscript
+("+35", "\u2212" for negative; omitted when it rounds to 0 or there are no
+cents), Sononym style. Anything else shows its key ("D#m", "C"); no value is
+an en dash in tertiary. Main text is primary, the superscript secondary
+(`Theme.Font.superscript` 9 pt, `Theme.Size.superscriptBaseline` 4 pt raise).
+All values share one colour: certainty is not coloured. The tier
+(`Theme.KeyTier`, bounds from the core `keyTierHigh()` / `keyTierMedium()`)
+only appears as the inspector's confidence word and in the "Include
+uncertain" filter.
 
 ### 4.2 Chip (`SonarChip`)
 Height 22, radius `small`, `row` font, 8 pt horizontal padding. States:
@@ -215,7 +219,7 @@ filter bar's popover chips).
 ### 4.3 Readout (`Readout`)
 A value with a caption above it: caption in `label`, value in 15 pt medium
 monospaced digits. Used in the player header (BPM, KEY, LENGTH, PITCH). Missing
-value: an en dash in tertiary. The KEY value takes its tier style (§4.1).
+value: an en dash in tertiary. The KEY value is note + superscript cents or key (`KeyLabel`, §4.1), primary.
 
 ### 4.4 Waveform
 Bars in `accent` on `surfaceWell`, radius `medium`. Played part full accent,
@@ -265,14 +269,14 @@ Inspector grid row, at least 24 pt high: label in `row` secondary on the left
 (`Theme.Size.propertyLabelWidth`, 72), value or editor right-aligned in the
 rest. Read-only values are selectable `row` text (monospaced digits for
 numbers); missing value: an en dash in tertiary. Sections are a `SectionLabel`
-plus rows with 2 pt between them. The Analysis "Key" value uses its tier
-colour; below it (one sample selected) read-only secondary rows give
+plus rows with 2 pt between them. The Analysis "Key" value is the `KeyLabel`
+rendering (§4.1); clicking it switches to the text field (Return commits,
+losing focus cancels), a trailing revert button clears the override; below it (one sample selected) read-only secondary rows give
 "Key source" (`Audio` / `Name` / `Audio + Name` / `You`, then the
 confidence word `High` / `Medium` / `Low`, e.g. `Audio · High`), "Name says"
 (the filename's key, only when it disagrees with the audio key), "Audio says"
-(the audio's key, only when the name outweighed a disagreeing audio key) and "Note"
-for one-shots (`E2 +18 ct`, prefixed `≈` when |cents| > 25, e.g.
-`≈A#1 -41 ct`). The Key filter popover has "Include uncertain" (low-tier
+(the audio's key, only when the name outweighed a disagreeing audio key); a
+one-shot's note is in the Key row itself. The Key filter popover has "Include uncertain" (low-tier
 keys) next to "Include compatible keys". Removable tags are `SonarChip`s with a
 trailing `xmark`.
 

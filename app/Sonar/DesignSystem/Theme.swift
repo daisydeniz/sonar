@@ -25,6 +25,8 @@ enum Theme {
     /// Fixed sizes of the content layer.
     enum Size {
         static let rowHeight: CGFloat = 24
+        /// Raise of the cents superscript of a note (`KeyLabel`).
+        static let superscriptBaseline: CGFloat = 4
         static let headerHeight: CGFloat = 22
         static let barHeight: CGFloat = 36
         /// Selected-waveform well in the player header: default, minimum and

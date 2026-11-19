@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: all agent milestones done (M0–M7, M9, M10); human-only: T3.7, T7.4, T8.1
-- Next task: none for agents — founder: T8.1 end-to-end test, triage `## Later`
+- Next task: none for agents (T10.8 done) — founder: T8.1 end-to-end test, triage `## Later`
 - Loop state: ROADMAP COMPLETE   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
@@ -18,6 +18,7 @@ manual tests, labeled data. Keep each item one line with the task id.)_
 - T0.1 (optional) For `cargo` in a normal terminal / hand-started `claude`, add to ~/.zprofile: `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"` (scripts and autopilot already handle it). Optional: `brew install gh`.
 - T3.7 (optional) Golden set: `eval/golden/labels.csv` (299 files from `Samples/`) was pre-filled from the pack's own file/folder labels, not by ear; a 5-minute skim to fix or blank wrong cells makes it real golden. `scripts/eval-real.sh` runs silver + golden.
 - T8.1 End-to-end test by the founder (after M7)
+- T10.8 Manual check: click the inspector Key on a one-shot → field opens focused; type a key + Return → table/readout show it (not the note); revert brings E2⁺³⁵ back; ⇧-select mixed keys → table keeps keyboard focus.
 - T9.8 Manual check: on the welcome screen and the trial-ended gate, Return triggers the primary button; drop folders on the welcome screen → overlay; Settings tabs (Libraries online/offline badges, License, About) look right in light/dark.
 - T9.6 Manual check: Find Similar on a sample (also with a waveform region) → 72 pt target well above the selected waveform, its play button plays the target (region only), Space stops it; Esc/× removes the well; drag a .wav from Finder → overlay readable.
 - T9.4 Manual check: select one sample → edit BPM/key/category/kind override and revert, add/remove a tag; ⌘/⇧-select several → fields show common values or "Mixed", an edit or tag applies to all, Reveal shows all in Finder.
@@ -44,6 +45,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-19 — T10.8 (founder request): Sononym-style key display: one-shots with a note show `E2` + superscript cents (`+35`, U+2212 minus, hidden at 0; a user key override wins), else the key; one text colour for all key values (tier greys removed, tier only in the inspector confidence word); shared `KeyLabel` (SwiftUI + AppKit) in table cell, KEY readout and inspector Key row (click to edit); inspector Note row removed. UI-only, no eval. check.sh green; reviewer r2 blocker (Mixed auto-focus) fixed.
 - 2026-11-19 — T10.7: BPM octave via tactus prior (120 BPM, σ 0.6 oct) + loop-length prior on stems; kind gets long-file / sustained-end / onset-count terms; leading-silence skip on long files. TEMPO 2, KIND 2, DSP_VERSION 11. Golden (names hidden): BPM ±1 32.0→88.9 %, loop→one-shot 42→3/287. Silver: BPM 25.3→81.2 %, loop→one-shot 234→49/1010 (4.85 %). Fixtures unchanged (kind 100, BPM 97.06). Kind AC met; BPM AC partially met (28 length-proven mislabels, FX/a cappella). Reviewer APPROVE r2. Later: 3 T10.7 items.
 - 2026-11-19 — T10.6: Key display per tier: cells, KEY readout and inspector Key in tier colour (high primary / medium secondary / low + conf 0 tertiary), en dash for none; inspector Key source + confidence word, one-shot note with cents (≈ when |cents| > 25), "Name says"/"Audio says" on disagreement; Key popover "Include uncertain". Migration 0004 (`pitch_cents`, `key_audio`), KEY_VERSION 5, DSP_VERSION 10. Eval-real unchanged vs T10.4b (silver key high/medium 79.7/61.5 %, MIREX 34.2 %; golden 68.8/34.5 %, MIREX 37.9 %). check.sh green; reviewer APPROVE r2. Later: 3 T10.6 items (incl. ui-snapshots.sh hang).
-- 2026-11-18 — T10.5: Key filter/facet honest by default: only medium + high tier (overrides count as certain); `--key-uncertain` / FFI `include_uncertain_keys` adds low. Mode-less `A` answers `A` and `Am` (also via compatible keys); sort by key puts low tier after the rest. `ff_key` = root·3+mode (+36 low), index SCHEMA_VERSION 3 (rebuild). Note: name-only keys of not-yet-analysed files are low tier, so they leave the default key filter until analysis. 500k p95 30.6 ms (budget 50). Fixtures eval green; no analysis change → no eval-real. check.sh green; reviewer APPROVE r1. Later: 2 T10.5 items.

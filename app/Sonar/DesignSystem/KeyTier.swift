@@ -2,8 +2,8 @@ import AppKit
 import SwiftUI
 
 extension Theme {
-    /// Certainty class of a key (ADR-041, DESIGN §4.1): shown as text
-    /// colour in the table, the KEY readout and the inspector. The bounds
+    /// Certainty class of a key (ADR-041, DESIGN §4.9): shown only as the
+    /// inspector's confidence word and used by the filter. The bounds
     /// come from the core (`keyTierHigh()` / `keyTierMedium()`), never from
     /// literals here.
     enum KeyTier: Equatable, Sendable {
@@ -24,27 +24,6 @@ extension Theme {
 
         /// Tier of a result row's key.
         static func of(_ row: FileRow) -> KeyTier { of(confidence: row.keyConf) }
-
-        /// Text style: high primary, medium secondary, low tertiary.
-        var style: HierarchicalShapeStyle {
-            switch self {
-            case .high: .primary
-            case .medium: .secondary
-            case .low: .tertiary
-            }
-        }
-
-        /// The same as a SwiftUI colour (text fields ignore hierarchical styles).
-        var color: SwiftUI.Color { SwiftUI.Color(nsColor: nsColor) }
-
-        /// The same as an AppKit colour.
-        var nsColor: NSColor {
-            switch self {
-            case .high: .labelColor
-            case .medium: .secondaryLabelColor
-            case .low: .tertiaryLabelColor
-            }
-        }
 
         /// Confidence word of the inspector.
         var word: String {

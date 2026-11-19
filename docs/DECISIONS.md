@@ -1321,3 +1321,5 @@ the engine fails to open).
   high takes the best band and the gap is a `## Later` item. Golden (88
   keys) high 68.8 %, medium 34.5 %. Re-fit on real files in T10.4b
   (fixtures-only first cut was 0.75 / 0.30). No analysis change.
+
+- **Addendum T10.8 (founder, 2026-11-19)**: key values no longer coloured by tier; one-shots show note+octave with superscript cents (Sononym style); tier stays in the inspector confidence word.
