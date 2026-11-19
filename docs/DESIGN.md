@@ -283,8 +283,9 @@ no border. Hover: hue at 24 %. Selected / active: the hue's deep fill
 (`…Fill`), white text, same weight as unselected (no semibold: a chip
 cloud must not reflow on toggle); an active chip's `×` is white. The count
 is the label at `Theme.chipCountOpacity` (0.7). Used for every chip in the
-filter panel and the bar's active filter chips; tag chips everywhere (T11.2)
-use `facetTag`. One component, not a second chip. Chip clouds wrap with
+filter panel and the bar's active filter chips; tag chips everywhere
+(inspector Tags, tag editor sheet, the panel's Tags section) use
+`facetTag`. One component, not a second chip. Chip clouds wrap with
 `FlowLayout` (spacing `s6`).
 
 ### 4.3 Readout (`Readout`)
@@ -348,8 +349,8 @@ confidence word `High` / `Medium` / `Low`, e.g. `Audio · High`), "Name says"
 (the filename's key, only when it disagrees with the audio key), "Audio says"
 (the audio's key, only when the name outweighed a disagreeing audio key); a
 one-shot's note is in the Key row itself. The Key section of the filter panel has "Include uncertain" (low-tier
-keys) next to "Include compatible keys". Removable tags are `SonarChip`s with a
-trailing `xmark`.
+keys) next to "Include compatible keys". Removable tags are `SonarChip`s in the
+`facetTag` hue (§4.2) with a trailing `xmark`.
 
 ### 4.10 Status badge (`StatusBadge`)
 `caption` text in a status colour (`Theme.Color.ok` / `warning` / `error`) on
@@ -366,7 +367,7 @@ Cancel / default-action buttons.
 **Tag editor sheet (T10.9, `TagEditorView`).** Row context menu / Edit menu
 "Edit Tags…" and the inspector's tag button. A `tag` symbol + `title`
 heading; a token box (`surfaceWell`, hairline, radius `medium`) holding the
-tags every target file has as `SonarChip`s with `×` and a borderless inline
+tags every target file has as `facetTag` `SonarChip`s with `×` and a borderless inline
 "Add tag" field at the end of the flow; below, a `surfaceContent` list of the
 library's tags filtered by the typed text (checkmark when chosen, name, file
 count in `caption` secondary, `selection` tint on the highlighted row, a

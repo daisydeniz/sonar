@@ -25,7 +25,7 @@ struct TagsEditorView: View {
             if !shownTags.isEmpty {
                 FlowLayout {
                     ForEach(shownTags, id: \.self) { tag in
-                        SonarChip(title: tag, trailingSymbol: "xmark") {
+                        SonarChip(title: tag, hue: .tag, trailingSymbol: "xmark") {
                             Task { await model.removeTag(tag) }
                         }
                         .help("Remove tag")

@@ -56,7 +56,10 @@ final class UISnapshotTests: XCTestCase {
 
     func testMain() async throws {
         let dir = try outputDir()
-        let model = try await populated()
+        // The selected row carries tags so the inspector shows `facetTag` chips (T11.2).
+        var rows = SnapshotFixtures.rows()
+        rows[2].tags = ["dark", "club", "analog"]
+        let model = try await populated(rows: rows)
         try snapshot("main", contentView(model), dir: dir, emphasis: true, selectRow: 2)
     }
 

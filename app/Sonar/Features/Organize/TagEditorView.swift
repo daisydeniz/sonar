@@ -42,7 +42,7 @@ struct TagEditorView: View {
     private var tokenBox: some View {
         FlowLayout {
             ForEach(state.chips, id: \.self) { tag in
-                SonarChip(title: tag, trailingSymbol: "xmark") { state.remove(tag) }
+                SonarChip(title: tag, hue: .tag, trailingSymbol: "xmark") { state.remove(tag) }
                     .help("Remove tag")
                     .accessibilityLabel("Remove tag \(tag)")
             }
