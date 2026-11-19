@@ -5,12 +5,18 @@ import SwiftUI
 /// (`accentSoft`, accent text, no border), disabled (40 % opacity). Optional
 /// count, leading category dot, trailing symbol, and (active chips only) a
 /// trailing clear `×` with its own action.
+///
+/// With a `hue` (ADR-042, Logic Pro style) the chip is coloured: hue text on
+/// the hue at 16 % (hover 24 %), no border; active = the hue's deep fill with
+/// white text. Weight never changes, so a chip cloud does not reflow.
 struct SonarChip: View {
     let title: String
     var count: Int?
     /// Colour of the leading dot, usually `Theme.categoryColor(_:)`.
     var dot: Color?
     var isActive = false
+    /// Facet hue (filter panel, active filter chips, tags); nil = plain chip.
+    var hue: Theme.Hue?
     /// Optional trailing SF Symbol (e.g. `xmark` on a removable tag).
     var trailingSymbol: String?
     /// Shows a separate clear `×` button while active (filter chips).
@@ -30,9 +36,7 @@ struct SonarChip: View {
                         Circle().fill(dot).frame(width: Theme.Size.categoryDot, height: Theme.Size.categoryDot)
                     }
                     Text(title).font(Theme.Font.row).lineLimit(1)
-                    if let count {
-                        Text("\(count)").font(Theme.Font.captionNumeric).foregroundStyle(.tertiary)
-                    }
+                    if let count { countText(count) }
                     if let trailingSymbol {
                         Image(systemName: trailingSymbol).font(Theme.Font.caption).imageScale(.small)
                     }
@@ -56,11 +60,11 @@ struct SonarChip: View {
                 .help(clearLabel)
             }
         }
-        .foregroundStyle(isActive ? Theme.Color.accent : Color.secondary)
+        .foregroundStyle(foreground)
         .frame(height: Theme.Size.chipHeight)
         .background(background, in: RoundedRectangle(cornerRadius: Theme.Radius.small))
         .overlay {
-            if !isActive {
+            if !isActive && hue == nil {
                 RoundedRectangle(cornerRadius: Theme.Radius.small)
                     .strokeBorder(Theme.Color.hairline, lineWidth: Theme.hairlineWidth)
             }
@@ -71,7 +75,23 @@ struct SonarChip: View {
         .accessibilityAddTraits(isActive ? .isSelected : [])
     }
 
+    @ViewBuilder
+    private func countText(_ count: Int) -> some View {
+        let text = Text("\(count)").font(Theme.Font.captionNumeric)
+        if hue == nil {
+            text.foregroundStyle(.tertiary)
+        } else {
+            text.opacity(Theme.chipCountOpacity)
+        }
+    }
+
+    private var foreground: Color {
+        if let hue { return isActive ? Color.white : hue.color }
+        return isActive ? Theme.Color.accent : Color.secondary
+    }
+
     private var background: Color {
+        if let hue { return isActive ? hue.fill : (hovering ? hue.tintHover : hue.tint) }
         if isActive { return Theme.Color.accentSoft }
         return hovering ? Theme.Color.surfaceWell : .clear
     }

@@ -61,10 +61,10 @@ enum Theme {
         static let propertyLabelWidth: CGFloat = 72
         /// Maximum text width of `EmptyStateView`.
         static let emptyStateTextWidth: CGFloat = 360
-        /// Filter-bar popovers: content width, tallest facet list, and the
-        /// min/max number fields of range filters.
-        static let popoverWidth: CGFloat = 240
-        static let popoverListMaxHeight: CGFloat = 240
+        /// Filter panel (DESIGN §3): popover width, height it scrolls past,
+        /// and the min/max number fields of the Tempo / Duration sections.
+        static let filterPanelWidth: CGFloat = 480
+        static let filterPanelMaxHeight: CGFloat = 640
         static let rangeField: CGFloat = 64
         /// Tag editor sheet (DESIGN §4.11): width, token-box minimum height,
         /// inline field width, suggestion list height, checkmark column.

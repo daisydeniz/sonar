@@ -10,6 +10,7 @@ final class DesignTokenTests: XCTestCase {
     private let names = [
         "SurfaceContent", "SurfaceRaised", "SurfaceWell", "Hairline", "Favorite",
         "CatDrum", "CatMetal", "CatBass", "CatTonal", "CatVocal", "CatFX", "AccentColor", "AccentContent",
+        "FacetProperty", "FacetTag",
     ]
 
     private func rgba(_ color: NSColor, dark: Bool) -> [CGFloat] {
@@ -86,6 +87,27 @@ final class DesignTokenTests: XCTestCase {
             let fill = rgba(Theme.NS.controlAccent, dark: dark)
             XCTAssertGreaterThanOrEqual(contrast([1, 1, 1, 1], fill), 4.5, "dark=\(dark)")
         }
+    }
+
+    /// Selected hued chips: white text on every hue's deep fill, both appearances (ADR-042).
+    func testWhiteTextOnEveryHueFill() {
+        XCTAssertEqual(Theme.Hue.allCases.count, 8)
+        for hue in Theme.Hue.allCases {
+            for dark in [false, true] {
+                let fill = rgba(hue.nsFill, dark: dark)
+                XCTAssertGreaterThanOrEqual(contrast([1, 1, 1, 1], fill), 4.5, "\(hue.fillAsset) dark=\(dark)")
+            }
+        }
+    }
+
+    func testHueColoursAndCategoryMapping() {
+        for hue in Theme.Hue.allCases {
+            let color = NSColor(named: NSColor.Name(hue.textAsset), bundle: .main)!
+            XCTAssertNotEqual(rgba(color, dark: false), rgba(color, dark: true), hue.textAsset)
+        }
+        XCTAssertEqual(Theme.categoryHue("snare"), .drum)
+        XCTAssertEqual(Theme.categoryHue("texture"), .fx)
+        XCTAssertNil(Theme.categoryHue(nil))
     }
 
     func testScales() {

@@ -38,6 +38,9 @@ extension Theme {
         /// Status: ok (system green).
         static let ok = SwiftUI.Color(nsColor: .systemGreen)
 
+        /// Section group inside the filter panel: a semantic fill that keeps
+        /// the popover's glass visible (not an opaque surface).
+        static var panelGroup: SwiftUI.Color { SwiftUI.Color(nsColor: .quinarySystemFill) }
         /// Focused selected row: accent at 16 % (light) / 24 % (dark).
         static var selection: SwiftUI.Color { SwiftUI.Color(nsColor: Theme.NS.selection) }
         /// Selected row while the table is not focused: label colour at 8 %.
@@ -80,7 +83,7 @@ extension Theme {
             derived { _ in (NS.accent, 0.14) }
         }
 
-        fileprivate static func named(_ name: String) -> NSColor {
+        static func named(_ name: String) -> NSColor {
             NSColor(named: NSColor.Name(name), bundle: .main) ?? .magenta  // magenta = missing asset
         }
 
@@ -109,7 +112,7 @@ extension Theme {
         categoryToken(category).map { NS.named($0.assetName) }
     }
 
-    private enum CategoryToken {
+    enum CategoryToken {
         case drum, metal, bass, tonal, vocal, fx
         var assetName: String {
             switch self {
@@ -123,7 +126,7 @@ extension Theme {
         }
     }
 
-    private static func categoryToken(_ category: String?) -> CategoryToken? {
+    static func categoryToken(_ category: String?) -> CategoryToken? {
         guard let category else { return nil }
         switch category.lowercased() {
         case "kick", "snare", "clap", "tom", "drums": return .drum

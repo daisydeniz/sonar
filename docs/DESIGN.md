@@ -71,10 +71,11 @@ else:
 Derived (computed in `Theme`, not separate assets):
 - `selection` = `accent` at 16 % (light) / 24 % (dark): focused selected row.
 - `selectionInactive` = label colour at 8 %: selected row, table not focused.
-- `accentSoft` = `accent` at 14 %: active chip / toggle background.
+- `accentSoft` = `accent` at 14 %: toggle background and the plain (unhued) active chip.
+- `panelGroup` = the system quinary fill: section groups in the filter panel.
 - Category chip/dot background = the category hue at 16 %, text = the hue.
 
-Facet hues and fills (ADR-042; colour sets added by T11.1). Every chip in
+Facet hues and fills (ADR-042). Every chip in
 the filter panel and every active filter chip takes its section's hue.
 Category values use their category hue (above). Two more hues, chosen away
 from every category hue and from `accent`:
@@ -173,46 +174,38 @@ states; the playhead follows audio via display link. No springs, no bounces.
   button, `caption`), indexing status (small progress bar
   `Theme.Size.indexingProgressWidth` 100 + `caption` monospaced counter +
   pause/resume), inspector toggle. No custom-drawn toolbar items.
-- **Filter bar**: ONE row, `surfaceRaised`, hairline below. Kind as a compact
-  segmented control (All / Loops / One-shots); Category, Key, BPM, Duration,
-  Tags as popover buttons; Favorites as an icon toggle; result count right,
-  `caption`, monospaced digits. A popover button with a selection turns into
-  an active chip (`accentSoft` background, accent text, shows the selection
-  summary, has a clear `×`). Facet lists with counts live inside the popovers
-  (checkbox rows: value, count in `caption` monospaced digits, width
-  `Theme.Size.popoverWidth`). Chips scroll horizontally when the column is
-  narrow; Favorites, "Clear all" and the count stay fixed on the right.
-  Library is not in the bar (the sidebar already filters by library).
-  **Target from T11.1 (ADR-042, Logic Pro browser), replaces the per-facet
-  popovers:** the bar holds Kind (segmented), one **Filters** button
-  (`line.3.horizontal.decrease`, accent when any filter is on), then the
-  **active filter chips**: one chip per selected value (`Kick`, `Bass`,
-  `Am`, `120–128 BPM`, tag `dark`) in its section hue, filled style
-  (§4.2), each with its own `×`; then Favorites, "Clear all", count.
-- **Filter panel** (T11.1): a system popover from the Filters button (glass
-  on macOS 26+, nothing custom behind it), width
-  `Theme.Size.filterPanelWidth` (≈ 480), scrolls past ~640 pt. Title
-  "Filters" + close. Sections, each a rounded group filled with a semantic
-  fill that keeps the glass visible (`.fill.quinary` via a `Theme` token,
-  not an opaque surface) with a `SectionLabel` title and a trailing "Show More" text button
-  when it holds more than two rows of chips:
-  **Category** (grouped by family: Drums, Percussion & metal, Bass, Tonal,
-  Vocal, FX; multi-select), **Key** (a small Any / Major / Minor segmented
-  control, then the 12 roots as multi-select chips, plus "Include
+- **Filter bar**: ONE row, `surfaceRaised`, hairline below. Kind as a
+  compact segmented control (All / Loops / One-shots); one **Filters**
+  button (`line.3.horizontal.decrease`, accent when any filter is on) that
+  opens the filter panel; then one **active filter chip per selected value**
+  (`Kick`, `Bass`, `Am`, `120–128 BPM`, tag `dark`) in its section hue,
+  filled style (§4.2), each with its own `×` (clicking the chip body opens
+  the panel); Favorites as an icon toggle; "Clear all"; result count right,
+  `caption`, monospaced digits. The chips scroll horizontally when the
+  column is narrow; Favorites, "Clear all" and the count stay fixed on the
+  right. Library is not in the bar (the sidebar already filters by library).
+- **Filter panel** (T11.1, ADR-042): a system popover from the Filters
+  button (glass on macOS 26+, nothing custom behind it), width
+  `Theme.Size.filterPanelWidth` (480), scrolls past
+  `filterPanelMaxHeight` (640). Title "Filters" + close. Sections, each a
+  `large`-radius group filled with `Theme.Color.panelGroup` (a semantic
+  quinary fill, so the glass shows through) with a `label` title and, when
+  it holds more than 12 chips, a trailing "Show More" / "Show Less" text
+  button (selected chips are never hidden by it): **Category** (chips
+  ordered by family: Drums, Percussion & metal, Bass, Tonal, Vocal, FX,
+  each in its category hue; multi-select), **Key** (Any / Major / Minor
+  segmented control, the 12 roots as multi-select chips, then "Include
   compatible keys" and "Include uncertain"; root `A` adds `A` in Major,
-  `Am` in Minor, both `A` and `Am` in Any, and the bar shows one chip per
-  root as labelled (`A`, `Am`, or `A any`); counts show in Major / Minor
-  only: in Any the chips have no count, since a mode-less key counts toward
-  both modes and a sum would double-count), **Tempo** (BPM min/max fields +
-  quick-range chips), **Duration** (min/max + quick-range chips),
-  **Tags** (multi-select, by file count, most used first). Tempo and
-  Duration hold ONE range each (`FilterState` min/max): their quick chips
-  are single-select, choosing one sets min/max, choosing it again clears
-  it, typing in the fields deselects a quick chip that no longer matches;
-  the bar shows one chip for the range (`120–128 BPM`). Category, Key and
-  Tag chips show their count (`caption`, monospaced) and are disabled at
-  count 0 unless selected. Clicking a chip applies at once (no Apply). Keyboard: Tab between
-  sections, arrows between chips, Space toggles, Esc closes.
+  `Am` in Minor, both in Any; the bar shows one chip per root: `A`, `Am`,
+  or `A any`; counts show in Major / Minor only, since in Any a mode-less
+  key counts toward both modes), **Tempo** and **Duration** (min / max
+  fields plus single-select quick-range chips: one range each, choosing it
+  sets min/max, choosing it again clears it, typing a different bound
+  deselects it; the bar shows one chip for the range), **Tags**
+  (multi-select, most used first). Category, Key and Tag chips show their
+  count (`caption`, monospaced) and are disabled at count 0 unless
+  selected. A click applies at once (no Apply). Keyboard: Tab between
+  controls, arrows between chips, Space toggles, Esc closes.
 - **Results table**: see §4.1.
 - **Player header** (founder request 2026-11-17, ADR-040; modelled on how
   pro sample browsers work, not on any one product's look): always present
@@ -282,17 +275,17 @@ Height 22, radius `small`, `row` font, 8 pt horizontal padding. States:
 default (hairline border, secondary text) · hover (`surfaceWell`) · active
 (`accentSoft`, accent text, no border) · disabled (40 % opacity). Optional
 count in `caption` monospaced digits; optional leading category dot;
-optional trailing clear `×` (own button and action, active chips only: the
-filter bar's popover chips).
+optional trailing clear `×` (own button and action, active chips only).
 
-**Hued chips (ADR-042, T11.1/T11.2, Logic Pro style).** A chip can carry a
-facet hue (§2.1). Unselected: hue text on the hue at 16 %, no border.
-Hover: hue at 24 %. Selected / active: the hue's deep fill (`…Fill`,
-§2.1), white text, same weight as unselected (no semibold: the chip cloud
-must not reflow on toggle). Used for every chip in the filter panel, the active filter chips
-in the bar, and tag chips everywhere (inspector Tags, tag editor), which
-all use `facetTag`. One component (`SonarChip` with a hue), not a second
-chip.
+**Hued chips (ADR-042, Logic Pro style).** A chip can carry a facet hue
+(§2.1) through `SonarChip(hue:)`. Unselected: hue text on the hue at 16 %,
+no border. Hover: hue at 24 %. Selected / active: the hue's deep fill
+(`…Fill`), white text, same weight as unselected (no semibold: a chip
+cloud must not reflow on toggle); an active chip's `×` is white. The count
+is the label at `Theme.chipCountOpacity` (0.7). Used for every chip in the
+filter panel and the bar's active filter chips; tag chips everywhere (T11.2)
+use `facetTag`. One component, not a second chip. Chip clouds wrap with
+`FlowLayout` (spacing `s6`).
 
 ### 4.3 Readout (`Readout`)
 A value with a caption above it: caption in `label`, value in 15 pt medium
@@ -354,7 +347,7 @@ losing focus cancels), a trailing revert button clears the override; below it (o
 confidence word `High` / `Medium` / `Low`, e.g. `Audio · High`), "Name says"
 (the filename's key, only when it disagrees with the audio key), "Audio says"
 (the audio's key, only when the name outweighed a disagreeing audio key); a
-one-shot's note is in the Key row itself. The Key filter popover has "Include uncertain" (low-tier
+one-shot's note is in the Key row itself. The Key section of the filter panel has "Include uncertain" (low-tier
 keys) next to "Include compatible keys". Removable tags are `SonarChip`s with a
 trailing `xmark`.
 

@@ -1,24 +1,30 @@
 import SwiftUI
 
 /// The filter bar (DESIGN §3): one 36 pt row on `surfaceRaised`. Kind as a
-/// segmented control, Category / Key / BPM / Duration / Tags as popover chips with facet counts from the core
-/// (drill-sideways), a Favorites icon toggle and the result count. Changing
-/// anything re-queries the core through `AppModel` (the view only edits
-/// `filters`).
+/// segmented control, one Filters button (popover panel), one hued active
+/// chip per selected value with its own `×`, a Favorites icon toggle,
+/// "Clear all" and the result count. Changing anything re-queries the core
+/// through `AppModel` (the view only edits `filters`).
 @MainActor
 struct FilterBarView: View {
     @Bindable var model: AppModel
+    @State private var panelShown = false
+    @State private var keyMode = KeyMode.any
 
     var body: some View {
         HStack(spacing: Theme.Space.s8) {
+            kindPicker
+            filtersButton
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: Theme.Space.s8) {
-                    kindPicker
-                    categoryChip
-                    keyChip
-                    bpmChip
-                    durationChip
-                    tagsChip
+                HStack(spacing: Theme.Space.s4) {
+                    ForEach(FilterPanel.activeChips(model.filters)) { chip in
+                        SonarChip(
+                            title: chip.title, isActive: true, hue: chip.hue,
+                            onClear: { clear(chip) }, clearLabel: "Remove \(chip.title) filter"
+                        ) { panelShown = true }
+                        .fixedSize()
+                        .accessibilityLabel("Filter \(chip.title)")
+                    }
                 }
                 .padding(.vertical, Theme.Space.s2)
             }
@@ -42,6 +48,12 @@ struct FilterBarView: View {
         .background(Theme.Color.surfaceRaised)
     }
 
+    private func clear(_ chip: FilterPanel.ActiveChip) {
+        var next = model.filters
+        FilterPanel.clear(chip, in: &next)
+        model.filters = next
+    }
+
     static func countText(_ count: Int) -> String {
         count == 1 ? "1 result" : "\(count.formatted()) results"
     }
@@ -63,79 +75,15 @@ struct FilterBarView: View {
         .accessibilityLabel("Kind")
     }
 
-    private var categoryChip: some View {
-        FilterPopoverChip(
-            title: "Category",
-            summary: FilterState.summary(of: model.filters.categories, display: Format.categoryTitle),
-            onClear: { model.filters.categories = [] }
-        ) {
-            FacetListView(
-                title: "Category",
-                chips: FacetChip.chips(facets: model.facets?.categories ?? [], selected: model.filters.categories),
-                display: Format.categoryTitle, dot: { Theme.categoryColor($0) }
-            ) { FilterState.toggle($0, in: &model.filters.categories) }
+    private var filtersButton: some View {
+        Button { panelShown.toggle() } label: {
+            Label("Filters", systemImage: "line.3.horizontal.decrease")
+                .foregroundStyle(model.filters.isActive ? Theme.Color.accent : Color.secondary)
         }
-    }
-
-    private var keyChip: some View {
-        FilterPopoverChip(
-            title: "Key",
-            summary: FilterState.summary(of: model.filters.keys).map {
-                model.filters.compatibleKeys ? "\($0) ≈" : $0
-            } ?? (model.filters.includeUncertainKeys ? "Uncertain" : nil),
-            onClear: {
-                model.filters.keys = []
-                model.filters.compatibleKeys = false
-                model.filters.includeUncertainKeys = false
-            }
-        ) {
-            VStack(alignment: .leading, spacing: Theme.Space.s8) {
-                FacetListView(
-                    title: "Key",
-                    chips: FacetChip.chips(facets: model.facets?.keys ?? [], selected: model.filters.keys)
-                ) { FilterState.toggle($0, in: &model.filters.keys) }
-                Toggle("Include compatible keys", isOn: $model.filters.compatibleKeys)
-                    .toggleStyle(.checkbox)
-                    .font(Theme.Font.row)
-                    .disabled(model.filters.keys.isEmpty)
-                Toggle("Include uncertain", isOn: $model.filters.includeUncertainKeys)
-                    .toggleStyle(.checkbox)
-                    .font(Theme.Font.row)
-                    .help("Also list keys the analysis is unsure about (low confidence)")
-            }
-        }
-    }
-
-    private var bpmChip: some View {
-        FilterPopoverChip(
-            title: "BPM",
-            summary: FilterState.rangeSummary(min: model.filters.bpmMin, max: model.filters.bpmMax),
-            onClear: { model.filters.bpmMin = nil; model.filters.bpmMax = nil }
-        ) {
-            RangeFieldsView(title: "BPM", unit: "", min: $model.filters.bpmMin, max: $model.filters.bpmMax)
-        }
-    }
-
-    private var durationChip: some View {
-        FilterPopoverChip(
-            title: "Duration",
-            summary: FilterState.rangeSummary(
-                min: model.filters.durationMinSec, max: model.filters.durationMaxSec, unit: "s"),
-            onClear: { model.filters.durationMinSec = nil; model.filters.durationMaxSec = nil }
-        ) {
-            RangeFieldsView(
-                title: "Duration", unit: "s", min: $model.filters.durationMinSec, max: $model.filters.durationMaxSec)
-        }
-    }
-
-    private var tagsChip: some View {
-        FilterPopoverChip(
-            title: "Tags", summary: FilterState.summary(of: model.filters.tags),
-            onClear: { model.filters.tags = [] }
-        ) {
-            FacetListView(
-                title: "Tags", chips: FacetChip.chips(facets: model.facets?.tags ?? [], selected: model.filters.tags)
-            ) { FilterState.toggle($0, in: &model.filters.tags) }
+        .help("Filters")
+        .accessibilityLabel("Filters")
+        .popover(isPresented: $panelShown, arrowEdge: .bottom) {
+            FilterPanelView(model: model, keyMode: $keyMode) { panelShown = false }
         }
     }
 
