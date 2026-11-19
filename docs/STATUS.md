@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M11 Logic Pro-style filters and tags (founder request 2026-11-20); human-only: T3.7, T7.4, T8.1
-- Next task: T11.2 Tag chips in facetTag hue
+- Next task: T11.3 Platform pass on macOS 27 (reviewer)
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (updated 2026-11-20; T0.1 was macOS 26.7.2 / Xcode 26.5)
@@ -47,6 +47,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-20 — T11.2: removable tag chips in the inspector and the Edit Tags sheet use `SonarChip(hue: .tag)` (`facetTag`), like the panel's Tags section; tag editor list rows unchanged. `main` snapshot now shows inspector tags. UI only, no eval. check.sh green; reviewer APPROVE r1 (NIT fixed).
 - 2026-11-20 — T11.1: one Filters button + system popover panel (Category by family, Key mode Any/Major/Minor + 12 roots + include toggles, Tempo/Duration min–max + single-select quick ranges, Tags) as hued chip clouds with counts and Show More; bar shows one hued active chip per value with ×. 10 colour sets (facet hues + 8 deep fills, white ≥ 4.5:1 tested), `SonarChip(hue:)`, `FilterPanelModel` + 8 tests, snapshots `main-filter-panel` / `main-filters`. UI only, no eval. check.sh green; reviewer APPROVE r1. Later: 5 T11.1 items.
 - 2026-11-20 — T11.0 (founder request): design direction after the move to macOS 27 / Xcode 27: Logic Pro browser is the main visual reference (DESIGN §1, local screenshot in git-ignored `design/reference/`); spec for one Filters panel with hued chip sections + one active chip per value (§3), hued chips with deep fill (§2.1, §4.2), glass only in the control layer (§5); BAMA `mac-design` / `ux-design` / `design-from-app` skills vendored in `.claude/skills/` (MIT). ADR-042, M11 (T11.1–T11.3). Docs only.
-- 2026-11-19 — T10.9 (founder request): "Add Tag…" alert → "Edit Tags…" sheet (row menu, menu bar, inspector tag button): chips of the tags all targets share (× removes), inline field filters library tags with counts (exact → prefix → substring), click/↓↑+Return toggles, "Create “x”" for new tags, case-insensitive reuse of existing spelling; Save applies the add/remove diff in one refresh, never removes tags only some files have. `TagEditorState` + 9 unit tests, snapshot `tag-editor`. UI only → no eval. check.sh green; reviewer APPROVE r2. Later: 1 T10.9 item.
