@@ -94,6 +94,8 @@ re-review finished phases. After the merge in step 8: `rm -f logs/handoff.md`.
   control is preferred over a custom one. No literal colours, paddings,
   radii or font sizes in feature code: `scripts/design-lint.sh` (part of
   `check.sh`) fails on them.
+- Platform rules (macOS 26/27, Liquid Glass) and UX: the vendored skills
+  `.claude/skills/mac-design` and `ux-design` (ADR-042); DESIGN.md wins.
 - Every screen works in light **and** dark and has empty / loading / error /
   filled states. Agents verify by looking: `scripts/ui-snapshots.sh` →
   `logs/ui/<screen>-<light|dark>.png` (add a screen there when a task

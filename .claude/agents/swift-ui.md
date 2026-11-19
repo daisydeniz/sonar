@@ -34,6 +34,11 @@ Design (docs/DESIGN.md, ADR-039)
   inspector container, sheets) is never custom-drawn; no blur/glass/shadow in
   the content layer.
 - Desktop density: do not produce airy, single-column, phone-like layouts.
+- Platform rules for macOS 26/27 (Liquid Glass, toolbars, menus, popover vs
+  sheet, wording): `.claude/skills/mac-design` and `ux-design` (ADR-042).
+  DESIGN.md wins on a conflict. A reference screenshot in `design/reference/`
+  can be measured against a snapshot with
+  `.claude/skills/design-from-app/scripts/{measure,compare}.swift`.
 - Light and dark, and the empty / loading / error / filled states, for every
   screen you touch.
 

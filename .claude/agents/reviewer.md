@@ -26,6 +26,8 @@ Check
    with the Read tool and go through the DESIGN.md §6 checklist. Check the
    diff for literal colours/sizes and for custom components that duplicate a
    system control or a `DesignSystem` component.
+   Also check the PNGs against `.claude/skills/mac-design/design-rules.md`
+   (macOS 26/27 platform rules, ADR-042); DESIGN.md wins on a conflict.
 
 BLOCKING only for: AC not met, a real bug (wrong result, data loss, crash,
 panic across FFI), license violation, missing/flaky tests for the AC, and

@@ -10,13 +10,23 @@ reads this file first and uses **only** the tokens defined here
 **A precise instrument, native to the Mac.** Sonar is a pro audio tool: dense,
 calm, fast to scan, keyboard-first. The reference mix is Sononym's information
 density, Ableton's browser discipline and Linear's polish, on a standard macOS
-frame.
+frame. **Logic Pro's browser (macOS 26/27) is the main visual reference**
+(founder, 2026-11-20, ADR-042) for the filter panel, chips and tags: filters
+as colour-coded chip clouds grouped in titled sections on a floating glass
+panel, each active filter a coloured chip of its own. The founder's
+screenshot is `design/reference/logic-pro-browser.png` (local only,
+git-ignored). Borrow structure, spacing and the colour logic; never Apple's
+icons, artwork or names.
 
 - **System frame, custom content.** Window chrome (sidebar, toolbar, inspector
-  container, menus, sheets, settings) is standard SwiftUI/AppKit, so it gets
-  the current macOS look (Liquid Glass on macOS 26+) for free. Sonar's own
-  identity lives in the content layer: results table, player header, waveform,
-  chips, meters.
+  container, menus, sheets, popovers, settings) is standard SwiftUI/AppKit, so
+  it gets the current macOS look (Liquid Glass on macOS 26+) for free. Sonar's
+  own identity lives in the content layer: results table, player header,
+  waveform, chips, meters.
+- **Glass for floating controls, flat for content** (Apple HIG, vendored as
+  `.claude/skills/mac-design`). Glass belongs to the navigation and control
+  layer: toolbar, sidebar, popovers (the filter panel), floating buttons.
+  Rows, waveforms, cards and chips never get glass. Never glass on glass.
 - **Light and dark are equal citizens.** The app follows the system appearance;
   there is no in-app theme switch. Every colour is a token with a light and a
   dark value. Every screen is checked in both.
@@ -63,6 +73,33 @@ Derived (computed in `Theme`, not separate assets):
 - `selectionInactive` = label colour at 8 %: selected row, table not focused.
 - `accentSoft` = `accent` at 14 %: active chip / toggle background.
 - Category chip/dot background = the category hue at 16 %, text = the hue.
+
+Facet hues and fills (ADR-042; colour sets added by T11.1). Every chip in
+the filter panel and every active filter chip takes its section's hue.
+Category values use their category hue (above). Two more hues, chosen away
+from every category hue and from `accent`:
+
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `facetProperty` | `#0369A1` | `#38BDF8` | Key, Tempo, Duration chips (Logic's "Properties") |
+| `facetTag` | `#4D7C0F` | `#A3E635` | tag chips everywhere |
+
+Each of the eight hues has a deep **fill** for the selected state, the
+same value in light and dark, white text on it ≥ 4.5:1 (token test):
+
+| Fill token | Value | White on it |
+|---|---|---|
+| `catDrumFill` | `#C2410C` | 5.2 |
+| `catMetalFill` | `#A16207` | 4.9 |
+| `catBassFill` | `#6D28D9` | 7.1 |
+| `catTonalFill` | `#1D4ED8` | 6.7 |
+| `catVocalFill` | `#BE185D` | 6.0 |
+| `catFXFill` | `#475569` | 7.6 |
+| `facetPropertyFill` | `#0369A1` | 5.9 |
+| `facetTagFill` | `#4D7C0F` | 5.0 |
+
+The `…Fill` tokens are the one allowed exception to "a filled custom control
+uses `controlAccent`" (§5): they are never `accent` and are contrast-tested.
 
 Category → hue goes through `Theme.categoryColor(_:)` only. Unknown or missing
 category: no dot, text in tertiary.
@@ -146,6 +183,36 @@ states; the playhead follows audio via display link. No springs, no bounces.
   `Theme.Size.popoverWidth`). Chips scroll horizontally when the column is
   narrow; Favorites, "Clear all" and the count stay fixed on the right.
   Library is not in the bar (the sidebar already filters by library).
+  **Target from T11.1 (ADR-042, Logic Pro browser), replaces the per-facet
+  popovers:** the bar holds Kind (segmented), one **Filters** button
+  (`line.3.horizontal.decrease`, accent when any filter is on), then the
+  **active filter chips**: one chip per selected value (`Kick`, `Bass`,
+  `Am`, `120–128 BPM`, tag `dark`) in its section hue, filled style
+  (§4.2), each with its own `×`; then Favorites, "Clear all", count.
+- **Filter panel** (T11.1): a system popover from the Filters button (glass
+  on macOS 26+, nothing custom behind it), width
+  `Theme.Size.filterPanelWidth` (≈ 480), scrolls past ~640 pt. Title
+  "Filters" + close. Sections, each a rounded group filled with a semantic
+  fill that keeps the glass visible (`.fill.quinary` via a `Theme` token,
+  not an opaque surface) with a `SectionLabel` title and a trailing "Show More" text button
+  when it holds more than two rows of chips:
+  **Category** (grouped by family: Drums, Percussion & metal, Bass, Tonal,
+  Vocal, FX; multi-select), **Key** (a small Any / Major / Minor segmented
+  control, then the 12 roots as multi-select chips, plus "Include
+  compatible keys" and "Include uncertain"; root `A` adds `A` in Major,
+  `Am` in Minor, both `A` and `Am` in Any, and the bar shows one chip per
+  root as labelled (`A`, `Am`, or `A any`); counts show in Major / Minor
+  only: in Any the chips have no count, since a mode-less key counts toward
+  both modes and a sum would double-count), **Tempo** (BPM min/max fields +
+  quick-range chips), **Duration** (min/max + quick-range chips),
+  **Tags** (multi-select, by file count, most used first). Tempo and
+  Duration hold ONE range each (`FilterState` min/max): their quick chips
+  are single-select, choosing one sets min/max, choosing it again clears
+  it, typing in the fields deselects a quick chip that no longer matches;
+  the bar shows one chip for the range (`120–128 BPM`). Category, Key and
+  Tag chips show their count (`caption`, monospaced) and are disabled at
+  count 0 unless selected. Clicking a chip applies at once (no Apply). Keyboard: Tab between
+  sections, arrows between chips, Space toggles, Esc closes.
 - **Results table**: see §4.1.
 - **Player header** (founder request 2026-11-17, ADR-040; modelled on how
   pro sample browsers work, not on any one product's look): always present
@@ -217,6 +284,15 @@ default (hairline border, secondary text) · hover (`surfaceWell`) · active
 count in `caption` monospaced digits; optional leading category dot;
 optional trailing clear `×` (own button and action, active chips only: the
 filter bar's popover chips).
+
+**Hued chips (ADR-042, T11.1/T11.2, Logic Pro style).** A chip can carry a
+facet hue (§2.1). Unselected: hue text on the hue at 16 %, no border.
+Hover: hue at 24 %. Selected / active: the hue's deep fill (`…Fill`,
+§2.1), white text, same weight as unselected (no semibold: the chip cloud
+must not reflow on toggle). Used for every chip in the filter panel, the active filter chips
+in the bar, and tag chips everywhere (inspector Tags, tag editor), which
+all use `facetTag`. One component (`SonarChip` with a hue), not a second
+chip.
 
 ### 4.3 Readout (`Readout`)
 A value with a caption above it: caption in `label`, value in 15 pt medium
@@ -323,6 +399,10 @@ Don't
   paddings / radii / font sizes in feature code. `scripts/design-lint.sh`
   fails the build on them.
 - No custom blur, glass, gradient, shadow or material in the content layer.
+  Glass comes from system containers (toolbar, sidebar, popover, sheet);
+  a custom `.glassEffect()` only on a floating control and only behind
+  `if #available(macOS 26, *)` (ADR-042). Never a custom background behind a
+  system bar, popover or sheet.
 - No custom-drawn replacements for system chrome (title bar, sidebar,
   toolbar, scrollbars, menus).
 - No text on `accent`: it is bright in dark mode (white on it is about
@@ -350,5 +430,14 @@ task:
    - light and dark both readable (text contrast ≥ 4.5:1, no lost hairlines)
    - no literal colour/size in the diff (`scripts/design-lint.sh` green)
    - empty, loading and error states exist and use the shared components
+   - macOS 26/27 platform rules: `.claude/skills/mac-design/design-rules.md`
+     (glass only in the control layer, concentric corners, toolbar items
+     over their column, standard symbols). This file wins on a conflict.
+
+UI tasks may use the vendored skills (`.claude/skills/`, ADR-042):
+`mac-design` (platform rules, Liquid Glass, toolbars, menus), `ux-design`
+(names, flow, popover vs sheet, wording), `design-from-app` (its
+`measure.swift` / `compare.swift` measure a reference screenshot in
+`design/reference/` against a snapshot).
 
 A token-rule violation or a broken light/dark state is BLOCKING for UI tasks.

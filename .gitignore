@@ -24,3 +24,6 @@ Samples/
 dist/
 # Local editor files
 .idea/
+
+# Design reference screenshots (other apps' UI; local only, DESIGN.md §1)
+design/reference/

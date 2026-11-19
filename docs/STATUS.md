@@ -3,13 +3,13 @@
 Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
-- Milestone: all agent milestones done (M0–M7, M9, M10); human-only: T3.7, T7.4, T8.1
-- Next task: none for agents (T10.9 done) — founder: T8.1 end-to-end test, triage `## Later`
-- Loop state: ROADMAP COMPLETE   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
+- Milestone: M11 Logic Pro-style filters and tags (founder request 2026-11-20); human-only: T3.7, T7.4, T8.1
+- Next task: T11.1 Filters panel
+- Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
-## Toolchain (T0.1, 2026-11-09)
-macOS 26.7.2 arm64 · Xcode 26.5 · xcodegen 2.46.0 · rustup 1.29.3 (Homebrew) ·
-rustc/cargo 1.99.1 · cargo-deny 0.20.2 · claude 2.1.316 · gh: not installed (optional)
+## Toolchain (updated 2026-11-20; T0.1 was macOS 26.7.2 / Xcode 26.5)
+macOS 27.2.1 arm64 · Xcode 27.2 · xcodegen 2.46.0 · rustup 1.29.3 (Homebrew) ·
+rustc/cargo 1.100.0 · cargo-deny 0.21.0 · claude 2.1.328 · gh: not installed (optional)
 
 ## Needs human
 _(Agents list anything that requires the founder: decisions, credentials,
@@ -46,6 +46,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-20 — T11.0 (founder request): design direction after the move to macOS 27 / Xcode 27: Logic Pro browser is the main visual reference (DESIGN §1, local screenshot in git-ignored `design/reference/`); spec for one Filters panel with hued chip sections + one active chip per value (§3), hued chips with deep fill (§2.1, §4.2), glass only in the control layer (§5); BAMA `mac-design` / `ux-design` / `design-from-app` skills vendored in `.claude/skills/` (MIT). ADR-042, M11 (T11.1–T11.3). Docs only.
 - 2026-11-19 — T10.9 (founder request): "Add Tag…" alert → "Edit Tags…" sheet (row menu, menu bar, inspector tag button): chips of the tags all targets share (× removes), inline field filters library tags with counts (exact → prefix → substring), click/↓↑+Return toggles, "Create “x”" for new tags, case-insensitive reuse of existing spelling; Save applies the add/remove diff in one refresh, never removes tags only some files have. `TagEditorState` + 9 unit tests, snapshot `tag-editor`. UI only → no eval. check.sh green; reviewer APPROVE r2. Later: 1 T10.9 item.
 - 2026-11-19 — T10.8 (founder request): Sononym-style key display: one-shots with a note show `E2` + superscript cents (`+35`, U+2212 minus, hidden at 0; a user key override wins), else the key; one text colour for all key values (tier greys removed, tier only in the inspector confidence word); shared `KeyLabel` (SwiftUI + AppKit) in table cell, KEY readout and inspector Key row (click to edit); inspector Note row removed. UI-only, no eval. check.sh green; reviewer r2 blocker (Mixed auto-focus) fixed.
-- 2026-11-19 — T10.7: BPM octave via tactus prior (120 BPM, σ 0.6 oct) + loop-length prior on stems; kind gets long-file / sustained-end / onset-count terms; leading-silence skip on long files. TEMPO 2, KIND 2, DSP_VERSION 11. Golden (names hidden): BPM ±1 32.0→88.9 %, loop→one-shot 42→3/287. Silver: BPM 25.3→81.2 %, loop→one-shot 234→49/1010 (4.85 %). Fixtures unchanged (kind 100, BPM 97.06). Kind AC met; BPM AC partially met (28 length-proven mislabels, FX/a cappella). Reviewer APPROVE r2. Later: 3 T10.7 items.

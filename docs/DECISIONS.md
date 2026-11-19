@@ -1323,3 +1323,27 @@ the engine fails to open).
   (fixtures-only first cut was 0.75 / 0.30). No analysis change.
 
 - **Addendum T10.8 (founder, 2026-11-19)**: key values no longer coloured by tier; one-shots show note+octave with superscript cents (Sononym style); tier stays in the inspector confidence word.
+
+## ADR-042 — Logic Pro browser as visual reference; vendored design skills (founder request)
+- **Why**: the founder (2026-11-20, now on macOS 27 / Xcode 27) wants the
+  browser, filter and tag UI to feel like Logic Pro's: colour-coded chip
+  clouds in titled sections on a floating glass panel, active filters as
+  coloured chips. He has no design background and asked the team to borrow
+  from BAMA's design skills (github.com/daveebbelaar/bama, MIT).
+- **Decision**: (1) Logic Pro's browser is the main visual reference in
+  DESIGN.md §1 (structure, spacing, colour logic; never Apple's icons,
+  artwork or names). Its screenshot stays local in `design/reference/`
+  (git-ignored; the repo is public). (2) The per-facet filter popovers become
+  one Filters panel (system popover → glass on macOS 26+) with hued chip
+  sections and one active chip per selected value in the bar (DESIGN §3,
+  T11.1). (3) Chips gain a facet hue with a deep fill for the selected state
+  (white text ≥ 4.5:1, token-tested); tags use one hue everywhere (T11.2).
+  (4) BAMA's `mac-design`, `ux-design` and `design-from-app` skills are
+  vendored in `.claude/skills/` with a Sonar adaptation note; DESIGN.md wins
+  on conflict. (5) Glass: system containers only; a custom `.glassEffect()`
+  only on a floating control and behind `if #available(macOS 26, *)`.
+- **Not chosen**: raising the deployment target to macOS 26 (would drop
+  users on 14/15 for a look the system already gives 26+ for free); a
+  dark-only theme like Logic's (light and dark stay equal, §1); Figma or
+  Claude Design (the UI is SwiftUI; there is no design-to-code path, and
+  agents verify with `ui-snapshots.sh`).
