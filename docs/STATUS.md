@@ -3,9 +3,9 @@
 Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
-- Milestone: M10 honest key (M0–M7, M9 done; human-only: T3.7, T7.4, T8.1)
-- Next task: T10.7 (M10 honest key, BPM/kind on real loops)
-- Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
+- Milestone: all agent milestones done (M0–M7, M9, M10); human-only: T3.7, T7.4, T8.1
+- Next task: none for agents — founder: T8.1 end-to-end test, triage `## Later`
+- Loop state: ROADMAP COMPLETE   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (T0.1, 2026-11-09)
 macOS 26.7.2 arm64 · Xcode 26.5 · xcodegen 2.46.0 · rustup 1.29.3 (Homebrew) ·
@@ -14,6 +14,7 @@ rustc/cargo 1.99.1 · cargo-deny 0.20.2 · claude 2.1.316 · gh: not installed (
 ## Needs human
 _(Agents list anything that requires the founder: decisions, credentials,
 manual tests, labeled data. Keep each item one line with the task id.)_
+- T10.7 Golden labels: 3 BPM labels in `eval/golden/labels.csv` are wrong by file length ("How Long" kit stems are 122 not 120; Kick Loop 14 + Darbuka Loop 10 are 120 not 122; see ADR-021 addendum T10.7); fixing them takes golden BPM ±1 to 90.2 %. Re-run `scripts/eval-real.sh`. Libraries re-analyse once (DSP_VERSION 11).
 - T0.1 (optional) For `cargo` in a normal terminal / hand-started `claude`, add to ~/.zprofile: `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"` (scripts and autopilot already handle it). Optional: `brew install gh`.
 - T3.7 (optional) Golden set: `eval/golden/labels.csv` (299 files from `Samples/`) was pre-filled from the pack's own file/folder labels, not by ear; a 5-minute skim to fix or blank wrong cells makes it real golden. `scripts/eval-real.sh` runs silver + golden.
 - T8.1 End-to-end test by the founder (after M7)
@@ -43,6 +44,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-19 — T10.7: BPM octave via tactus prior (120 BPM, σ 0.6 oct) + loop-length prior on stems; kind gets long-file / sustained-end / onset-count terms; leading-silence skip on long files. TEMPO 2, KIND 2, DSP_VERSION 11. Golden (names hidden): BPM ±1 32.0→88.9 %, loop→one-shot 42→3/287. Silver: BPM 25.3→81.2 %, loop→one-shot 234→49/1010 (4.85 %). Fixtures unchanged (kind 100, BPM 97.06). Kind AC met; BPM AC partially met (28 length-proven mislabels, FX/a cappella). Reviewer APPROVE r2. Later: 3 T10.7 items.
 - 2026-11-19 — T10.6: Key display per tier: cells, KEY readout and inspector Key in tier colour (high primary / medium secondary / low + conf 0 tertiary), en dash for none; inspector Key source + confidence word, one-shot note with cents (≈ when |cents| > 25), "Name says"/"Audio says" on disagreement; Key popover "Include uncertain". Migration 0004 (`pitch_cents`, `key_audio`), KEY_VERSION 5, DSP_VERSION 10. Eval-real unchanged vs T10.4b (silver key high/medium 79.7/61.5 %, MIREX 34.2 %; golden 68.8/34.5 %, MIREX 37.9 %). check.sh green; reviewer APPROVE r2. Later: 3 T10.6 items (incl. ui-snapshots.sh hang).
 - 2026-11-18 — T10.5: Key filter/facet honest by default: only medium + high tier (overrides count as certain); `--key-uncertain` / FFI `include_uncertain_keys` adds low. Mode-less `A` answers `A` and `Am` (also via compatible keys); sort by key puts low tier after the rest. `ff_key` = root·3+mode (+36 low), index SCHEMA_VERSION 3 (rebuild). Note: name-only keys of not-yet-analysed files are low tier, so they leave the default key filter until analysis. 500k p95 30.6 ms (budget 50). Fixtures eval green; no analysis change → no eval-real. check.sh green; reviewer APPROVE r1. Later: 2 T10.5 items.
-- 2026-11-18 — T10.4b: Key tiers re-fitted on real files (`scripts/eval-real.sh`, names hidden): `KEY_TIER_HIGH` 0.90 / `KEY_TIER_MEDIUM` 0.60 (was 0.75/0.30 from fixtures). Silver (344 keys): high 79.7 %, medium 61.5 %, low 31.7 %, ECE 18.5 %, key exact/MIREX 30.0/34.2 %. Golden (88): 68.8/34.5/34.9 %, ECE 31.7 %, exact/MIREX 30.5/37.9 %. 90 % high target unreachable by any bound (best band 79.7 %) → best monotone bounds, documented. Fixtures 100/100/0 %; ECE docs corrected to 15 bins. check.sh green; reviewer APPROVE r2. Later: 1 T10.4b item.
