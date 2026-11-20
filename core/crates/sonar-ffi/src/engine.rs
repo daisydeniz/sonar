@@ -406,17 +406,24 @@ impl SonarEngine {
 
     // ---- audio ------------------------------------------------------------
 
-    /// `buckets` (1...16384) min/max pairs over the whole file for a
-    /// waveform. **Blocking** (decodes the file).
+    /// Waveform peaks per channel: one list of `buckets` (1...16384)
+    /// min/max pairs over the whole file for each channel; one list for
+    /// mono, two (left, right) for stereo and wider files (ADR-043 stereo
+    /// lanes). **Blocking** (decodes the file once).
     pub fn waveform_peaks(
         &self,
         file_id: i64,
         buckets: u32,
-    ) -> Result<Vec<WaveformPeak>, FfiError> {
+    ) -> Result<Vec<Vec<WaveformPeak>>, FfiError> {
         let n = usize::try_from(buckets).unwrap_or(usize::MAX);
-        guard(|| self.engine.waveform_peaks(file_id, n)).map(|p| {
-            p.into_iter()
-                .map(|(min, max)| WaveformPeak { min, max })
+        guard(|| self.engine.waveform_peaks(file_id, n)).map(|channels| {
+            channels
+                .into_iter()
+                .map(|p| {
+                    p.into_iter()
+                        .map(|(min, max)| WaveformPeak { min, max })
+                        .collect()
+                })
                 .collect()
         })
     }

@@ -152,6 +152,16 @@ pub struct Decoded {
     pub problem: Option<String>,
 }
 
+/// Result of [`Decoder::decode_channels`]: channels kept apart.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DecodedChannels {
+    /// One sample vector per kept channel, in file order, all the same
+    /// length, at `info.sample_rate`.
+    pub channels: Vec<Vec<f32>>,
+    /// Format, length and window of the decode; `info.samples` is empty.
+    pub info: Decoded,
+}
+
 impl Decoded {
     /// Duration of `samples` (s).
     pub fn analysis_secs(&self) -> f64 {
@@ -177,7 +187,9 @@ pub fn probe_sample_rate(path: &Path) -> Result<u32> {
 pub struct Decoder {
     resampler: MonoResampler,
     planar: stream::Planar,
-    mono: Vec<f32>,
+    /// Source-rate output lanes of the packet loop: one (mono downmix) or,
+    /// for [`Decoder::decode_channels`], one per kept channel.
+    lanes: Vec<Vec<f32>>,
     meter: Meter,
 }
 
@@ -192,6 +204,21 @@ impl Decoder {
     /// is discarded.
     pub fn decode(&mut self, path: &Path, opts: &DecodeOptions) -> Result<Decoded> {
         self.decode_guarded(path, opts, None, true).map(|(d, _)| d)
+    }
+
+    /// Like [`Decoder::decode`], but keeps the first `max_channels` channels
+    /// (at least one; a mono file gives one) apart instead of downmixing
+    /// them: each is resampled on its own to the target rate. All channels
+    /// have the same length. For views that draw channels separately
+    /// (stereo waveform lanes, ADR-043).
+    pub fn decode_channels(
+        &mut self,
+        path: &Path,
+        opts: &DecodeOptions,
+        max_channels: usize,
+    ) -> Result<DecodedChannels> {
+        let (info, _, channels) = self.decode_lanes(path, opts, None, true, max_channels.max(1))?;
+        Ok(DecodedChannels { channels, info })
     }
 
     /// [`Decoder::decode`] plus basic metadata ([`crate::meta`]) in the same
@@ -229,8 +256,8 @@ impl Decoder {
     }
 
     /// `allow_header`: a length-only probe may take the length from the
-    /// container header ([`header`]); only tests pass `false`. The body is
-    /// in [`inner`].
+    /// container header ([`header`]); only tests pass `false`. Mono
+    /// downmix; see [`Decoder::decode_lanes`].
     fn decode_guarded(
         &mut self,
         path: &Path,
@@ -238,14 +265,34 @@ impl Decoder {
         meta: Option<&MetaOptions>,
         allow_header: bool,
     ) -> Result<(Decoded, Option<BasicMeta>)> {
-        let result = quiet_panic::guarded(|| self.decode_inner(path, opts, meta, allow_header));
+        self.decode_lanes(path, opts, meta, allow_header, 1)
+            .map(|(d, m, _)| (d, m))
+    }
+
+    /// Guarded decode. `split`: 1 = mono downmix in `Decoded::samples`;
+    /// more = up to that many channels apart in the third value (then
+    /// `samples` is empty). The body is in [`inner`].
+    fn decode_lanes(
+        &mut self,
+        path: &Path,
+        opts: &DecodeOptions,
+        meta: Option<&MetaOptions>,
+        allow_header: bool,
+        split: usize,
+    ) -> Result<(Decoded, Option<BasicMeta>, Vec<Vec<f32>>)> {
+        let result =
+            quiet_panic::guarded(|| self.decode_inner(path, opts, meta, allow_header, split));
         let out = result.unwrap_or_else(|_| {
             *self = Self::default();
             Err(decode_err(path, "internal decoder panic"))
         });
-        self.mono.clear();
-        if self.mono.capacity() > RETAIN_SCRATCH_SAMPLES {
-            self.mono = Vec::new();
+        // Keep one lane's scratch (the common mono case), release the rest.
+        self.lanes.truncate(1);
+        for lane in &mut self.lanes {
+            lane.clear();
+            if lane.capacity() > RETAIN_SCRATCH_SAMPLES {
+                *lane = Vec::new();
+            }
         }
         let planar: usize = self.planar.iter().map(Vec::capacity).sum();
         if planar > RETAIN_PLANAR_SAMPLES {

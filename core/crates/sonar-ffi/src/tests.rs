@@ -142,7 +142,9 @@ fn add_index_search_favourite_peaks() {
         .expect("hybrid");
     assert_eq!(hybrid.rows.len(), 1);
 
-    let peaks = engine.waveform_peaks(hit.file_id, 200).expect("peaks");
+    let lanes = engine.waveform_peaks(hit.file_id, 200).expect("peaks");
+    assert_eq!(lanes.len(), 1, "mono fixture: one lane");
+    let peaks = &lanes[0];
     assert_eq!(peaks.len(), 200);
     assert!(peaks.iter().all(|p| p.min <= p.max && p.max <= 1.0));
     assert!(peaks.iter().any(|p| p.max > 0.3));
@@ -350,9 +352,10 @@ fn fixtures_library_like_the_xctest() {
         })
         .expect("favs");
     assert_eq!(favs.rows.len(), 1);
-    let peaks = engine.waveform_peaks(hit.file_id, 200).expect("peaks");
-    assert_eq!(peaks.len(), 200);
-    assert!(peaks.iter().any(|p| p.max - p.min > 0.01));
+    let lanes = engine.waveform_peaks(hit.file_id, 200).expect("peaks");
+    assert!((1..=2).contains(&lanes.len()));
+    assert!(lanes.iter().all(|l| l.len() == 200));
+    assert!(lanes[0].iter().any(|p| p.max - p.min > 0.01));
 
     let clips = engine
         .search(SearchQuery {

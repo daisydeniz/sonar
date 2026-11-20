@@ -94,8 +94,10 @@ final class EngineBridgeTests: XCTestCase {
         XCTAssertTrue(Set(first.rows.map(\.fileId)).isDisjoint(with: second.rows.map(\.fileId)))
 
         // waveform peaks.
-        let peaks = try await Task.detached { try engine.waveformPeaks(fileId: hit.fileId, buckets: 200) }.value
-        XCTAssertEqual(peaks.count, 200)
+        let lanes = try await Task.detached { try engine.waveformPeaks(fileId: hit.fileId, buckets: 200) }.value
+        XCTAssertTrue((1...2).contains(lanes.count), "one lane per channel, at most two")
+        XCTAssertTrue(lanes.allSatisfy { $0.count == 200 })
+        let peaks = lanes[0]
         XCTAssertTrue(peaks.allSatisfy { $0.min <= $0.max && abs($0.min) <= 1 && abs($0.max) <= 1 })
         XCTAssertTrue(peaks.contains { $0.max - $0.min > 0.01 }, "a one-shot is not silent")
 

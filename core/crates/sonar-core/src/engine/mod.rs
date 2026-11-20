@@ -69,7 +69,9 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
-pub use audio::{waveform_peaks, PreviewPcm, MAX_PEAK_BUCKETS, MAX_PREVIEW_SECS};
+pub use audio::{
+    waveform_peaks, PreviewPcm, MAX_PEAK_BUCKETS, MAX_PEAK_CHANNELS, MAX_PREVIEW_SECS,
+};
 pub use events::{EngineEvent, EventListener, EVENT_QUEUE_CAPACITY};
 pub use indexing::IndexingStatus;
 pub use row_sort::sort_by_row;

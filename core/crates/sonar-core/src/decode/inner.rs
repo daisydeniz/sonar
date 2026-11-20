@@ -18,14 +18,16 @@ use crate::{Error, Result};
 impl Decoder {
     /// Unguarded body of [`Decoder::decode`] / [`Decoder::decode_with_meta`].
     /// `allow_header`: a length-only probe may take the length from the
-    /// container header ([`header`]); only tests pass `false`.
+    /// container header ([`header`]); only tests pass `false`. `split` as
+    /// in `Decoder::decode_lanes`.
     pub(super) fn decode_inner(
         &mut self,
         path: &Path,
         opts: &DecodeOptions,
         meta: Option<&MetaOptions>,
         allow_header: bool,
-    ) -> Result<(Decoded, Option<BasicMeta>)> {
+        split: usize,
+    ) -> Result<(Decoded, Option<BasicMeta>, Vec<Vec<f32>>)> {
         let target = opts.target_rate;
         if !(source::MIN_SAMPLE_RATE..=source::MAX_SAMPLE_RATE).contains(&target) {
             return Err(decode_err(path, format!("invalid target rate {target} Hz")));
@@ -38,7 +40,16 @@ impl Decoder {
             .map_err(|e| decode_err(path, e))?;
         let window = analysis_window(opts.max_analysis_secs, rate, target, block);
 
-        self.mono.clear();
+        let mode = if split > 1 {
+            stream::Lanes::Split
+        } else {
+            stream::Lanes::Mono
+        };
+        let lane_count = match mode {
+            stream::Lanes::Split => src.channels.clamp(1, split),
+            stream::Lanes::Mono => 1,
+        };
+        self.lanes.resize_with(lane_count, Vec::new);
         // The header is untrusted: reserve at most the window and 2 Mi
         // frames (8 MiB); longer windows grow amortised.
         let declared = src.declared_frames.unwrap_or(0);
@@ -46,7 +57,10 @@ impl Decoder {
             .unwrap_or(usize::MAX)
             .min(window.keep_frames)
             .min(MAX_RESERVE_FRAMES);
-        self.mono.reserve(reserve);
+        for lane in &mut self.lanes {
+            lane.clear();
+            lane.reserve(reserve);
+        }
         if let Some(m) = meta {
             let weights = channel_weights(src.layout.as_ref(), src.channels);
             self.meter.reset(rate, &weights, m.max_frames(rate));
@@ -88,17 +102,25 @@ impl Decoder {
                             let e = io::Error::other("file changed while reading");
                             return Err(Error::io(path, e));
                         }
-                        self.count(path, &mut again, &window, meta, opts)?
+                        self.count(path, &mut again, &window, meta, opts, mode)?
                     }
                 }
             }
-            None => self.count(path, &mut src, &window, meta, opts)?,
+            None => self.count(path, &mut src, &window, meta, opts, mode)?,
         };
 
-        let samples = self
-            .resampler
-            .resample(&self.mono, rate, target, window.max_out)
-            .map_err(|e| decode_err(path, e))?;
+        let mut lanes = Vec::with_capacity(self.lanes.len());
+        for lane in &self.lanes {
+            let out = self
+                .resampler
+                .resample(lane, rate, target, window.max_out)
+                .map_err(|e| decode_err(path, e))?;
+            lanes.push(out);
+        }
+        let samples = match mode {
+            stream::Lanes::Mono => lanes.pop().unwrap_or_default(),
+            stream::Lanes::Split => Vec::new(),
+        };
         let num_frames = outcome.total_frames;
         // Metering stopped at a bad packet: the measured span is short.
         let meta_partial = outcome.partial || outcome.meter_problem.is_some();
@@ -117,7 +139,7 @@ impl Decoder {
         let meta = meta.map(|_| {
             BasicMeta::from_measurement(&decoded.source, &self.meter, meta_partial, meta_problem)
         });
-        Ok((decoded, meta))
+        Ok((decoded, meta, lanes))
     }
 
     /// The packet loop ([`stream::run`]) over `src`.
@@ -128,13 +150,15 @@ impl Decoder {
         window: &Window,
         meta: Option<&MetaOptions>,
         opts: &DecodeOptions,
+        mode: stream::Lanes,
     ) -> Result<stream::Outcome> {
         stream::run(
             path,
             src,
             window.keep_frames,
             &mut self.planar,
-            &mut self.mono,
+            &mut self.lanes,
+            mode,
             meta.map(|_| &mut self.meter),
             opts.cancel.as_deref(),
         )

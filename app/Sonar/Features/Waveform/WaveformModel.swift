@@ -8,15 +8,18 @@ protocol WaveformProviding: Sendable {
     func peaks(fileId: Int64, buckets: Int) async throws -> [WaveformPeak]
 }
 
-/// Peaks from the Rust core (`waveformPeaks`, ADR-032).
+/// Peaks from the Rust core (`waveformPeaks`, ADR-032). The core returns one
+/// list per channel (ADR-043); until the stereo lanes view (T12.4) they are
+/// drawn as one envelope.
 struct CoreWaveformProvider: WaveformProviding {
     let engine: SonarEngine
 
     func peaks(fileId: Int64, buckets: Int) async throws -> [WaveformPeak] {
         let engine = engine
-        return try await Task.detached(priority: .userInitiated) {
+        let channels = try await Task.detached(priority: .userInitiated) {
             try engine.waveformPeaks(fileId: fileId, buckets: UInt32(buckets))
         }.value
+        return WaveformMath.envelope(channels)
     }
 }
 

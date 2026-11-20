@@ -26,6 +26,14 @@ final class WaveformMathTests: XCTestCase {
         XCTAssertEqual(WaveformMath.rebucket([pk(0, 1)], from: -1, to: 2, into: 3).count, 3)
     }
 
+    func testEnvelopeOfChannelsCoversEveryLane() {
+        XCTAssertTrue(WaveformMath.envelope([]).isEmpty)
+        XCTAssertEqual(WaveformMath.envelope([[pk(-0.2, 0.3)]]), [pk(-0.2, 0.3)])
+        let left = [pk(-0.8, 0.8), pk(-0.1, 0.1)]
+        let right = [pk(0, 0), pk(-0.5, 0.4)]
+        XCTAssertEqual(WaveformMath.envelope([left, right]), [pk(-0.8, 0.8), pk(-0.5, 0.4)])
+    }
+
     func testPathSegmentsSpanPeaksAndHaveMinimumHeight() {
         let path = WaveformMath.path(columns: [pk(-1, 1), pk(0, 0)], size: CGSize(width: 20, height: 100))
         let box = path.boundingBoxOfPath

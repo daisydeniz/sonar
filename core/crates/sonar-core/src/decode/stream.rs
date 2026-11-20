@@ -5,7 +5,7 @@
 //! until the meter's own window is full too, and every decoded block's
 //! playable frames (priming dropped, gapless end respected) are fed to it
 //! at the source rate, all channels, before downmix. Only the analysis
-//! window is ever buffered; the mono samples are identical with or without
+//! window is ever buffered; the output lanes are identical with or without
 //! a meter. A codec error on a packet decoded only for the meter stops the
 //! meter ([`Outcome::meter_problem`]) and the loop continues counting, so
 //! `partial` and `problem` are identical with or without a meter, and so is
@@ -82,18 +82,26 @@ pub(super) struct Outcome {
 pub(super) type Planar = Vec<Vec<f32>>;
 
 /// Streams every packet of the selected track. The first `keep` frames are
-/// downmixed into `mono` (source rate); `meter`, if given, measures the
-/// playable frames until it is full; later packets are only counted.
+/// written to `lanes` (source rate): with [`Lanes::Mono`] the downmix into
+/// `lanes[0]`, with [`Lanes::Split`] channel `c` into `lanes[c]` (every lane
+/// keeps the same length; a missing channel is silence). `meter`, if given,
+/// measures the playable frames until it is full; later packets are only
+/// counted. `lanes` must not be empty.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn run(
     path: &Path,
     src: &mut Opened,
     keep: usize,
     planar: &mut Planar,
-    mono: &mut Vec<f32>,
+    lanes: &mut [Vec<f32>],
+    mode: Lanes,
     mut meter: Option<&mut Meter>,
     cancel: Option<&AtomicBool>,
 ) -> Result<Outcome> {
     let mut out = Outcome::default();
+    if lanes.is_empty() {
+        return Err(decode_err(path, "no output lanes"));
+    }
     // Priming (MP4 edit list / iTunSMPB): `skip` leading frames are decoded
     // like any other and dropped at the end, so they do not count towards
     // the window. A zero window (length probe) decodes nothing at all.
@@ -146,7 +154,7 @@ pub(super) fn run(
             continue;
         }
         let meter_wants = meter.as_ref().is_some_and(|m| !m.is_full()) && decoded_frames < play_end;
-        let metering_only = mono.len() >= keep;
+        let metering_only = lanes[0].len() >= keep;
         if metering_only && !meter_wants {
             let ticks = packet_ticks(&packet, src);
             ticks_past_window = ticks_past_window.saturating_add(ticks);
@@ -168,7 +176,7 @@ pub(super) fn run(
                 consecutive_errors = 0;
                 let frames = buf.frames();
                 buf.copy_to_vecs_planar::<f32>(planar);
-                append_mean(planar, frames.min(keep - mono.len()), mono);
+                push_lanes(planar, frames.min(keep - lanes[0].len()), lanes, mode);
                 if let Some(m) = meter.as_deref_mut() {
                     let r = playable(decoded_frames, frames as u64, play_start, play_end);
                     m.push(planar, r);
@@ -182,7 +190,8 @@ pub(super) fn run(
                 let ticks = packet_ticks(&packet, src);
                 let dur = ticks_to_frames(ticks, src.time_base, src.sample_rate);
                 let gap = usize::try_from(dur).unwrap_or(usize::MAX);
-                mono.resize(mono.len() + gap.min(keep - mono.len()), 0.0);
+                let len = lanes[0].len() + gap.min(keep - lanes[0].len());
+                lanes.iter_mut().for_each(|l| l.resize(len, 0.0));
                 if let Some(m) = meter.as_deref_mut() {
                     m.push_silence(playable(decoded_frames, dur, play_start, play_end).len());
                 }
@@ -211,8 +220,11 @@ pub(super) fn run(
         if let Some(len) = g.len {
             out.total_frames = out.total_frames.min(len);
         }
-        mono.drain(..skip.min(mono.len()));
-        mono.truncate(usize::try_from(out.total_frames).unwrap_or(usize::MAX));
+        let total = usize::try_from(out.total_frames).unwrap_or(usize::MAX);
+        for lane in lanes.iter_mut() {
+            lane.drain(..skip.min(lane.len()));
+            lane.truncate(total);
+        }
     }
     let short = src.declared_frames.is_some_and(|n| out.total_frames < n);
     if short && out.problem.is_none() {
@@ -227,6 +239,34 @@ pub(super) fn run(
         out.problem = None;
     }
     Ok(out)
+}
+
+/// How decoded channels map to output lanes in [`run`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Lanes {
+    /// One lane: the equal-weight mean of all channels ([`append_mean`]).
+    Mono,
+    /// Lane `c` holds channel `c` alone.
+    Split,
+}
+
+/// Appends `frames` frames of `planar` to `lanes` per `mode`, keeping every
+/// lane as long as `lanes[0]` (missing or short planes pad with silence).
+fn push_lanes(planar: &[Vec<f32>], frames: usize, lanes: &mut [Vec<f32>], mode: Lanes) {
+    let Some((first, rest)) = lanes.split_first_mut() else {
+        return;
+    };
+    match mode {
+        Lanes::Mono => append_mean(planar, frames, first),
+        Lanes::Split => {
+            append_mean(planar.get(..1).unwrap_or_default(), frames, first);
+            for (c, lane) in rest.iter_mut().enumerate() {
+                append_mean(planar.get(c + 1..c + 2).unwrap_or_default(), frames, lane);
+            }
+        }
+    }
+    let len = first.len();
+    rest.iter_mut().for_each(|l| l.resize(len, 0.0));
 }
 
 /// Part of a block of `n` frames starting at decoded-stream frame `pos`

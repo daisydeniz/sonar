@@ -3,15 +3,18 @@
 //! Both decode the file on the caller's thread (blocking, a few ms to a
 //! second for long files); the host calls them off the main thread. Nothing
 //! is cached or written to the store: peaks are cheap to recompute and a
-//! host caches what it draws.
+//! host caches what it draws. Peaks are per channel (stereo lanes, ADR-043).
 
 use super::{lock, Engine};
 use crate::decode::source::{MAX_SAMPLE_RATE, MIN_SAMPLE_RATE};
-use crate::decode::{decode_file, probe_sample_rate, DecodeOptions, ANALYSIS_RATE};
+use crate::decode::{decode_file, probe_sample_rate, DecodeOptions, Decoder, ANALYSIS_RATE};
 use crate::{Error, Result};
 
 /// Most buckets [`Engine::waveform_peaks`] accepts.
 pub const MAX_PEAK_BUCKETS: usize = 16_384;
+/// Most channels [`Engine::waveform_peaks`] returns (stereo lanes,
+/// ADR-043); channels past these are left out.
+pub const MAX_PEAK_CHANNELS: usize = 2;
 /// Longest stretch [`Engine::preview_pcm`] decodes (s); longer files are
 /// cut and flagged [`PreviewPcm::truncated`].
 pub const MAX_PREVIEW_SECS: f64 = 600.0;
@@ -66,14 +69,17 @@ impl Engine {
             .ok_or(Error::FileNotFound { id })
     }
 
-    /// `buckets` min/max pairs over the whole file (mono, analysis rate),
-    /// for a waveform view. Blocking (decodes the file).
+    /// Waveform peaks of file `id`: one list of `buckets` min/max pairs
+    /// (see [`waveform_peaks`]) per channel, over the whole file at the
+    /// analysis rate. A mono file gives one list, stereo two (left, right);
+    /// files with more channels give their first [`MAX_PEAK_CHANNELS`].
+    /// Blocking (decodes the file once).
     ///
     /// # Errors
     /// [`Error::InvalidInput`] for 0 or more than [`MAX_PEAK_BUCKETS`]
     /// buckets, [`Error::FileNotFound`], [`Error::Decode`] /
     /// [`Error::UnsupportedFormat`] / [`Error::Io`] for the audio file.
-    pub fn waveform_peaks(&self, id: i64, buckets: usize) -> Result<Vec<(f32, f32)>> {
+    pub fn waveform_peaks(&self, id: i64, buckets: usize) -> Result<Vec<Vec<(f32, f32)>>> {
         if buckets == 0 || buckets > MAX_PEAK_BUCKETS {
             return Err(Error::InvalidInput {
                 reason: format!("peak buckets must be 1..={MAX_PEAK_BUCKETS}, got {buckets}"),
@@ -85,8 +91,12 @@ impl Engine {
             max_analysis_secs: None,
             cancel: None,
         };
-        let decoded = decode_file(&path, &opts)?;
-        Ok(waveform_peaks(&decoded.samples, buckets))
+        let decoded = Decoder::new().decode_channels(&path, &opts, MAX_PEAK_CHANNELS)?;
+        Ok(decoded
+            .channels
+            .iter()
+            .map(|c| waveform_peaks(c, buckets))
+            .collect())
     }
 
     /// Decoded PCM of file `id` at its own sample rate (see [`PreviewPcm`]),

@@ -63,6 +63,20 @@ struct WaveformViewport: Equatable, Sendable {
 }
 
 enum WaveformMath {
+    /// One peak list covering every channel's list (`waveformPeaks` returns
+    /// one per channel): per bucket the lowest min and the highest max.
+    /// Until the stereo lanes view (T12.4) the waveform draws this envelope.
+    static func envelope(_ channels: [[WaveformPeak]]) -> [WaveformPeak] {
+        guard var out = channels.first else { return [] }
+        for lane in channels.dropFirst() {
+            for i in 0..<min(out.count, lane.count) {
+                out[i] = WaveformPeak(min: Swift.min(out[i].min, lane[i].min),
+                                      max: Swift.max(out[i].max, lane[i].max))
+            }
+        }
+        return out
+    }
+
     /// Merges `peaks` over the sound fraction range `from..<to` into `count`
     /// min/max columns. Empty columns (range narrower than a bucket) repeat
     /// the containing bucket so the shape never has holes.

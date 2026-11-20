@@ -6,12 +6,14 @@ use serde_json::json;
 
 use crate::user_cmd::{open, resolve_one};
 
-/// Prints `buckets` min/max pairs of `file` (an id or a path); with `pcm`
-/// also the decoded preview PCM's rate, channels and length.
+/// Prints `buckets` min/max pairs per channel of `file` (an id or a path;
+/// one channel for mono, two for stereo and wider; JSON `peaks` is a list
+/// per channel); with `pcm` also the decoded preview PCM's rate, channels
+/// and length.
 pub fn run(file: &str, buckets: usize, pcm: bool, as_json: bool) -> Result<()> {
     let engine = open()?;
     let id = resolve_one(&engine, file)?;
-    let peaks = engine
+    let channels = engine
         .waveform_peaks(id, buckets)
         .context("computing waveform peaks")?;
     let preview = if pcm {
@@ -22,7 +24,7 @@ pub fn run(file: &str, buckets: usize, pcm: bool, as_json: bool) -> Result<()> {
     if as_json {
         let doc = json!({
             "file_id": id,
-            "peaks": peaks,
+            "peaks": channels,
             "pcm": preview.as_ref().map(|p| json!({
                 "sample_rate": p.sample_rate,
                 "channels": p.channels,
@@ -32,9 +34,16 @@ pub fn run(file: &str, buckets: usize, pcm: bool, as_json: bool) -> Result<()> {
         });
         println!("{}", serde_json::to_string_pretty(&doc)?);
     } else {
-        println!("file #{id}: {} peak buckets", peaks.len());
-        for (i, (lo, hi)) in peaks.iter().enumerate() {
-            println!("{i:>5}  {lo:>8.4}  {hi:>8.4}");
+        let buckets = channels.first().map_or(0, Vec::len);
+        println!(
+            "file #{id}: {} channel(s) x {buckets} peak buckets",
+            channels.len()
+        );
+        for (c, peaks) in channels.iter().enumerate() {
+            println!("channel {c}");
+            for (i, (lo, hi)) in peaks.iter().enumerate() {
+                println!("{i:>5}  {lo:>8.4}  {hi:>8.4}");
+            }
         }
         if let Some(p) = preview {
             println!(

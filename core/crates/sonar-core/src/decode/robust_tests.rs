@@ -188,11 +188,20 @@ fn read_failure_is_an_io_error_not_a_partial_result() {
     for (keep, metered) in [(1 << 20, false), (0, false), (0, true)] {
         let mut src = source::open_source(path, FailingSource::boxed(bytes.clone(), 100_000))
             .expect("header is readable");
-        let (mut planar, mut mono) = (Vec::new(), Vec::new());
+        let (mut planar, mut mono) = (Vec::new(), vec![Vec::new()]);
         let mut meter = crate::meta::Meter::new();
         meter.reset(44_100, &[1.0], u64::MAX);
         let m = metered.then_some(&mut meter);
-        let r = stream::run(path, &mut src, keep, &mut planar, &mut mono, m, None);
+        let r = stream::run(
+            path,
+            &mut src,
+            keep,
+            &mut planar,
+            &mut mono,
+            stream::Lanes::Mono,
+            m,
+            None,
+        );
         match r {
             Err(Error::Io { path: p, source }) => {
                 assert_eq!(p, path);
@@ -206,7 +215,17 @@ fn read_failure_is_an_io_error_not_a_partial_result() {
     assert!(matches!(r, Err(Error::Io { .. })), "{:?}", r.err());
     // The same bytes without the failure decode completely.
     let mut src = source::open_source(path, FailingSource::boxed(bytes, u64::MAX)).unwrap();
-    let (mut planar, mut mono) = (Vec::new(), Vec::new());
-    let out = stream::run(path, &mut src, 1 << 20, &mut planar, &mut mono, None, None).unwrap();
+    let (mut planar, mut mono) = (Vec::new(), vec![Vec::new()]);
+    let out = stream::run(
+        path,
+        &mut src,
+        1 << 20,
+        &mut planar,
+        &mut mono,
+        stream::Lanes::Mono,
+        None,
+        None,
+    )
+    .unwrap();
     assert_eq!((out.total_frames, out.partial), (88_200, false));
 }
