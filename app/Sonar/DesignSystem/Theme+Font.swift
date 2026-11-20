@@ -9,7 +9,9 @@ extension Theme {
         static let title = SwiftUI.Font.system(size: 15, weight: .semibold)
         /// 13 regular: default controls, inspector values, sidebar.
         static let body = SwiftUI.Font.system(size: 13)
-        /// 12 regular: table cells, chips, bar controls.
+        /// 12 medium: every chip (same weight selected or not).
+        static let chip = SwiftUI.Font.system(size: 12, weight: .medium)
+        /// 12 regular: table cells, bar controls.
         static let row = SwiftUI.Font.system(size: 12)
         /// `row` with monospaced digits.
         static let rowNumeric = SwiftUI.Font.system(size: 12).monospacedDigit()
@@ -19,8 +21,8 @@ extension Theme {
         static let captionNumeric = SwiftUI.Font.system(size: 11).monospacedDigit()
         /// 10 semibold; use with `sonarLabelStyle()` (uppercase, +0.6 tracking).
         static let label = SwiftUI.Font.system(size: 10, weight: .semibold)
-        /// 15 medium, monospaced digits: `Readout` values.
-        static let readoutValue = SwiftUI.Font.system(size: 15, weight: .medium).monospacedDigit()
+        /// 13 medium, monospaced digits: readout and knob values.
+        static let readoutValue = SwiftUI.Font.system(size: 13, weight: .medium).monospacedDigit()
         /// 9 regular, monospaced digits: the cents superscript of a note (`KeyLabel`).
         static let superscript = SwiftUI.Font.system(size: 9).monospacedDigit()
     }

@@ -374,7 +374,7 @@ final class UISnapshotTests: XCTestCase {
 
     func testComponents() async throws {
         let dir = try outputDir()
-        try snapshot("components", ComponentsGallery(), dir: dir)
+        try snapshot("components", ComponentsGallery(), dir: dir, size: CGSize(width: 1440, height: 760))
     }
 
     // MARK: Rendering

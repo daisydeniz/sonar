@@ -1,13 +1,38 @@
 import SwiftUI
 
-/// Rotary knob for a stepped integer value (DESIGN §4.8), DAW-style:
-/// vertical drag changes the value (up = more), double-click resets to
-/// `defaultValue`, arrow keys / VoiceOver adjust by one step. No reset button.
+/// Rotary knob for a stepped integer value (DESIGN §4.8, ADR-043), DAW-style:
+/// a coloured face in its parameter family colour with a dark pointer, a 270°
+/// track and a value arc from the default to the value. Vertical drag changes
+/// the value (up = more), double-click resets to `defaultValue`, arrow keys /
+/// VoiceOver adjust by one step. No reset button.
 struct Knob: View {
+    /// Parameter family: sets the face colour (never the individual knob).
+    enum Family {
+        case pitch, gain, filter, time, neutral
+
+        var face: Color {
+            switch self {
+            case .pitch: return Theme.Color.knobPitch
+            case .gain: return Theme.Color.knobGain
+            case .filter: return Theme.Color.knobFilter
+            case .time: return Theme.Color.knobTime
+            case .neutral: return Theme.Color.knobNeutral
+            }
+        }
+    }
+
+    /// 24 pt in bars, 44 pt in panels.
+    enum Size {
+        case small, large
+        var diameter: CGFloat { self == .small ? Theme.Size.knobSmall : Theme.Size.knobLarge }
+    }
+
     @Binding var value: Int
     let range: ClosedRange<Int>
     let defaultValue: Int
     let accessibilityLabel: String
+    var family: Family = .pitch
+    var size: Size = .small
 
     /// Drag distance (pt) for one step.
     static let pointsPerStep: CGFloat = 6
@@ -17,8 +42,14 @@ struct Knob: View {
 
     @State private var dragStartValue: Int?
     @FocusState private var focused: Bool
+    @Environment(\.colorScheme) private var scheme
 
-    init(value: Binding<Int>, in range: ClosedRange<Int>, defaultValue: Int = 0, accessibilityLabel: String) {
+    init(
+        value: Binding<Int>, in range: ClosedRange<Int>, defaultValue: Int = 0, accessibilityLabel: String,
+        family: Family = .pitch, size: Size = .small
+    ) {
+        self.family = family
+        self.size = size
         _value = value
         self.range = range
         self.defaultValue = defaultValue
@@ -40,32 +71,52 @@ struct Knob: View {
         if clamped != value { value = clamped }
     }
 
+    /// Pointer: black at 55 %, white on the dark neutral face.
+    private var pointerColor: Color {
+        family == .neutral && scheme == .dark ? Color.white : Color.black.opacity(Theme.knobPointerOpacity)
+    }
+
+    /// Value arc: the face colour (the neutral face is too close to the track).
+    private var arcColor: Color {
+        family == .neutral ? Color.primary.opacity(Theme.knobNeutralArcOpacity) : family.face
+    }
+
     var body: some View {
-        let line = Theme.Size.knobStroke
+        let d = size.diameter
+        let arc = Theme.Size.knobArc
+        let outer = d + arc * 4
+        let ring = d + arc * 2
         let current = fraction(value)
         let origin = fraction(min(max(defaultValue, range.lowerBound), range.upperBound))
+        let angle = Angle.degrees(-135 + current * 270)
         ZStack {
             Circle()
                 .trim(from: 0, to: Self.sweep)
-                .stroke(.quaternary, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                .stroke(Color.primary.opacity(Theme.knobTrackOpacity), style: StrokeStyle(lineWidth: arc, lineCap: .round))
                 .rotationEffect(Self.startAngle)
-                .padding(line / 2)
+                .frame(width: ring, height: ring)
             Circle()
                 .trim(from: min(origin, current) * Self.sweep, to: max(origin, current) * Self.sweep)
-                .stroke(Theme.Color.accent, style: StrokeStyle(lineWidth: line, lineCap: .round))
+                .stroke(arcColor, style: StrokeStyle(lineWidth: arc, lineCap: .round))
                 .rotationEffect(Self.startAngle)
-                .padding(line / 2)
+                .frame(width: ring, height: ring)
             Circle()
-                .fill(Theme.Color.surfaceRaised)
-                .overlay(Circle().strokeBorder(.tertiary, lineWidth: Theme.hairlineWidth * 2))
-                .padding(line * 2)
+                .fill(family.face)
+                .overlay(Circle().strokeBorder(Color.black.opacity(Theme.knobRimOpacity), lineWidth: Theme.hairlineWidth * 2))
+                .overlay {
+                    Circle()
+                        .trim(from: 0.64, to: 0.86)
+                        .stroke(Color.white.opacity(Theme.knobHighlightOpacity), style: StrokeStyle(lineWidth: Theme.hairlineWidth * 2, lineCap: .round))
+                        .padding(Theme.hairlineWidth * 4)
+                }
+                .frame(width: d, height: d)
             Capsule()
-                .fill(Color.primary)
-                .frame(width: line, height: Theme.Size.knob / 2 - line * 3)
-                .offset(y: -(Theme.Size.knob / 4 - line * 0.5))
-                .rotationEffect(.degrees(-135 + current * 270))
+                .fill(pointerColor)
+                .frame(width: Theme.hairlineWidth * 3, height: d / 2 * 0.57)
+                .offset(y: -(d / 2 * 0.535))
+                .rotationEffect(angle)
         }
-        .frame(width: Theme.Size.knob, height: Theme.Size.knob)
+        .frame(width: outer, height: outer)
         .contentShape(Circle())
         .gesture(
             DragGesture(minimumDistance: 1)

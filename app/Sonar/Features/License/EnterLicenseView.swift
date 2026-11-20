@@ -22,7 +22,7 @@ struct EnterLicenseView: View {
                 .scrollContentBackground(.hidden)
                 .padding(Theme.Space.s4)
                 .frame(height: 110)
-                .background(Theme.Color.surfaceWell, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
+                .background(Theme.Color.surfaceGroup, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
                 .overlay {
                     RoundedRectangle(cornerRadius: Theme.Radius.medium)
                         .strokeBorder(Theme.Color.hairline, lineWidth: Theme.hairlineWidth)

@@ -144,6 +144,9 @@ v1.x: record-to-search, 2D map, tempo-synced preview, kit builder, `.als` projec
 v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 
 ## Later (not picked by the loop — founder triages after M8)
+- (from T12.1 review) `SonarChip.swift` mixed-chip dash uses a literal `lineWidth: 1` and spacing tokens as the dash pattern; add a `chipDash` token. Its `×` now shows whenever `onClear` is set (not only when active); document it.
+- (from T12.1 review) Components gallery: readout values not yet `signal` (Readout v2 in T12.4); neutral "Start" knob at 0 ms points up instead of the range start.
+- (from T12.1) Light hover chip (fill 18 %) `facetCategory` text on `surfaceGroup` is 4.22:1 (< 4.5); darken the text or lower the hover tint if it matters.
 - (from T10.9 review) `CommonTags.swift` intersects tags case-sensitively; files tagged "Dark" and "dark" share no chip in the tag editor unless the core normalises tag case.
 - (from T10.7) BPM ±1 below 90 % on real loops (golden 88.9 %, silver 81.2 %): rest is rhythm-less FX/risers, 1–4 s fills, a cappella takes; also ≤ 72 BPM material now reads double-time (tactus prior σ 0.6, fixture loop_000 70→140).
 - (from T10.7 review) `tempo/mod.rs` loop-length prior on long files: beat counts are dense on multi-minute stems (adds noise); consider limiting it to files < ~3 min.

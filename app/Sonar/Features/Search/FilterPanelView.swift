@@ -66,7 +66,7 @@ struct FilterPanelView: View {
         }
         .padding(Theme.Space.s12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.Color.panelGroup, in: RoundedRectangle(cornerRadius: Theme.Radius.large))
+        .background(Theme.Color.surfaceGroup, in: RoundedRectangle(cornerRadius: Theme.Radius.large))
     }
 
     private func chip(
@@ -91,7 +91,7 @@ struct FilterPanelView: View {
                     ForEach(shown) { c in
                         chip(
                             Format.categoryTitle(c.value), count: Int(c.count), selected: c.selected,
-                            hue: Theme.categoryHue(c.value) ?? .fx, disabled: c.count == 0,
+                            hue: .category, disabled: c.count == 0,
                             label: "Category \(Format.categoryTitle(c.value)), \(c.count) results"
                         ) { FilterState.toggle(c.value, in: &model.filters.categories) }
                     }
@@ -115,7 +115,7 @@ struct FilterPanelView: View {
                     let selected = FilterPanel.isKeySelected(root: root, mode: keyMode, in: model.filters.keys)
                     chip(
                         root, count: FilterPanel.keyCount(root: root, mode: keyMode, facets: facets),
-                        selected: selected, hue: .property,
+                        selected: selected, hue: .key,
                         disabled: !FilterPanel.isKeyAvailable(
                             root: root, mode: keyMode, facets: facets, keys: model.filters.keys),
                         label: "Key \(root) \(keyMode.title)"

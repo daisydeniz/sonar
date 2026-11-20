@@ -100,8 +100,8 @@ text ≥ 4.5:1, token test):
 | `facetCategory` | `#9A1DB5` | `#E27DF5` | `#A21CAF` | 6.3 | Category (magenta) |
 | `facetKey` | `#4C43D9` | `#A3A0FF` | `#4F46E5` | 6.3 | Key (indigo) |
 | `facetProperty` | `#03679C` | `#5CC8F5` | `#0369A1` | 5.9 | Tempo, Duration (cyan) |
-| `facetTag` | `#A84F06` | `#F7A24C` | `#B45309` | 5.0 | Tags, everywhere (orange) |
-| `facetLibrary` | `#C02626` | `#FF7B78` | `#C62828` | 5.6 | Library (red) |
+| `facetTag` | `#8F4305` | `#F7A24C` | `#B45309` | 5.0 | Tags, everywhere (orange) |
+| `facetLibrary` | `#A82020` | `#FF7B78` | `#C62828` | 5.6 | Library (red) |
 
 The `…Fill` tokens are the one allowed exception to "a filled custom control
 uses `controlAccent`" (§5): they are never `accent` and are contrast-tested.

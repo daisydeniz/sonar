@@ -72,7 +72,7 @@ struct TagEditorView: View {
         }
         .frame(maxWidth: .infinity, minHeight: Theme.Size.tagBoxMinHeight, alignment: .topLeading)
         .padding(Theme.Space.s8)
-        .background(Theme.Color.surfaceWell, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
+        .background(Theme.Color.surfaceGroup, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
         .overlay {
             RoundedRectangle(cornerRadius: Theme.Radius.medium)
                 .strokeBorder(Theme.Color.hairline, lineWidth: Theme.hairlineWidth)

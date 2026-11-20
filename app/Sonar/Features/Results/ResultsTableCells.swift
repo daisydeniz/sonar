@@ -66,18 +66,8 @@ class ResultCellView: NSTableCellView {
 /// A rounded neutral bar standing in for a name that is not loaded yet.
 final class SkeletonBarView: NSView {
     override func draw(_ dirtyRect: NSRect) {
-        Theme.NS.surfaceWell.setFill()
+        Theme.NS.surfaceGroup.setFill()
         NSBezierPath(roundedRect: bounds, xRadius: Theme.Radius.small, yRadius: Theme.Radius.small).fill()
-    }
-}
-
-/// A filled circle in one colour (category dot).
-final class DotView: NSView {
-    var color: NSColor? { didSet { needsDisplay = true } }
-    override func draw(_ dirtyRect: NSRect) {
-        guard let color else { return }
-        color.setFill()
-        NSBezierPath(ovalIn: bounds).fill()
     }
 }
 
@@ -110,25 +100,15 @@ final class NameCellView: ResultCellView {
     }
 }
 
-/// Category column: dot in the category hue + capitalised name.
+/// Category column: capitalised category name as plain row text.
 final class CategoryCellView: ResultCellView {
-    private let dot = DotView()
-
     init(identifier: NSUserInterfaceItemIdentifier) {
         super.init(identifier: identifier, font: Theme.NSFonts.row)
-        addLeadingAccessory(dot, size: Theme.Size.categoryDot)
     }
 
     override func configure(_ file: FileRow, libraryName: String?) {
         label.stringValue = Format.categoryTitle(file.category)
-        dot.color = Theme.categoryNSColor(file.category)
-        dot.alphaValue = file.hidden ? 0.4 : 1
         super.configure(file, libraryName: libraryName)
-    }
-
-    override func showLoading() {
-        super.showLoading()
-        dot.color = nil
     }
 }
 

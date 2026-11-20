@@ -38,12 +38,12 @@ enum CategoryFamily: Int, CaseIterable, Sendable {
     }
 
     static func of(_ category: String) -> CategoryFamily {
-        switch Theme.categoryHue(category) {
-        case .drum: return .drums
-        case .metal: return .percussion
-        case .bass: return .bass
-        case .tonal: return .tonal
-        case .vocal: return .vocal
+        switch category.lowercased() {
+        case "kick", "snare", "clap", "tom", "drums": return .drums
+        case "hat", "cymbal", "perc": return .percussion
+        case "bass": return .bass
+        case "lead", "pad", "keys", "pluck", "synth": return .tonal
+        case "vocal": return .vocal
         default: return .fx
         }
     }
@@ -176,14 +176,14 @@ enum FilterPanel {
             (CategoryFamily.of($0).rawValue, $0) < (CategoryFamily.of($1).rawValue, $1)
         }
         for c in cats {
-            chips.append(ActiveChip(kind: .category(c), title: Format.categoryTitle(c), hue: Theme.categoryHue(c) ?? .fx))
+            chips.append(ActiveChip(kind: .category(c), title: Format.categoryTitle(c), hue: .category))
         }
         let byRoot = Dictionary(grouping: f.keys.map(split), by: \.root)
         let orderedRoots = byRoot.keys.sorted { (roots.firstIndex(of: $0) ?? roots.count, $0) < (roots.firstIndex(of: $1) ?? roots.count, $1) }
         for root in orderedRoots {
             let minors = byRoot[root]?.map(\.minor) ?? []
             let title = minors.contains(true) && minors.contains(false) ? "\(root) any" : (minors.contains(true) ? root + "m" : root)
-            chips.append(ActiveChip(kind: .key(root: root), title: title, hue: .property))
+            chips.append(ActiveChip(kind: .key(root: root), title: title, hue: .key))
         }
         if let s = FilterState.rangeSummary(min: f.bpmMin, max: f.bpmMax) {
             chips.append(ActiveChip(kind: .tempo, title: "\(s) BPM", hue: .property))

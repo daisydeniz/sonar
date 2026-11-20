@@ -4,7 +4,7 @@ import SwiftUI
 /// accent, unplayed accent at 45 %), playhead, click-to-seek, zoom (pinch,
 /// Cmd-scroll, +/- buttons) and scroll-to-pan when zoomed. Drag selects a
 /// region (tint, edge handles, readout, Play / Find Similar to Selection,
-/// DESIGN §4.4). Fills the height its parent gives it; sits in a `surfaceWell`.
+/// DESIGN §4.4). Fills the height its parent gives it; sits in a `waveWell`.
 @MainActor
 struct WaveformView: View {
     let model: WaveformModel
@@ -18,8 +18,8 @@ struct WaveformView: View {
             overlay
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Color.surfaceWell, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.medium))
+        .background(Theme.Color.waveWell, in: RoundedRectangle(cornerRadius: Theme.Radius.well))
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.well))
         .overlay(alignment: .bottomTrailing) { zoomControls }
         .overlay { regionBar }
     }

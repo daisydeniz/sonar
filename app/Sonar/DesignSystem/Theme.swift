@@ -19,16 +19,18 @@ enum Theme {
     enum Radius {
         static let small: CGFloat = 4
         static let medium: CGFloat = 6
+        /// Waveform well.
+        static let well: CGFloat = 8
         static let large: CGFloat = 10
     }
 
     /// Fixed sizes of the content layer.
     enum Size {
-        static let rowHeight: CGFloat = 24
+        static let rowHeight: CGFloat = 26
         /// Raise of the cents superscript of a note (`KeyLabel`).
         static let superscriptBaseline: CGFloat = 4
-        static let headerHeight: CGFloat = 22
-        static let barHeight: CGFloat = 36
+        static let headerHeight: CGFloat = 24
+        static let barHeight: CGFloat = 44
         /// Selected-waveform well in the player header: default, minimum and
         /// maximum height (user-resizable, DESIGN §2.3).
         static let waveformHeight: CGFloat = 180
@@ -43,18 +45,20 @@ enum Theme {
         /// Height of the draggable split divider under the player header.
         static let splitHandle: CGFloat = 6
         static let transportButton: CGFloat = 28
-        static let chipHeight: CGFloat = 22
-        /// Diameter of `Knob` and the width of its arc.
-        static let knob: CGFloat = 26
-        static let knobStroke: CGFloat = 2.5
+        /// Chip height; `chipHeightCompact` inside menus and lists.
+        static let chipHeight: CGFloat = 24
+        static let chipHeightCompact: CGFloat = 22
+        /// `Knob` face diameters: 24 in bars, 44 in panels.
+        static let knobSmall: CGFloat = 24
+        static let knobLarge: CGFloat = 44
+        /// Value arc of a knob: stroke width and gap outside the face.
+        static let knobArc: CGFloat = 2.2
         /// Waveform region: edge line width and drag-handle size (DESIGN §4.4).
         static let regionEdge: CGFloat = 1
         static let regionHandleWidth: CGFloat = 6
         static let regionHandleHeight: CGFloat = 24
         /// Width of the floating readout + menu on a region.
         static let regionBarWidth: CGFloat = 200
-        /// Diameter of the category dot in table rows.
-        static let categoryDot: CGFloat = 6
         /// Symbol point size of `EmptyStateView`.
         static let emptyStateSymbol: CGFloat = 28
         /// Label column of `PropertyRow` (inspector grids).
@@ -78,7 +82,7 @@ enum Theme {
     }
 
     /// Opacity of the unplayed part of the waveform (played = full accent).
-    static let waveformUnplayedOpacity: Double = 0.45
+    static let waveformUnplayedOpacity: Double = 0.40
 
     /// One physical pixel at the given backing scale (2 = Retina).
     static func hairlineWidth(scale: CGFloat) -> CGFloat { 1 / max(scale, 1) }

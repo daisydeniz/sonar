@@ -2,34 +2,42 @@ import AppKit
 import SwiftUI
 
 extension Theme {
-    /// Colour tokens as SwiftUI `Color`. Values live in
+    /// Colour tokens as SwiftUI `Color` (DESIGN §2.1, ADR-043). Values live in
     /// `Assets.xcassets/Colors` (light + dark); derived ones are computed.
     /// Text uses the system semantic colours, status the system colours.
     enum Color {
-        /// Content accent: waveform, playhead, selection tint, active chip,
-        /// accent-coloured text and icons. Bright in dark mode: never put
-        /// text on it (use `controlAccent` for filled controls).
+        /// Content accent: playhead head, selection tint, Filters button,
+        /// links. Bright in dark mode: never put text on it (use
+        /// `controlAccent` for filled controls).
         static let accent = SwiftUI.Color("AccentContent")
-        /// Fill of system controls (the app's `AccentColor` asset: default
-        /// and prominent buttons, menu highlight, sliders, focus ring).
-        /// White text on it passes 4.5:1 in both appearances.
+        /// The app's `AccentColor` asset: default/prominent buttons, play
+        /// button, menu highlight, focus ring. White on it passes 4.5:1.
         static let controlAccent = SwiftUI.Color("AccentColor")
+        /// Amber: "on" mode toggles, readout values, trial badge.
+        static let signal = SwiftUI.Color("Signal")
         /// Results table and main content background.
         static let surfaceContent = SwiftUI.Color("SurfaceContent")
-        /// Filter bar, similarity bar, player header, cards.
+        /// Player header, filter bar, similarity bar.
         static let surfaceRaised = SwiftUI.Color("SurfaceRaised")
-        /// Waveform well, inset areas, meter tracks.
-        static let surfaceWell = SwiftUI.Color("SurfaceWell")
+        /// Cards: inspector, filter panel sections, tag list well.
+        static let surfaceGroup = SwiftUI.Color("SurfaceGroup")
+        /// Unselected chip background in dark (light uses the hue at 11 %).
+        static let chipBase = SwiftUI.Color("ChipBase")
+        /// Waveform well, its readout strip, and the waveform itself.
+        static let waveWell = SwiftUI.Color("WaveWell")
+        static let waveStrip = SwiftUI.Color("WaveStrip")
+        static let wave = SwiftUI.Color("Wave")
         /// 1 px separators and borders.
         static let hairline = SwiftUI.Color("Hairline")
         /// Filled favourite heart.
         static let favorite = SwiftUI.Color("Favorite")
-        static let catDrum = SwiftUI.Color("CatDrum")
-        static let catMetal = SwiftUI.Color("CatMetal")
-        static let catBass = SwiftUI.Color("CatBass")
-        static let catTonal = SwiftUI.Color("CatTonal")
-        static let catVocal = SwiftUI.Color("CatVocal")
-        static let catFX = SwiftUI.Color("CatFX")
+
+        /// Knob family faces (same in both appearances except neutral).
+        static let knobPitch = SwiftUI.Color("KnobPitch")
+        static let knobGain = SwiftUI.Color("KnobGain")
+        static let knobFilter = SwiftUI.Color("KnobFilter")
+        static let knobTime = SwiftUI.Color("KnobTime")
+        static let knobNeutral = SwiftUI.Color("KnobNeutral")
 
         /// Status: error (system red).
         static let error = SwiftUI.Color(nsColor: .systemRed)
@@ -38,15 +46,16 @@ extension Theme {
         /// Status: ok (system green).
         static let ok = SwiftUI.Color(nsColor: .systemGreen)
 
-        /// Section group inside the filter panel: a semantic fill that keeps
-        /// the popover's glass visible (not an opaque surface).
-        static var panelGroup: SwiftUI.Color { SwiftUI.Color(nsColor: .quinarySystemFill) }
-        /// Focused selected row: accent at 16 % (light) / 24 % (dark).
+        /// Focused selected row: `accent` at 12 % (light) / 20 % (dark).
         static var selection: SwiftUI.Color { SwiftUI.Color(nsColor: Theme.NS.selection) }
         /// Selected row while the table is not focused: label colour at 8 %.
         static var selectionInactive: SwiftUI.Color { SwiftUI.Color(nsColor: Theme.NS.selectionInactive) }
-        /// Active chip / toggle background: accent at 14 %.
-        static var accentSoft: SwiftUI.Color { SwiftUI.Color(nsColor: Theme.NS.accentSoft) }
+        /// Background of an "on" toggle and the trial badge.
+        static var signalSoft: SwiftUI.Color { SwiftUI.Color(nsColor: Theme.NS.signalSoft) }
+        /// Waveform lane divider and well border.
+        static var waveGrid: SwiftUI.Color { SwiftUI.Color(nsColor: Theme.NS.waveGrid) }
+        /// Waveform lane centre line.
+        static var waveCentre: SwiftUI.Color { SwiftUI.Color(nsColor: Theme.NS.waveCentre) }
     }
 
     /// The same tokens as `NSColor`, for AppKit code (table, waveform).
@@ -54,33 +63,40 @@ extension Theme {
     enum NS {
         static var accent: NSColor { named("AccentContent") }
         static var controlAccent: NSColor { named("AccentColor") }
+        static var signal: NSColor { named("Signal") }
         static var surfaceContent: NSColor { named("SurfaceContent") }
         static var surfaceRaised: NSColor { named("SurfaceRaised") }
-        static var surfaceWell: NSColor { named("SurfaceWell") }
+        static var surfaceGroup: NSColor { named("SurfaceGroup") }
+        static var chipBase: NSColor { named("ChipBase") }
+        static var waveWell: NSColor { named("WaveWell") }
+        static var waveStrip: NSColor { named("WaveStrip") }
+        static var wave: NSColor { named("Wave") }
         static var hairline: NSColor { named("Hairline") }
         static var favorite: NSColor { named("Favorite") }
-        static var catDrum: NSColor { named("CatDrum") }
-        static var catMetal: NSColor { named("CatMetal") }
-        static var catBass: NSColor { named("CatBass") }
-        static var catTonal: NSColor { named("CatTonal") }
-        static var catVocal: NSColor { named("CatVocal") }
-        static var catFX: NSColor { named("CatFX") }
 
         static var error: NSColor { .systemRed }
         static var warning: NSColor { .systemOrange }
         static var ok: NSColor { .systemGreen }
 
-        /// Focused selected row: accent at 16 % (light) / 24 % (dark).
+        /// Focused selected row: accent at 12 % (light) / 20 % (dark).
         static var selection: NSColor {
-            derived { isDark in (NS.accent, isDark ? 0.24 : 0.16) }
+            derived { isDark in (NS.accent, isDark ? 0.20 : 0.12) }
         }
         /// Selected row, table not focused: label colour at 8 %.
         static var selectionInactive: NSColor {
             derived { _ in (NSColor.labelColor, 0.08) }
         }
-        /// Active chip / toggle background: accent at 14 %.
-        static var accentSoft: NSColor {
-            derived { _ in (NS.accent, 0.14) }
+        /// "On" toggle / trial badge background: signal at 18 % / 16 %.
+        static var signalSoft: NSColor {
+            derived { isDark in (NS.signal, isDark ? 0.16 : 0.18) }
+        }
+        /// Waveform grid: wave at 10 % (light) / 14 % (dark).
+        static var waveGrid: NSColor {
+            derived { isDark in (NS.wave, isDark ? 0.14 : 0.10) }
+        }
+        /// Waveform centre line: wave at 28 % / 32 %.
+        static var waveCentre: NSColor {
+            derived { isDark in (NS.wave, isDark ? 0.32 : 0.28) }
         }
 
         static func named(_ name: String) -> NSColor {
@@ -98,43 +114,6 @@ extension Theme {
                 }
                 return out
             }
-        }
-    }
-
-    /// Category hue for a core category string, or nil (no dot) when the
-    /// category is missing. Unknown non-nil values count as FX.
-    static func categoryColor(_ category: String?) -> SwiftUI.Color? {
-        categoryToken(category).map { SwiftUI.Color($0.assetName) }
-    }
-
-    /// `NSColor` twin of `categoryColor(_:)`.
-    static func categoryNSColor(_ category: String?) -> NSColor? {
-        categoryToken(category).map { NS.named($0.assetName) }
-    }
-
-    enum CategoryToken {
-        case drum, metal, bass, tonal, vocal, fx
-        var assetName: String {
-            switch self {
-            case .drum: return "CatDrum"
-            case .metal: return "CatMetal"
-            case .bass: return "CatBass"
-            case .tonal: return "CatTonal"
-            case .vocal: return "CatVocal"
-            case .fx: return "CatFX"
-            }
-        }
-    }
-
-    static func categoryToken(_ category: String?) -> CategoryToken? {
-        guard let category else { return nil }
-        switch category.lowercased() {
-        case "kick", "snare", "clap", "tom", "drums": return .drum
-        case "hat", "cymbal", "perc": return .metal
-        case "bass": return .bass
-        case "lead", "pad", "keys", "pluck", "synth": return .tonal
-        case "vocal": return .vocal
-        default: return .fx
         }
     }
 }

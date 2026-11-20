@@ -48,7 +48,7 @@ struct TargetWellView: View {
             }
             TargetWaveform(waveform: waveform)
                 .frame(height: Theme.Size.compareWellHeight)
-                .background(Theme.Color.surfaceWell, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
+                .background(Theme.Color.surfaceGroup, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
                 .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.medium))
                 .padding(.horizontal, Theme.Space.s12)
                 .accessibilityLabel("Waveform of \(well.name)")

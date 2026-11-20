@@ -2,23 +2,20 @@ import AppKit
 import SwiftUI
 
 extension Theme {
-    /// Facet hues of the filter panel and the hued `SonarChip` (DESIGN §2.1,
-    /// ADR-042): the six category hues plus `property` (Key, Tempo, Duration)
-    /// and `tag`. Each has a text colour (light/dark aware) and a deep fill
-    /// for the selected state (white text on it, ≥ 4.5:1).
+    /// Facet hues (DESIGN §2.1, ADR-043): one per filter section, used by
+    /// every chip that shows a value of that section. Text colour is
+    /// light/dark aware; the deep fill is for the selected state (white text
+    /// on it, ≥ 4.5:1, token test).
     enum Hue: CaseIterable, Sendable {
-        case drum, metal, bass, tonal, vocal, fx, property, tag
+        case category, key, property, tag, library
 
         var textAsset: String {
             switch self {
-            case .drum: return "CatDrum"
-            case .metal: return "CatMetal"
-            case .bass: return "CatBass"
-            case .tonal: return "CatTonal"
-            case .vocal: return "CatVocal"
-            case .fx: return "CatFX"
+            case .category: return "FacetCategory"
+            case .key: return "FacetKey"
             case .property: return "FacetProperty"
             case .tag: return "FacetTag"
+            case .library: return "FacetLibrary"
             }
         }
 
@@ -28,28 +25,29 @@ extension Theme {
         var color: SwiftUI.Color { SwiftUI.Color(textAsset) }
         /// Selected-state background (same in light and dark).
         var fill: SwiftUI.Color { SwiftUI.Color(fillAsset) }
-        /// Unselected chip background: the hue at 16 %.
-        var tint: SwiftUI.Color { color.opacity(0.16) }
-        /// Hovered unselected chip background: the hue at 24 %.
-        var tintHover: SwiftUI.Color { color.opacity(0.24) }
+        /// Unselected chip background in light: the fill at 11 %.
+        var tint: SwiftUI.Color { fill.opacity(0.11) }
+        /// Hovered unselected chip background in light: the fill at 18 %.
+        var tintHover: SwiftUI.Color { fill.opacity(0.18) }
 
+        var nsColor: NSColor { NS.named(textAsset) }
         var nsFill: NSColor { NS.named(fillAsset) }
     }
 
-    /// Opacity of the count next to a hued chip's title.
-    static let chipCountOpacity: Double = 0.7
+    /// Opacity of the count next to a chip's title.
+    static let chipCountOpacity: Double = 0.72
+    /// Opacity of a disabled chip.
+    static let chipDisabledOpacity: Double = 0.38
+    /// Opacity of the `×` on a selected chip.
+    static let chipClearOpacity: Double = 0.85
+    /// Hover overlay on a dark chip: label colour at 6 %.
+    static let chipHoverOverlayOpacity: Double = 0.06
 
-    /// Hue of a core category string (`nil` = missing category).
-    static func categoryHue(_ category: String?) -> Hue? {
-        categoryToken(category).map { token in
-            switch token {
-            case .drum: return .drum
-            case .metal: return .metal
-            case .bass: return .bass
-            case .tonal: return .tonal
-            case .vocal: return .vocal
-            case .fx: return .fx
-            }
-        }
-    }
+    /// Knob parts (DESIGN §4.8): pointer black at 55 %, track label at 10 %,
+    /// rim black at 35 %, top highlight white at 35 %, neutral value arc.
+    static let knobPointerOpacity: Double = 0.55
+    static let knobTrackOpacity: Double = 0.10
+    static let knobRimOpacity: Double = 0.35
+    static let knobHighlightOpacity: Double = 0.35
+    static let knobNeutralArcOpacity: Double = 0.55
 }

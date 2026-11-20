@@ -1387,3 +1387,6 @@ the engine fails to open).
   Save/Cancel tag sheet (popover with live apply + Undo is the macOS
   pattern, Finder tags); "Sound character" chips and a "Recently added"
   quick filter seen in a mockup (no core data yet → `## Later`).
+- **Addendum T12.1**: light text of `facetTag` `#A84F06` → `#8F4305` and
+  `facetLibrary` `#C02626` → `#A82020`; the mockup values were 4.15 / 4.33:1
+  on their unselected chip over `surfaceGroup` (token test needs ≥ 4.5).

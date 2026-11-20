@@ -57,7 +57,7 @@ final class WaveformNSView: NSView {
             shape.fillColor = nil
             shape.lineCap = .butt
         }
-        playedMask.backgroundColor = Theme.NS.accent.cgColor  // mask alpha only
+        playedMask.backgroundColor = Theme.NS.wave.cgColor  // mask alpha only
         waveLayer.mask = playedMask
         for l in [regionTint] + regionEdges + regionHandles {
             l.isHidden = true
@@ -96,8 +96,8 @@ final class WaveformNSView: NSView {
 
     private func updateColors() {
         effectiveAppearance.performAsCurrentDrawingAppearance {
-            waveLayer.strokeColor = Theme.NS.accent.cgColor
-            unplayedLayer.strokeColor = Theme.NS.accent.withAlphaComponent(Theme.waveformUnplayedOpacity).cgColor
+            waveLayer.strokeColor = Theme.NS.wave.cgColor
+            unplayedLayer.strokeColor = Theme.NS.wave.withAlphaComponent(Theme.waveformUnplayedOpacity).cgColor
             playhead.backgroundColor = NSColor.labelColor.cgColor
             regionTint.backgroundColor = Theme.NS.selection.cgColor
             for l in regionEdges + regionHandles { l.backgroundColor = Theme.NS.accent.cgColor }

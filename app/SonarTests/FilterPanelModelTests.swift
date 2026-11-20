@@ -72,10 +72,10 @@ final class FilterPanelModelTests: XCTestCase {
         f.tags = ["dark"]
         let chips = FilterPanel.activeChips(f)
         XCTAssertEqual(chips.map(\.title), ["Kick", "Bass", "C", "Am", "120–128 BPM", "≤ 0.5 s", "dark"])
-        XCTAssertEqual(chips.map(\.hue), [.drum, .bass, .property, .property, .property, .property, .tag])
+        XCTAssertEqual(chips.map(\.hue), [.category, .category, .key, .key, .property, .property, .tag])
 
         f.keys = ["A", "Am"]
-        XCTAssertEqual(FilterPanel.activeChips(f).filter { $0.hue == .property && $0.title.hasPrefix("A") }.map(\.title), ["A any"])
+        XCTAssertEqual(FilterPanel.activeChips(f).filter { $0.hue == .key && $0.title.hasPrefix("A") }.map(\.title), ["A any"])
     }
 
     func testClearingAChipRemovesOnlyItsValue() {
