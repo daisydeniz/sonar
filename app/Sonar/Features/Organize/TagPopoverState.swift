@@ -45,9 +45,17 @@ struct TagPopoverState {
     private(set) var library: [(name: String, files: Int)]
     private(set) var files: [(id: Int64, tags: [String])]
     /// The inline field's text.
-    var text = "" { didSet { if text != oldValue { highlight = text.isEmpty ? nil : 0 } } }
+    var text = "" {
+        didSet {
+            guard text != oldValue else { return }
+            highlight = text.isEmpty ? nil : typedRowIndex
+            highlightMoved = false
+        }
+    }
     /// Highlighted index into `rows` (nil = none).
     private(set) var highlight: Int?
+    /// True once ↑/↓ picked a row; until then Return acts on the typed text.
+    private var highlightMoved = false
     /// How many tags "Most used" shows (also the menu).
     static let mostUsedCount = 8
 
@@ -146,7 +154,19 @@ struct TagPopoverState {
         return result
     }
 
+    /// The row the typed text means: the tag equal to it, else "Create tag".
+    private var typedRowIndex: Int? {
+        let list = rows
+        return list.firstIndex {
+            switch $0 {
+            case .create: true
+            case .tag(let name, _, _): Self.same(name, canonical(text))
+            }
+        }
+    }
+
     mutating func moveHighlight(by delta: Int) {
+        highlightMoved = true
         let count = rows.count
         guard count > 0 else { highlight = nil; return }
         guard let current = highlight else { highlight = delta > 0 ? 0 : count - 1; return }
@@ -191,9 +211,16 @@ struct TagPopoverState {
         chips.last.flatMap { remove($0.name) }
     }
 
-    /// Return: toggles the highlighted tag or creates the typed one; clears the text.
+    /// Return: adds the typed tag (never removes: typing a tag the files
+    /// already have is a no-op); after ↑/↓ toggles the picked row instead.
+    /// Clears the text.
     @discardableResult
     mutating func activateHighlighted() -> [TagChange] {
+        if !highlightMoved, !text.trimmingCharacters(in: .whitespaces).isEmpty {
+            let change = add(text)
+            text = ""
+            return change.map { [$0] } ?? []
+        }
         let list = rows
         guard let h = highlight, h < list.count else { return [] }
         let change: TagChange?

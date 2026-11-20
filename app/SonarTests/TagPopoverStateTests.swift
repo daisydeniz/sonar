@@ -55,11 +55,31 @@ final class TagPopoverStateTests: XCTestCase {
         XCTAssertEqual(n.activateHighlighted().first?.tag, "night drive")
     }
 
+    /// Return after typing adds exactly the typed tag: "5" with "55" on the
+    /// file must not toggle (remove) "55", and typing a tag the file already
+    /// has is a no-op, not a removal.
+    func testReturnAddsTypedTextNeverRemoves() {
+        var s = TagPopoverState(library: [TagInfo(name: "55", files: 1)], files: [(id: 1, tags: ["55"])])
+        s.text = "5"
+        XCTAssertEqual(names(s.rows), ["55", "+5"])
+        XCTAssertEqual(s.highlight, 1)
+        XCTAssertEqual(s.activateHighlighted(), [TagChange(kind: .add, tag: "5", fileIds: [1])])
+        XCTAssertEqual(Set(s.chips.map(\.name)), ["55", "5"])
+        s.text = "55"
+        XCTAssertEqual(s.highlight, 0, "the exact match")
+        XCTAssertEqual(s.activateHighlighted(), [])
+        XCTAssertEqual(Set(s.chips.map(\.name)), ["55", "5"])
+        // ↑/↓ picks a row on purpose: Return toggles that row.
+        s.text = "5"
+        s.moveHighlight(by: -1)
+        XCTAssertEqual(s.activateHighlighted(), [TagChange(kind: .remove, tag: "55", fileIds: [1])])
+    }
+
     func testMatchOrderPrefixThenContainsCreateLast() {
         var s = state([[]])
         s.text = "lo"
         XCTAssertEqual(names(s.rows), ["lofi", "low end", "loose", "+lo"])
-        XCTAssertEqual(s.highlight, 0)
+        XCTAssertEqual(s.highlight, 3, "typing highlights what Return does: Create")
         s.text = "e"
         XCTAssertEqual(names(s.rows), ["groove", "low end", "loose", "+e"])
         s.text = "lofi"
