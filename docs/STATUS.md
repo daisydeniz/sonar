@@ -4,8 +4,8 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M12 Visual v2 and tags UX (founder request 2026-11-20, ADR-043); human-only: T3.7, T7.4, T8.1
-- Next task: T12.9 Design pass v2 (reviewer)
-- Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
+- Next task: none — M12 done (`m12-done`); only [HUMAN] tasks remain (T3.7, T7.4, T8.1)
+- Loop state: ROADMAP COMPLETE   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (updated 2026-11-20; T0.1 was macOS 26.7.2 / Xcode 26.5)
 macOS 27.2.1 arm64 · Xcode 27.2 · xcodegen 2.46.0 · rustup 1.29.3 (Homebrew) ·
@@ -50,6 +50,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-21 — T12.9: design pass v2 — regenerated all 70 snapshots (35 screens × light/dark), reviewer compared them with `design/reference/sonar-v2/` + DESIGN §6: APPROVE r1, no BLOCKING findings, so no code change. 10 NITs → Later (T12.9 items: inspector BPM field, sidebar counts/link, popover bold, locale formatting, …). M12 complete (`m12-done`).
 - 2026-11-21 — T12.8: Manage Tags sheet (filter, similar-pairs card on `signalSoft` with Merge into / Merge All / Ignore, tag list with counts + "unused", inline rename, Merge…, delete with confirmation, + / − bar) opened from both Tags menus and the popover; sidebar Tags section (5 most used + Show All, click scopes results incl. toolbar title, drop rows adds tag). Rename/merge/delete/drop are one Undo step each (affected files snapshotted via paged tag search, capped pages handled). Tokens `manageTags*`. UI only, no eval. check.sh green; reviewer APPROVE r2. Later: 7 T12.8 items.
 - 2026-11-21 — T12.7: Tags › submenu (row context menu with real tri-state NSMenuItems, Edit menu with ✓/– icons; 8 most used, Add Tag… ⌘T, Manage Tags… disabled until T12.8); live tag popover (`NSPopover`, mixed n/m chips → all, Most used, prefix-then-contains matches, Create tag last) replaces `TagEditorView`/"Edit Tags…"; inspector Tags `+` opens it; each change one Undo step; selections beyond the pager cache fetch missing rows from core. Tokens `tagPopoverWidth`, `tagAddButton`, `tagListHeight` 248. UI only, no eval. check.sh green; reviewer APPROVE r2. Later: 2 T12.7 items.
-- 2026-11-20 — T12.6: results table v2 (selection inset 6, tertiary header, playing row shows `speaker.wave.2` in `accent`), toolbar title = scope + libraries subtitle (`ScopeLabel`), trial badge `signal` on `signalSoft`; inspector header with three equal actions and `InspectorCard`s Analysis / Tags / File (token `cardPaddingVertical`). Bit depth/size not in core → Later. UI only, no eval. check.sh green; reviewer APPROVE r1. Later: 2 T12.6 items.

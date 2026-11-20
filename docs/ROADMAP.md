@@ -137,7 +137,7 @@ Every T12 UI task: DESIGN.md first (whole file), then the target mockups `design
 - [x] T12.6 (swift-ui) Results table, toolbar and inspector v2 (DESIGN §3, §4.1, §4.9; dep T12.1): 26 pt rows, 24 pt header, plain Category text, playing-row speaker symbol, toolbar title + libraries subtitle, trial badge in `signal`; inspector header with three equal actions and cards Analysis / Tags / File (bit depth and size only if core already has them, else `## Later`). AC: snapshots `main`, `main-multi`, `main-noselection` light/dark compared with `main-*.png`; `ResultsTablePerfTests` budget unchanged. (034ecd4)
 - [x] T12.7 (swift-ui) Tags menu and tag popover (DESIGN §4.12 layers 1–2; deps T12.1, T12.2): row context menu and Edit menu "Tags ›" submenu (8 most used, tri-state for the selection, Add Tag… ⌘T, Manage Tags…); the live-applying tag popover replaces `TagEditorView` (mixed chips, Most used, matches, "Create tag" row last, keys per §4.12); inspector Tags card `+` opens it; every change is one Undo step; "Edit Tags…" removed. AC: unit tests for popover state (toggle, create, mixed → all, match order, undo grouping) and the submenu tri-state; snapshots `tags-popover`, `tags-popover-multi` light/dark compared with the mockups; `OrganizeTests` green; manual menu check in STATUS "Needs human". (24ce96f)
 - [x] T12.8 (swift-ui) Manage Tags sheet and sidebar Tags section (DESIGN §3 Sidebar, §4.12 layer 3; deps T12.2, T12.7): tag list with counts and "unused", inline rename, Merge…, delete with confirmation, similar-pairs card (Merge into, Merge All, Ignore); sidebar Tags (5 most used + Show All, click scopes the results, dropping rows adds the tag, Undo). AC: snapshot `tags-manage` light/dark compared with `tags-manage-*.png`, sidebar visible in `main`; tests for rename/merge/delete/ignore through FFI and for drop-to-tag; manual check in "Needs human". (c37873a)
-- [ ] T12.9 (reviewer) Design pass v2: re-run `scripts/ui-snapshots.sh`, compare every screen with `design/reference/sonar-v2/` and DESIGN §6; swift-ui fixes BLOCKING findings, the rest go to `## Later`. AC: reviewer APPROVE on the full snapshot set.
+- [x] T12.9 (reviewer) Design pass v2: re-run `scripts/ui-snapshots.sh`, compare every screen with `design/reference/sonar-v2/` and DESIGN §6; swift-ui fixes BLOCKING findings, the rest go to `## Later`. AC: reviewer APPROVE on the full snapshot set.
 
 ## Future (do not start)
 v1.x: record-to-search, 2D map, tempo-synced preview, kit builder, `.als` project map.
@@ -150,6 +150,16 @@ v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 - (from T12.8) Manage Tags filter field lacks the magnifier; list selection is system full-width, not inset/rounded as in the mockup; `−` button renders narrower than `+`.
 - (from T12.8) Dropping rows on a sidebar tag uses the current selection instead of mapping the dropped file URLs to ids.
 - (from T12.8) Merge… is a menu of "Merge into “x”" entries rather than a picker sheet.
+- (from T12.9) Inspector BPM always shows as an edit field; mockup/§4.9 show plain right-aligned text that becomes editable on click (like Key).
+- (from T12.9) Sidebar: "All Samples" has no count; "Show All (n)" is a grey ellipsis row, mockup has an accent link; sidebar icons are large outline glyphs (rows look taller than the mockup).
+- (from T12.9) `tags-popover-multi` snapshot is captured at 1x (others 2x) in `UISnapshotTests.swift`.
+- (from T12.9) Tag popover "Create tag “x”": tag name should be bold per mockup.
+- (from T12.9) Manage Tags: "TAG" column header ~4 pt left of the row text.
+- (from T12.9) `components` gallery "Selected + playing row" lacks the `speaker.wave.2` icon.
+- (from T12.9) Light `main-region`: the region time readout over the waveform has low contrast.
+- (from T12.9) Number formatting follows the system locale ("1,8 MB", "4.213/12.480") while the UI is English; pin snapshot locale or use one formatter.
+- (from T12.9) `main-error`, `license-gate`: no visually primary button in snapshots (likely the inactive-window item from T9.9); verify by hand.
+- (from T12.9) Snapshot fixture: mono one-shot rows show a stereo loop waveform in `main-filters`/`main-banner`/`main-indexing`/`main-unfocused`; `main-multi`/`main-key-*` waveform wells are empty.
 - (from T12.8 review) Undo snapshot for rename/merge comes from a tag search; cross-check against the file ids the core returns and log on mismatch.
 - (from T12.7 review) Tag undo step is registered after the core write returns; ⌘Z pressed before that undoes the previous step.
 - (from T12.7 review) `testAddTagReachesFilesOutsideThePagerCache`: assert fixture size instead of XCTSkip; drop the no-op `peek` + sleep.
