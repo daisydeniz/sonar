@@ -11,6 +11,9 @@ protocol PreviewPlayer: AnyObject {
     func play(_ clip: PreviewClip, loop: Bool, gainDb: Double?, pitchCents: Float) throws
     func stop()
     func setPitch(cents: Float)
+    /// Preview gain in dB on top of the loudness gain (the player's output
+    /// only, never the system volume); applies at once and to later plays.
+    func setGain(db: Float)
     /// Pre-starts the output so the first play is fast (no-op by default).
     func warmUp()
     /// Like `play` but starting `startAt` seconds into the clip (seek).
@@ -26,6 +29,7 @@ protocol PreviewPlayer: AnyObject {
 
 extension PreviewPlayer {
     func warmUp() {}
+    func setGain(db: Float) {}
     func playbackTime() -> TimeInterval? { nil }
     func play(
         _ clip: PreviewClip, loop: Bool, gainDb: Double?, pitchCents: Float, startAt: TimeInterval
@@ -189,7 +193,8 @@ final class EnginePlayer: PreviewPlayer {
         playId += 1
         let id = playId
         setPitch(cents: pitchCents)
-        chain.gain.globalGain = Float(min(max(gainDb ?? 0, -24), 24))
+        normalizationDb = Float(gainDb ?? 0)
+        applyGain()
         let rate = clip.buffer.format.sampleRate
         let total = Int(clip.buffer.frameLength)
         let lo = min(max(range?.lowerBound ?? 0, 0), max(total - 1, 0))
@@ -251,6 +256,20 @@ final class EnginePlayer: PreviewPlayer {
     func stop() {
         playId += 1
         active?.player.stop()
+    }
+
+    /// Loudness-normalisation gain of the sound playing now and the user's
+    /// preview gain; the EQ's global gain is their sum (EQ range -96...24).
+    private var normalizationDb: Float = 0
+    private var userGainDb: Float = 0
+
+    func setGain(db: Float) {
+        userGainDb = db
+        applyGain()
+    }
+
+    private func applyGain() {
+        active?.gain.globalGain = min(max(normalizationDb + userGainDb, -96), 24)
     }
 
     /// Sets the pitch shift of the sound playing now; at 0 the time-pitch

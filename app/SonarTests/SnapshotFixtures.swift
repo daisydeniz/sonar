@@ -68,6 +68,31 @@ enum SnapshotFixtures {
         }
     }
 
+    /// A loop of four decaying hits per lane (stereo: the right lane is a
+    /// little different), like the mockup.
+    static func loopPeaks(lanes: Int, count: Int = 512) -> [[WaveformPeak]] {
+        (0..<lanes).map { lane in
+            (0..<count).map { i in
+                let t = Float(i) / Float(count)
+                let beat = (t * 4).truncatingRemainder(dividingBy: 1)
+                let env = exp(-4 * beat) * (0.55 + 0.4 * abs(sin(Float(i) * (0.37 + 0.05 * Float(lane)))))
+                return WaveformPeak(min: -env, max: env * 0.95)
+            }
+        }
+    }
+
+    /// The mockup's selected sample: a stereo 138 BPM loop.
+    static func stereoLoop(_ base: FileRow) -> FileRow {
+        var row = base
+        row.name = "Cymatics_Drums_Warm_17"
+        row.path = "/Samples/KSHMR Vol 1/Drum Loops/Cymatics_Drums_Warm_17.wav"
+        row.kind = "loop"
+        row.bpm = 138
+        row.durationMs = 1739
+        row.channels = 2
+        return row
+    }
+
     /// Duplicate groups over the first rows.
     static func duplicates(rows: [FileRow]) -> DuplicatesResult {
         DuplicatesResult(
@@ -101,7 +126,11 @@ struct SnapshotPageLoader: ResultPageLoader {
 
 /// Fixed peaks for any file.
 struct SnapshotWaveformProvider: WaveformProviding {
-    func peaks(fileId: Int64, buckets: Int) async throws -> [WaveformPeak] { SnapshotFixtures.peaks() }
+    /// 2 = stereo loop, 1 = mono one-shot.
+    var lanes = 2
+    func peaks(fileId: Int64, buckets: Int) async throws -> [[WaveformPeak]] {
+        lanes == 1 ? [SnapshotFixtures.peaks()] : SnapshotFixtures.loopPeaks(lanes: lanes)
+    }
 }
 
 /// License backend that always fails (the manager then fails open).

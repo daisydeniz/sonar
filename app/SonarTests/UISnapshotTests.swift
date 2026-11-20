@@ -41,13 +41,22 @@ final class UISnapshotTests: XCTestCase {
     }
 
     /// Model with libraries, collections, rows and the third row selected.
-    private func populated(rows: [FileRow] = SnapshotFixtures.rows()) async throws -> AppModel {
+    private func populated(rows: [FileRow] = SnapshotFixtures.rows(), lanes: Int = 2) async throws -> AppModel {
         let model = makeModel()
+        model.waveform.provider = SnapshotWaveformProvider(lanes: lanes)
         model.installStaticState(libraries: SnapshotFixtures.libraries, collections: SnapshotFixtures.collections)
         _ = try await model.pager.reset(loader: SnapshotPageLoader(rows: rows))
         model.select(rows.count > 2 ? rows[2] : nil)
         await model.waveform.settle()
         return model
+    }
+
+    /// The default rows with the third one replaced by the mockup's stereo 138 BPM loop.
+    private func loopRows() -> [FileRow] {
+        var rows = SnapshotFixtures.rows()
+        rows[2] = SnapshotFixtures.stereoLoop(rows[2])
+        rows[2].tags = ["dark", "club", "analog"]
+        return rows
     }
 
     private func contentView(_ model: AppModel) -> some View {
@@ -56,11 +65,17 @@ final class UISnapshotTests: XCTestCase {
 
     func testMain() async throws {
         let dir = try outputDir()
-        // The selected row carries tags so the inspector shows `facetTag` chips (T11.2).
-        var rows = SnapshotFixtures.rows()
-        rows[2].tags = ["dark", "club", "analog"]
-        let model = try await populated(rows: rows)
+        // Stereo loop with BPM (bars.beats ruler, two lanes); it carries tags
+        // so the inspector shows `facetTag` chips (T11.2).
+        let model = try await populated(rows: loopRows())
         try snapshot("main", contentView(model), dir: dir, emphasis: true, selectRow: 2)
+    }
+
+    /// Mono one-shot without BPM: one lane, seconds ruler.
+    func testMainOneShot() async throws {
+        let dir = try outputDir()
+        let model = try await populated(lanes: 1)
+        try snapshot("main-oneshot", contentView(model), dir: dir, emphasis: true, selectRow: 2)
     }
 
     /// Filter bar with hued active chips: categories, key, tempo, tag.
@@ -121,7 +136,7 @@ final class UISnapshotTests: XCTestCase {
     /// Waveform with a selected region: tint, edge handles, readout and menu.
     func testMainRegion() async throws {
         let dir = try outputDir()
-        let model = try await populated()
+        let model = try await populated(rows: loopRows())
         let duration = try XCTUnwrap(model.waveform.duration)
         model.waveform.setRegion(WaveformRegion(from: 0.12, to: 0.4, duration: duration))
         try snapshot("main-region", contentView(model), dir: dir, emphasis: true, selectRow: 2)
@@ -147,7 +162,7 @@ final class UISnapshotTests: XCTestCase {
 
     func testMainSimilar() async throws {
         let dir = try outputDir()
-        let rows = SnapshotFixtures.rows()
+        let rows = loopRows()
         let model = try await populated(rows: rows)
         let seed = rows[2]
         model.targetWaveform.provider = SnapshotWaveformProvider()

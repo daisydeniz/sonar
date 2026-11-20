@@ -15,6 +15,7 @@ final class AudioPreview {
     static let autoPlayKey = "preview.autoPlay"
     static let normalizeKey = "preview.normalizeLoudness"
     static let pitchRange = -12...12
+    static let gainKey = "preview.gainDb"
     /// Neighbour rows pre-decoded on each side of the selection.
     static let neighbourReach = 2
 
@@ -32,6 +33,9 @@ final class AudioPreview {
     var region: WaveformRegion?
     /// Semitones, tempo preserved.
     private(set) var pitchSemitones = 0
+    /// Preview gain in dB (`PreviewGain.rangeDb`), remembered; the preview
+    /// engine only, never the system volume or the file.
+    private(set) var gainDb = 0.0
     var autoPlay: Bool {
         didSet { defaults.set(autoPlay, forKey: Self.autoPlayKey) }
     }
@@ -66,6 +70,8 @@ final class AudioPreview {
         self.maxConcurrentPrefetch = maxConcurrentPrefetch
         autoPlay = defaults.object(forKey: Self.autoPlayKey) as? Bool ?? true
         normalizeLoudness = defaults.object(forKey: Self.normalizeKey) as? Bool ?? true
+        gainDb = PreviewGain.clamped(defaults.double(forKey: Self.gainKey))
+        player.setGain(db: Float(gainDb))
         player.onFinished = { [weak self] in
             self?.isPlaying = false
             self?.isTargetPlaying = false
@@ -124,6 +130,16 @@ final class AudioPreview {
     }
 
     func resetPitch() { setPitch(semitones: 0) }
+
+    /// Sets the preview gain (clamped, 0.1 dB resolution), applied at once
+    /// and remembered across launches.
+    func setGain(db: Double) {
+        gainDb = PreviewGain.clamped(db)
+        defaults.set(gainDb, forKey: Self.gainKey)
+        player.setGain(db: Float(gainDb))
+    }
+
+    func resetGain() { setGain(db: 0) }
 
     /// Playhead position as a fraction (0...1) of the selected sound, or nil
     /// when nothing plays. Cheap; polled by the waveform's display link.

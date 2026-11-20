@@ -33,6 +33,11 @@ struct Knob: View {
     let accessibilityLabel: String
     var family: Family = .pitch
     var size: Size = .small
+    /// Value change per drag step / key press; `fineStep` while Shift is held.
+    var step = 1
+    var fineStep = 1
+    /// Spoken value (with unit); default is the integer value.
+    var spokenValue: String?
 
     /// Drag distance (pt) for one step.
     static let pointsPerStep: CGFloat = 6
@@ -46,8 +51,12 @@ struct Knob: View {
 
     init(
         value: Binding<Int>, in range: ClosedRange<Int>, defaultValue: Int = 0, accessibilityLabel: String,
-        family: Family = .pitch, size: Size = .small
+        family: Family = .pitch, size: Size = .small, step: Int = 1, fineStep: Int? = nil,
+        spokenValue: String? = nil
     ) {
+        self.spokenValue = spokenValue
+        self.step = step
+        self.fineStep = fineStep ?? step
         self.family = family
         self.size = size
         _value = value
@@ -57,9 +66,9 @@ struct Knob: View {
     }
 
     /// Value after a vertical drag of `dy` points (negative = up) from `start`.
-    static func value(start: Int, dy: CGFloat, in range: ClosedRange<Int>) -> Int {
+    static func value(start: Int, dy: CGFloat, in range: ClosedRange<Int>, step: Int = 1) -> Int {
         let steps = Int((-dy / pointsPerStep).rounded(.towardZero))
-        return min(max(start + steps, range.lowerBound), range.upperBound)
+        return min(max(start + steps * step, range.lowerBound), range.upperBound)
     }
 
     private func fraction(_ v: Int) -> Double {
@@ -71,6 +80,8 @@ struct Knob: View {
         if clamped != value { value = clamped }
     }
 
+    private func keyStep(_ press: KeyPress) -> Int { press.modifiers.contains(.shift) ? fineStep : step }
+
     /// Pointer: black at 55 %, white on the dark neutral face.
     private var pointerColor: Color {
         family == .neutral && scheme == .dark ? Color.white : Color.black.opacity(Theme.knobPointerOpacity)
@@ -81,7 +92,8 @@ struct Knob: View {
         family == .neutral ? Color.primary.opacity(Theme.knobNeutralArcOpacity) : family.face
     }
 
-    var body: some View {
+    /// The drawn knob: track, value arc, face and pointer.
+    @ViewBuilder private var dial: some View {
         let d = size.diameter
         let arc = Theme.Size.knobArc
         let outer = d + arc * 4
@@ -117,31 +129,39 @@ struct Knob: View {
                 .rotationEffect(angle)
         }
         .frame(width: outer, height: outer)
+    }
+
+    private func key(_ press: KeyPress, _ direction: Int) -> KeyPress.Result {
+        set(value + direction * keyStep(press))
+        return .handled
+    }
+
+    var body: some View {
+        dial
         .contentShape(Circle())
         .gesture(
             DragGesture(minimumDistance: 1)
                 .onChanged { drag in
                     let start = dragStartValue ?? value
                     if dragStartValue == nil { dragStartValue = start }
-                    set(Self.value(start: start, dy: drag.translation.height, in: range))
+                    let fine = NSEvent.modifierFlags.contains(.shift)
+                    set(Self.value(start: start, dy: drag.translation.height, in: range, step: fine ? fineStep : step))
                 }
                 .onEnded { _ in dragStartValue = nil }
         )
         .onTapGesture(count: 2) { set(defaultValue) }
         .focusable()
         .focused($focused)
-        .onKeyPress(.upArrow) { set(value + 1); return .handled }
-        .onKeyPress(.rightArrow) { set(value + 1); return .handled }
-        .onKeyPress(.downArrow) { set(value - 1); return .handled }
-        .onKeyPress(.leftArrow) { set(value - 1); return .handled }
+        .onKeyPress(keys: [.upArrow, .rightArrow]) { key($0, 1) }
+        .onKeyPress(keys: [.downArrow, .leftArrow]) { key($0, -1) }
         .help("Drag up/down to change, double-click to reset")
         .accessibilityElement()
         .accessibilityLabel(accessibilityLabel)
-        .accessibilityValue("\(value)")
+        .accessibilityValue(spokenValue ?? "\(value)")
         .accessibilityAdjustableAction { direction in
             switch direction {
-            case .increment: set(value + 1)
-            case .decrement: set(value - 1)
+            case .increment: set(value + step)
+            case .decrement: set(value - step)
             @unknown default: break
             }
         }

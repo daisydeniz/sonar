@@ -3,23 +3,22 @@ import Observation
 
 /// Source of waveform peaks (the core in the app, fakes in tests).
 protocol WaveformProviding: Sendable {
-    /// `buckets` min/max pairs for the whole file (blocking work happens off
-    /// the caller's thread). Throws for unreadable files.
-    func peaks(fileId: Int64, buckets: Int) async throws -> [WaveformPeak]
+    /// `buckets` min/max pairs per channel for the whole file, one list per
+    /// lane (mono 1, stereo 2; blocking work happens off the caller's
+    /// thread). Throws for unreadable files.
+    func peaks(fileId: Int64, buckets: Int) async throws -> [[WaveformPeak]]
 }
 
-/// Peaks from the Rust core (`waveformPeaks`, ADR-032). The core returns one
-/// list per channel (ADR-043); until the stereo lanes view (T12.4) they are
-/// drawn as one envelope.
+/// Peaks from the Rust core (`waveformPeaks`, ADR-032): one list per channel
+/// (ADR-043), drawn as one lane each.
 struct CoreWaveformProvider: WaveformProviding {
     let engine: SonarEngine
 
-    func peaks(fileId: Int64, buckets: Int) async throws -> [WaveformPeak] {
+    func peaks(fileId: Int64, buckets: Int) async throws -> [[WaveformPeak]] {
         let engine = engine
-        let channels = try await Task.detached(priority: .userInitiated) {
+        return try await Task.detached(priority: .userInitiated) {
             try engine.waveformPeaks(fileId: fileId, buckets: UInt32(buckets))
         }.value
-        return WaveformMath.envelope(channels)
     }
 }
 
@@ -28,19 +27,19 @@ struct CoreWaveformProvider: WaveformProviding {
 final class WaveformCache {
     private let capacity: Int
     private var order: [Int64] = []  // least recently used first
-    private var items: [Int64: [WaveformPeak]] = [:]
+    private var items: [Int64: [[WaveformPeak]]] = [:]
 
     init(capacity: Int = 32) { self.capacity = max(1, capacity) }
 
     var count: Int { items.count }
 
-    func get(_ id: Int64) -> [WaveformPeak]? {
+    func get(_ id: Int64) -> [[WaveformPeak]]? {
         guard let v = items[id] else { return nil }
         touch(id)
         return v
     }
 
-    func put(_ id: Int64, _ peaks: [WaveformPeak]) {
+    func put(_ id: Int64, _ peaks: [[WaveformPeak]]) {
         items[id] = peaks
         touch(id)
         while order.count > capacity { items[order.removeFirst()] = nil }
@@ -56,7 +55,7 @@ final class WaveformCache {
 enum WaveformState: Equatable {
     case empty
     case loading
-    case ready([WaveformPeak])
+    case ready([[WaveformPeak]])
     /// Unreadable / corrupt file: shown as "No waveform".
     case failed
 }
@@ -73,6 +72,9 @@ final class WaveformModel {
 
     private(set) var state: WaveformState = .empty
     private(set) var viewport = WaveformViewport()
+    /// Amplitude zoom of the lanes (display only), 1...`maxAmplitudeZoom`.
+    private(set) var amplitudeZoom = 1.0
+    static let maxAmplitudeZoom = 8.0
     /// Selected time range (DESIGN §4.4); cleared when the selected sample changes.
     private(set) var region: WaveformRegion?
     /// Duration (s) of the selected sound; without it no region can be drawn.
@@ -97,6 +99,7 @@ final class WaveformModel {
         task?.cancel()
         task = nil
         viewport = WaveformViewport()
+        amplitudeZoom = 1
         guard let fileId else {
             state = .empty
             return
@@ -112,17 +115,22 @@ final class WaveformModel {
         state = .loading
         let mine = generation
         task = Task { [weak self] in
-            let result: [WaveformPeak]?
+            let result: [[WaveformPeak]]?
             do {
                 result = try await provider.peaks(fileId: fileId, buckets: Self.bucketCount)
             } catch {
                 result = nil
             }
             guard let self else { return }
-            if let result, !result.isEmpty { self.cache.put(fileId, result) }
+            if let result, Self.hasPeaks(result) { self.cache.put(fileId, result) }
             guard mine == self.generation else { return }
-            if let result, !result.isEmpty { self.state = .ready(result) } else { self.state = .failed }
+            if let result, Self.hasPeaks(result) { self.state = .ready(result) } else { self.state = .failed }
         }
+    }
+
+    /// At least one lane with at least one bucket.
+    private static func hasPeaks(_ lanes: [[WaveformPeak]]) -> Bool {
+        lanes.contains { !$0.isEmpty }
     }
 
     /// Waits for the pending load (tests).
@@ -151,4 +159,11 @@ final class WaveformModel {
     }
     /// Shows the whole file again.
     func resetZoom() { viewport = WaveformViewport() }
+
+    /// Scales the lanes' amplitude by `factor` (clamped; display only).
+    func zoomAmplitude(by factor: Double) {
+        let z = amplitudeZoom * factor
+        amplitudeZoom = z.isFinite ? min(max(z, 1), Self.maxAmplitudeZoom) : 1
+    }
+    func resetAmplitudeZoom() { amplitudeZoom = 1 }
 }

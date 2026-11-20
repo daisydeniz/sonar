@@ -84,12 +84,15 @@ enum KeyLabel {
     }
 
     /// SwiftUI rendering as one `Text` (so it truncates and aligns like text).
-    static func text(_ parts: Parts?, font: SwiftUI.Font = Theme.Font.row) -> Text {
+    static func text(
+        _ parts: Parts?, font: SwiftUI.Font = Theme.Font.row, color: SwiftUI.Color? = nil
+    ) -> Text {
         guard let parts else { return Text(dash).font(font).foregroundStyle(.tertiary) }
-        let main = Text(parts.main).font(font).foregroundStyle(.primary)
+        let main = color.map { Text(parts.main).font(font).foregroundStyle($0) }
+            ?? Text(parts.main).font(font).foregroundStyle(.primary)
         guard let sup = parts.superscript else { return main }
         return main + Text(sup).font(Theme.Font.superscript).baselineOffset(Theme.Size.superscriptBaseline)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(color ?? SwiftUI.Color.secondary)
     }
 }
 

@@ -17,6 +17,28 @@ enum Format {
         return tenths == tenths.rounded() ? String(Int(tenths)) : String(format: "%.1f", tenths)
     }
 
+    /// File extension without the dot, lowercased ("wav"); empty when none.
+    static func fileExtension(path: String) -> String {
+        URL(fileURLWithPath: path).pathExtension.lowercased()
+    }
+
+    /// "WAV · 44.1 kHz · Stereo" for the waveform readout strip; parts the
+    /// file lacks are left out, nil when nothing is known.
+    static func audioFormat(path: String, sampleRate: UInt32?, channels: UInt16?) -> String? {
+        var parts: [String] = []
+        let ext = fileExtension(path: path)
+        if !ext.isEmpty { parts.append(ext.uppercased()) }
+        if let sampleRate, sampleRate > 0 {
+            let khz = Double(sampleRate) / 1000
+            let text = khz == khz.rounded() ? String(Int(khz)) : String(format: "%.1f", khz)
+            parts.append(text + " kHz")
+        }
+        if let channels, channels > 0 {
+            parts.append(channels == 1 ? "Mono" : (channels == 2 ? "Stereo" : "\(channels) ch"))
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " \u{00B7} ")
+    }
+
     /// "1.2 MB" for a byte count.
     static func bytes(_ n: UInt64) -> String {
         ByteCountFormatter.string(fromByteCount: Int64(clamping: n), countStyle: .file)

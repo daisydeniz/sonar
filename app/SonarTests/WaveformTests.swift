@@ -26,14 +26,6 @@ final class WaveformMathTests: XCTestCase {
         XCTAssertEqual(WaveformMath.rebucket([pk(0, 1)], from: -1, to: 2, into: 3).count, 3)
     }
 
-    func testEnvelopeOfChannelsCoversEveryLane() {
-        XCTAssertTrue(WaveformMath.envelope([]).isEmpty)
-        XCTAssertEqual(WaveformMath.envelope([[pk(-0.2, 0.3)]]), [pk(-0.2, 0.3)])
-        let left = [pk(-0.8, 0.8), pk(-0.1, 0.1)]
-        let right = [pk(0, 0), pk(-0.5, 0.4)]
-        XCTAssertEqual(WaveformMath.envelope([left, right]), [pk(-0.8, 0.8), pk(-0.5, 0.4)])
-    }
-
     func testPathSegmentsSpanPeaksAndHaveMinimumHeight() {
         let path = WaveformMath.path(columns: [pk(-1, 1), pk(0, 0)], size: CGSize(width: 20, height: 100))
         let box = path.boundingBoxOfPath
@@ -90,11 +82,11 @@ final class FakeWaveformProvider: WaveformProviding, @unchecked Sendable {
 
     var requests: [Int64] { lock.withLock { calls } }
 
-    func peaks(fileId: Int64, buckets: Int) async throws -> [WaveformPeak] {
+    func peaks(fileId: Int64, buckets: Int) async throws -> [[WaveformPeak]] {
         lock.withLock { calls.append(fileId) }
         if let d = delays[fileId] { try await Task.sleep(nanoseconds: d) }
         if failing.contains(fileId) { throw PreviewDecodeError.empty }
-        return [pk(-Float(fileId), Float(fileId))]
+        return [[pk(-Float(fileId), Float(fileId))]]
     }
 }
 
@@ -106,11 +98,11 @@ final class WaveformModelTests: XCTestCase {
         model.load(fileId: 1)
         XCTAssertEqual(model.state, .loading)
         await model.settle()
-        XCTAssertEqual(model.state, .ready([pk(-1, 1)]))
+        XCTAssertEqual(model.state, .ready([[pk(-1, 1)]]))
         model.load(fileId: 2)
         await model.settle()
         model.load(fileId: 1)  // cached: instant, no new request
-        XCTAssertEqual(model.state, .ready([pk(-1, 1)]))
+        XCTAssertEqual(model.state, .ready([[pk(-1, 1)]]))
         XCTAssertEqual(provider.requests, [1, 2])
     }
 
@@ -122,7 +114,7 @@ final class WaveformModelTests: XCTestCase {
         model.load(fileId: 2)
         await model.settle()
         try? await Task.sleep(nanoseconds: 200_000_000)
-        XCTAssertEqual(model.state, .ready([pk(-2, 2)]))
+        XCTAssertEqual(model.state, .ready([[pk(-2, 2)]]))
     }
 
     func testFailureAndNilSelection() async {
@@ -151,10 +143,10 @@ final class WaveformModelTests: XCTestCase {
 
     func testCacheEvictsLeastRecentlyUsed() {
         let cache = WaveformCache(capacity: 2)
-        cache.put(1, [pk(0, 1)])
-        cache.put(2, [pk(0, 1)])
+        cache.put(1, [[pk(0, 1)]])
+        cache.put(2, [[pk(0, 1)]])
         _ = cache.get(1)
-        cache.put(3, [pk(0, 1)])
+        cache.put(3, [[pk(0, 1)]])
         XCTAssertNotNil(cache.get(1))
         XCTAssertNil(cache.get(2))
         XCTAssertEqual(cache.count, 2)

@@ -35,6 +35,8 @@ extension Theme {
         static var rowNumeric: NSFont { .monospacedDigitSystemFont(ofSize: 12, weight: .regular) }
         static var label: NSFont { .systemFont(ofSize: 10, weight: .semibold) }
         static var caption: NSFont { .systemFont(ofSize: 11) }
+        /// `caption` with monospaced digits (ruler labels).
+        static var captionNumeric: NSFont { .monospacedDigitSystemFont(ofSize: 11, weight: .regular) }
         /// Cents superscript of a note (`KeyLabel`).
         static var superscript: NSFont { .monospacedDigitSystemFont(ofSize: 9, weight: .regular) }
     }

@@ -29,6 +29,8 @@ final class FakePlayer: PreviewPlayer {
     }
     func stop() { stops += 1 }
     func setPitch(cents: Float) { pitches.append(cents) }
+    private(set) var gains: [Float] = []
+    func setGain(db: Float) { gains.append(db) }
 }
 
 /// Decoder returning tiny clips; per-file delays model slow decodes.

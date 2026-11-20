@@ -1,31 +1,42 @@
 import SwiftUI
 
-/// Player-header waveform (DESIGN §4.4): layer-rendered peaks (played full
-/// accent, unplayed accent at 45 %), playhead, click-to-seek, zoom (pinch,
-/// Cmd-scroll, +/- buttons) and scroll-to-pan when zoomed. Drag selects a
-/// region (tint, edge handles, readout, Play / Find Similar to Selection,
-/// DESIGN §4.4). Fills the height its parent gives it; sits in a `waveWell`.
+/// Player-header waveform well (DESIGN §4.4): ruler, one lane per channel
+/// (layer-rendered peaks, played full `wave`, unplayed at 40 %), playhead,
+/// click-to-seek, zoom (pinch, Cmd-scroll, zoom menus) and scroll-to-pan when
+/// zoomed, then the readout strip. Drag selects a region (tint, edge
+/// handles, readout, Play / Find Similar to Selection). Fills the height its
+/// parent gives it; the well is a `waveWell` box.
 @MainActor
 struct WaveformView: View {
     let model: WaveformModel
     let preview: AudioPreview
+    /// The selected sample (BPM for the ruler, readout strip values).
+    let row: FileRow?
     /// Find Similar to Selection (the app model uses the region).
     var onFindSimilarToSelection: () -> Void = {}
 
     var body: some View {
-        ZStack {
-            WaveformRepresentable(model: model, preview: preview, onFindSimilar: onFindSimilarToSelection)
-            overlay
+        VStack(spacing: 0) {
+            ZStack {
+                WaveformRepresentable(
+                    model: model, preview: preview, bpm: row?.bpm, onFindSimilar: onFindSimilarToSelection)
+                overlay
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay { regionBar }
+            Theme.Color.waveGrid.frame(height: Theme.hairlineWidth)
+            WaveformReadoutStrip(row: row, model: model)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.Color.waveWell, in: RoundedRectangle(cornerRadius: Theme.Radius.well))
+        .background(Theme.Color.waveWell)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.well))
-        .overlay(alignment: .bottomTrailing) { zoomControls }
-        .overlay { regionBar }
+        .overlay {
+            RoundedRectangle(cornerRadius: Theme.Radius.well)
+                .strokeBorder(Theme.Color.waveGrid, lineWidth: Theme.hairlineWidth)
+        }
     }
 
     /// Floating start/length readout and menu at the region's left edge
-    /// (kept inside the well).
+    /// (kept inside the lanes, below the ruler).
     @ViewBuilder private var regionBar: some View {
         if case .ready = model.state, let region = model.region, let duration = model.duration {
             GeometryReader { geo in
@@ -56,30 +67,10 @@ struct WaveformView: View {
                 .padding(.vertical, Theme.Space.s2)
                 .frame(width: Theme.Size.regionBarWidth)
                 .background(Theme.Color.surfaceRaised, in: RoundedRectangle(cornerRadius: Theme.Radius.small))
-                .offset(x: min(max(x + Theme.Space.s4, Theme.Space.s4), maxX), y: Theme.Space.s4)
+                .offset(
+                    x: min(max(x + Theme.Space.s4, Theme.Space.s4), maxX),
+                    y: Theme.Size.rulerHeight + Theme.Space.s4)
             }
-        }
-    }
-
-    @ViewBuilder private var zoomControls: some View {
-        if case .ready = model.state {
-            HStack(spacing: Theme.Space.s4) {
-                Button { model.zoom(by: 1 / 1.5) } label: { Image(systemName: "minus.magnifyingglass") }
-                    .disabled(!model.viewport.isZoomed)
-                    .help("Zoom out")
-                    .accessibilityLabel("Zoom out")
-                Button { model.zoom(by: 1.5) } label: { Image(systemName: "plus.magnifyingglass") }
-                    .disabled(model.viewport.zoom >= WaveformViewport.maxZoom)
-                    .help("Zoom in")
-                    .accessibilityLabel("Zoom in")
-                Button { model.resetZoom() } label: { Image(systemName: "arrow.left.and.right") }
-                    .disabled(!model.viewport.isZoomed)
-                    .help("Show whole file")
-                    .accessibilityLabel("Reset zoom")
-            }
-            .buttonStyle(.borderless)
-            .controlSize(.small)
-            .padding(Theme.Space.s6)
         }
     }
 
@@ -98,16 +89,21 @@ struct WaveformView: View {
 private struct WaveformRepresentable: NSViewRepresentable {
     let model: WaveformModel
     let preview: AudioPreview
+    let bpm: Double?
     let onFindSimilar: () -> Void
 
     func makeNSView(context: Context) -> WaveformNSView {
-        WaveformNSView(frame: .zero)
+        let view = WaveformNSView(frame: .zero)
+        view.rulerHeight = Theme.Size.rulerHeight
+        return view
     }
 
     func updateNSView(_ view: WaveformNSView, context: Context) {
         if case .ready(let peaks) = model.state { view.peaks = peaks } else { view.peaks = [] }
         view.viewport = model.viewport
         view.duration = model.duration
+        view.bpm = bpm
+        view.amplitudeZoom = model.amplitudeZoom
         view.region = model.region
         view.onRegion = { [weak model] in model?.setRegion($0) }
         view.onPlaySelection = { [weak preview] in preview?.playSelection() }
