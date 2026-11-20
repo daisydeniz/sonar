@@ -15,7 +15,7 @@
 use std::sync::atomic::Ordering;
 
 use super::{lock, Engine};
-use crate::store::{CollectionInfo, OverrideField, TagInfo};
+use crate::store::{CollectionInfo, OverrideField, SimilarPair, TagInfo};
 use crate::{Result, Store};
 
 impl Engine {
@@ -77,6 +77,62 @@ impl Engine {
     /// [`Error::Sqlite`](crate::Error::Sqlite).
     pub fn tags(&self) -> Result<Vec<TagInfo>> {
         lock(&self.inner.store).tags()
+    }
+
+    /// Runs a tag operation that returns the files it touched, then
+    /// refreshes the index for exactly those.
+    fn tag_op(&self, op: impl FnOnce(&mut Store) -> Result<Vec<i64>>) -> Result<Vec<i64>> {
+        let mut store = lock(&self.inner.store);
+        let ids = op(&mut store)?;
+        if !ids.is_empty() && self.inner.index_ready.load(Ordering::SeqCst) {
+            self.inner.sync_index(&store, &ids)?;
+        }
+        Ok(ids)
+    }
+
+    /// Renames a tag; onto an existing tag it merges (ADR-043). Returns
+    /// the ids of the files that carried it.
+    ///
+    /// # Errors
+    /// As [`Engine::add_tags`]; an unknown tag is
+    /// [`Error::InvalidInput`](crate::Error::InvalidInput).
+    pub fn rename_tag(&self, from: &str, to: &str) -> Result<Vec<i64>> {
+        self.tag_op(|s| s.rename_tag(from, to))
+    }
+
+    /// Merges tags into `target` (created if new). Returns the ids of the
+    /// files that carried any source.
+    ///
+    /// # Errors
+    /// As [`Engine::rename_tag`].
+    pub fn merge_tags(&self, sources: &[String], target: &str) -> Result<Vec<i64>> {
+        self.tag_op(|s| s.merge_tags(sources, target))
+    }
+
+    /// Deletes a tag from all files. Returns the ids of the files that
+    /// carried it.
+    ///
+    /// # Errors
+    /// As [`Engine::rename_tag`].
+    pub fn delete_tag(&self, name: &str) -> Result<Vec<i64>> {
+        self.tag_op(|s| s.delete_tag(name))
+    }
+
+    /// Tags that look like the same word, with a reason each, minus the
+    /// ignored pairs.
+    ///
+    /// # Errors
+    /// [`Error::Sqlite`](crate::Error::Sqlite).
+    pub fn similar_tags(&self) -> Result<Vec<SimilarPair>> {
+        lock(&self.inner.store).similar_tags()
+    }
+
+    /// Never suggests this pair of tags as similar again.
+    ///
+    /// # Errors
+    /// [`Error::InvalidInput`](crate::Error::InvalidInput).
+    pub fn ignore_similar_tags(&self, a: &str, b: &str) -> Result<()> {
+        lock(&self.inner.store).ignore_similar_tags(a, b)
     }
 
     /// Sets an override of `field` (`bpm`, `key`, `category`, `kind`) on

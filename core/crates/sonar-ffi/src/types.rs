@@ -331,6 +331,32 @@ pub struct TagInfo {
     pub files: u64,
 }
 
+/// Why two tags were suggested as the same.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, uniffi::Enum)]
+pub enum SimilarTagReason {
+    /// Equal ignoring `-`, `_` and spaces.
+    Separators,
+    /// One edit apart.
+    Typo,
+    /// One is the other plus one or two letters.
+    Prefix,
+}
+
+/// Two tags that look like the same word.
+#[derive(Debug, Clone, uniffi::Record)]
+pub struct SimilarTagPair {
+    /// First tag.
+    pub a: String,
+    /// Files with `a`.
+    pub a_files: u64,
+    /// Second tag.
+    pub b: String,
+    /// Files with `b`.
+    pub b_files: u64,
+    /// Which rule matched.
+    pub reason: SimilarTagReason,
+}
+
 /// A collection.
 #[derive(Debug, Clone, uniffi::Record)]
 pub struct CollectionInfo {

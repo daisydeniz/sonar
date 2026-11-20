@@ -223,3 +223,21 @@ pub fn request(q: SearchQuery) -> Result<SearchRequest, FfiError> {
         facets: q.facets,
     })
 }
+
+impl From<sonar_core::store::SimilarPair> for crate::types::SimilarTagPair {
+    fn from(p: sonar_core::store::SimilarPair) -> Self {
+        use crate::types::SimilarTagReason as R;
+        use sonar_core::store::SimilarReason as C;
+        Self {
+            a: p.a,
+            a_files: u64::try_from(p.a_files).unwrap_or(0),
+            b: p.b,
+            b_files: u64::try_from(p.b_files).unwrap_or(0),
+            reason: match p.reason {
+                C::Separators => R::Separators,
+                C::Typo => R::Typo,
+                C::Prefix => R::Prefix,
+            },
+        }
+    }
+}

@@ -20,6 +20,7 @@ mod search_args;
 mod search_cmd;
 mod similar_cmd;
 mod stats_cmd;
+mod tags_cmd;
 mod tokenize_cmd;
 mod user_args;
 mod user_cmd;
@@ -136,6 +137,7 @@ fn main() -> Result<()> {
         Command::Fav(args) => user_cmd::flag(&args, false)?,
         Command::Hide(args) => user_cmd::flag(&args, true)?,
         Command::Tag { command } => user_cmd::tag(&command)?,
+        Command::Tags { command } => tags_cmd::run(&command)?,
         Command::Collection { command } => user_cmd::collection(&command)?,
         Command::Override(args) => user_cmd::override_field(&args)?,
         Command::License { command } => license_cmd::run(&command)?,

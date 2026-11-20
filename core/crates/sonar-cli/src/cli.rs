@@ -370,6 +370,14 @@ pub enum Command {
         command: crate::user_args::TagCommand,
     },
 
+    /// Manage tags library-wide: list, rename, merge, delete, find similar
+    /// tags and ignore a pair (ADR-043).
+    Tags {
+        /// Tag-management action.
+        #[command(subcommand)]
+        command: crate::tags_cmd::TagsCommand,
+    },
+
     /// Collections: named, ordered lists of library files.
     Collection {
         /// Collection action.

@@ -62,6 +62,23 @@ pub(super) fn clean_name(raw: &str, what: &str) -> Result<String> {
     Ok(name.to_owned())
 }
 
+/// Normalises a tag (ADR-043): trims, collapses runs of whitespace to one
+/// space, then applies the [`clean_name`] rules. Tabs and newlines are
+/// control characters and rejected, not collapsed.
+pub(super) fn clean_tag(raw: &str) -> Result<String> {
+    if raw.chars().any(char::is_control) {
+        return Err(Error::InvalidInput {
+            reason: "tag contains a control character".to_owned(),
+        });
+    }
+    clean_name(&collapse_spaces(raw), "tag")
+}
+
+/// Trims and collapses whitespace runs; never fails (used to match names).
+pub(super) fn collapse_spaces(raw: &str) -> String {
+    raw.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 pub(super) fn unix_now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -130,8 +147,8 @@ impl Store {
         Ok(ids)
     }
 
-    /// Adds `tags` to every file in `ids`. A tag that exists ignoring case
-    /// keeps its first spelling. Returns the number of new file-tag links.
+    /// Adds `tags` (normalised, see [`clean_tag`]) to every file in `ids`. A
+    /// tag that exists ignoring case keeps its spelling. Returns the number of new file-tag links.
     ///
     /// # Errors
     /// [`Error::InvalidInput`] (empty, over-long or control-character tag),
@@ -139,7 +156,7 @@ impl Store {
     pub fn add_tags(&mut self, ids: &[i64], tags: &[String]) -> Result<usize> {
         let tags = tags
             .iter()
-            .map(|t| clean_name(t, "tag"))
+            .map(|t| clean_tag(t))
             .collect::<Result<Vec<_>>>()?;
         let tx = self.conn_mut().transaction()?;
         require_files(&tx, ids)?;
@@ -176,9 +193,10 @@ impl Store {
                 "DELETE FROM file_tags WHERE file_id = ?1 \
                  AND tag_id = (SELECT id FROM tags WHERE name = ?2)",
             )?;
-            for tag in tags {
+            let tags: Vec<String> = tags.iter().map(|t| collapse_spaces(t)).collect();
+            for tag in &tags {
                 for &id in ids {
-                    removed += unlink.execute(params![id, tag.trim()])?;
+                    removed += unlink.execute(params![id, tag])?;
                 }
             }
         }

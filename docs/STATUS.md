@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M12 Visual v2 and tags UX (founder request 2026-11-20, ADR-043); human-only: T3.7, T7.4, T8.1
-- Next task: T12.2 Tag normalisation and management in core
+- Next task: T12.3 Per-channel waveform peaks
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (updated 2026-11-20; T0.1 was macOS 26.7.2 / Xcode 26.5)
@@ -47,6 +47,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-20 — T12.2: tags normalised on every write (trim, collapse spaces), case-insensitive unique (migration 0005 merges case duplicates into the most-used spelling, tie oldest; `tag_ignored_pairs`); store/engine/FFI `rename_tag`, `merge_tags`, `delete_tag`, `similar_tags` (ADR-043 rule with reason), `ignore_similar_tags`, each returning affected file ids; CLI `sonar tags list|rename|merge|delete|similar|ignore`. similar over 5,000 tags 82.5 ms release. No ranking change, no eval. check.sh green; reviewer APPROVE r1. Later: 3 T12.2 items.
 - 2026-11-20 — T12.1: tokens v2 (blue accent/controlAccent, amber `signal`, `surfaceGroup`, `chipBase`, wave tokens, 5 facet hues + fills, knob families), `SonarChip` v2 (5 states, hue required), `Knob` v2 (coloured face, value arc); `cat*`, `categoryColor`, category dot, `accentSoft`/`panelGroup`/`surfaceWell` removed. `ThemeTokenTests` contrast gates; light `facetTag`/`facetLibrary` text darkened (ADR-043 addendum). UI only, no eval. check.sh green; reviewer APPROVE r1. Later: 3 T12.1 items.
 - 2026-11-20 — T12.0 (founder + Claude, design canvas): Visual v2 approved in light/dark mockups (`design/reference/sonar-v2/`, 14 PNGs). DESIGN.md v2 (blue accent + amber signal, card surfaces, one hue per filter section, Logic-style waveform well with ruler and stereo lanes, Gain knob, coloured knob faces, §4.12 Tags), ADR-043, M12 T12.1–T12.9. Docs only.
-- 2026-11-20 — T11.3: macOS 27 platform pass over all 66 snapshots. Fixed: inspector attached to the split view with its toggle over the inspector column (in the detail toolbar while hidden) + View > Show Inspector ⌃⌘I; no custom background behind the inspector; Duplicates Reveal uses `folder`; waveform More uses `ellipsis`. UI only, no eval. check.sh green; reviewer APPROVE r2. Later: 7 T11.3 items. M11 done.

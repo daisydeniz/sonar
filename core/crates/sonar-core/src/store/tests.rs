@@ -71,6 +71,7 @@ const SCHEMA: &[(&str, &[&str])] = &[
     ("overrides", &["file_id", "field", "value"]),
     ("tags", &["id", "name"]),
     ("file_tags", &["file_id", "tag_id"]),
+    ("tag_ignored_pairs", &["a", "b"]),
     ("collections", &["id", "name", "created_at"]),
     (
         "collection_items",

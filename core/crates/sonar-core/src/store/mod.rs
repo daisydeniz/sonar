@@ -17,6 +17,10 @@ mod libraries;
 mod migrations;
 mod overrides;
 mod stats;
+mod tag_similar;
+#[cfg(test)]
+mod tag_tests;
+mod tags;
 #[cfg(test)]
 mod tests;
 mod user_data;
@@ -34,6 +38,7 @@ pub use libraries::Library;
 pub use migrations::LATEST_VERSION;
 pub use overrides::{OverrideField, MAX_BPM, MIN_BPM};
 pub use stats::{LibraryStats, StageStats, StatusCounts, StoreStats};
+pub use tag_similar::{SimilarPair, SimilarReason};
 pub use user_data::TagInfo;
 
 /// How long a connection waits for a lock held by another connection.

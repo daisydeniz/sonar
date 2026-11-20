@@ -23,7 +23,8 @@ use crate::facet_types::SearchFacets;
 use crate::similar_types::{self, SimilarHit, SimilarPage, SimilarQuery};
 use crate::types::{
     AddedLibrary, CollectionInfo, EngineEvent, FileRow, IndexingProgress, LibraryInfo,
-    OverrideField, PreviewPcm, ScanInfo, SearchPage, SearchQuery, TagInfo, WaveformPeak,
+    OverrideField, PreviewPcm, ScanInfo, SearchPage, SearchQuery, SimilarTagPair, TagInfo,
+    WaveformPeak,
 };
 
 /// Largest page a search returns (a bigger `limit` is cut to it).
@@ -303,6 +304,36 @@ impl SonarEngine {
                 })
                 .collect()
         })
+    }
+
+    /// Renames a tag; onto an existing tag it merges (the existing spelling
+    /// stays). Returns the ids of the files that carried it (for Undo and
+    /// refreshing rows). Unknown tag or bad name: `FfiError.InvalidInput`.
+    pub fn rename_tag(&self, from: String, to: String) -> Result<Vec<i64>, FfiError> {
+        guard(|| self.engine.rename_tag(&from, &to))
+    }
+
+    /// Merges tags into `target` (created if new). Returns the ids of the
+    /// files that carried any source.
+    pub fn merge_tags(&self, sources: Vec<String>, target: String) -> Result<Vec<i64>, FfiError> {
+        guard(|| self.engine.merge_tags(&sources, &target))
+    }
+
+    /// Deletes a tag from every file. Returns the ids of the files that
+    /// carried it.
+    pub fn delete_tag(&self, name: String) -> Result<Vec<i64>, FfiError> {
+        guard(|| self.engine.delete_tag(&name))
+    }
+
+    /// Tags that look like the same word (not the ignored pairs).
+    pub fn similar_tags(&self) -> Result<Vec<SimilarTagPair>, FfiError> {
+        guard(|| self.engine.similar_tags())
+            .map(|p| p.into_iter().map(SimilarTagPair::from).collect())
+    }
+
+    /// Never suggests this pair as similar again.
+    pub fn ignore_similar_tags(&self, a: String, b: String) -> Result<(), FfiError> {
+        guard(|| self.engine.ignore_similar_tags(&a, &b))
     }
 
     /// Overrides BPM / key / category / kind by hand; invalid values throw
