@@ -9,6 +9,8 @@ struct TagPopoverView: View {
     @Bindable var model: TagPopoverModel
     let onClose: () -> Void
     @FocusState private var fieldFocused: Bool
+    /// Height of the list's rows, so the list's ideal height is its content.
+    @State private var listContentHeight: CGFloat = 0
 
     private var state: TagPopoverState { model.state }
 
@@ -75,6 +77,9 @@ struct TagPopoverView: View {
                 .accessibilityLabel("Add tag")
         }
         .frame(maxWidth: .infinity, minHeight: Theme.Size.tagBoxMinHeight, alignment: .topLeading)
+        // Always as tall as its chip rows: compressing it let the last row
+        // spill over the list when the popover was short on room.
+        .fixedSize(horizontal: false, vertical: true)
         .padding(Theme.Space.s8)
         .background(Theme.Color.surfaceContent, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
         .overlay {
@@ -112,11 +117,14 @@ struct TagPopoverView: View {
                     }
                 }
                 .padding(.vertical, Theme.Space.s4)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { listContentHeight = $0 }
             }
             .onChange(of: state.highlight) { if let h = state.highlight { proxy.scrollTo(h) } }
         }
-        .frame(maxHeight: Theme.Size.tagListHeight)
-        .fixedSize(horizontal: false, vertical: true)
+        // Ideally as tall as its rows, at most `tagListHeight`; when the
+        // popover has less room (short screen, many chips) the list shrinks
+        // and scrolls, never the chips.
+        .frame(idealHeight: min(listContentHeight, Theme.Size.tagListHeight), maxHeight: Theme.Size.tagListHeight)
     }
 
     private func rowView(_ row: TagPopoverState.Row, highlighted: Bool) -> some View {

@@ -365,6 +365,19 @@ final class UISnapshotTests: XCTestCase {
         try snapshot("tags-popover", view, dir: dir, size: CGSize(width: 380, height: 360))
     }
 
+    /// Tag popover, one file with enough long tags to wrap the token field
+    /// onto three rows: the box grows and the list stays below it.
+    func testTagsPopoverMany() async throws {
+        let dir = try outputDir()
+        let model = try await populated(rows: loopRows())
+        let id = try XCTUnwrap(model.selectedFileId)
+        let tags = ["warm", "second tag added with enter", "third tag added with enter", "groove", "analog"]
+        let state = TagPopoverState(library: Self.snapshotTagLibrary, files: [(id: id, tags: tags)])
+        let view = TagPopoverView(model: TagPopoverModel(app: model, ids: [id], state: state), onClose: {})
+            .background(Color(nsColor: .windowBackgroundColor))
+        try snapshot("tags-popover-many", view, dir: dir, size: CGSize(width: 380, height: 400))
+    }
+
     /// Tag popover, three files: mixed chips (2/3, 1/3) and "Most used" with ✓ / –.
     func testTagsPopoverMulti() async throws {
         let dir = try outputDir()

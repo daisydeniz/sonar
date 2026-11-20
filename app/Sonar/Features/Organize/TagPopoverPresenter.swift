@@ -52,6 +52,9 @@ final class TagPopoverController: NSHostingController<TagPopoverHost> {
     init(model: AppModel, ids: [Int64]) {
         app = model
         super.init(rootView: TagPopoverHost(model: model, ids: ids))
+        // The popover follows the view's ideal size, so it grows when the
+        // chips wrap onto another row.
+        sizingOptions = .preferredContentSize
     }
 
     @available(*, unavailable)
