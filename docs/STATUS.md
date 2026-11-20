@@ -3,9 +3,9 @@
 Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
-- Milestone: M11 Logic Pro-style filters and tags (founder request 2026-11-20); human-only: T3.7, T7.4, T8.1
-- Next task: none — all non-human tasks done (M11 complete, tag m11-done)
-- Loop state: ROADMAP COMPLETE   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
+- Milestone: M12 Visual v2 and tags UX (founder request 2026-11-20, ADR-043); human-only: T3.7, T7.4, T8.1
+- Next task: T12.1 Tokens and shared components v2
+- Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (updated 2026-11-20; T0.1 was macOS 26.7.2 / Xcode 26.5)
 macOS 27.2.1 arm64 · Xcode 27.2 · xcodegen 2.46.0 · rustup 1.29.3 (Homebrew) ·
@@ -29,7 +29,6 @@ manual tests, labeled data. Keep each item one line with the task id.)_
 - T9.3 Manual check: drag the divider under the waveform (resize cursor, 120–360 pt, height kept after relaunch); no selection shows a flat line and disabled transport; play/stop/loop/Auto/pitch knob in the header work.
 - T9.2 Manual check (not visible in snapshots): hovering a results row shows the outline heart and clicking it favourites the row; clicking a column header sorts and shows the sort arrow next to the title; selection tint turns grey when the table loses focus.
 - T9.1 The `swift-ui` agent ran `brew install xcodegen` (2.46.0) because it was missing on this Mac; `scripts/bootstrap.sh` should have covered it. Nothing to do unless you want it removed.
-- T9.x Design direction check (optional, cheapest now): open `logs/ui/components-dark.png` / `-light.png` after `scripts/ui-snapshots.sh`; tell the loop if the teal accent or category hues should change (one-line token edits in `docs/DESIGN.md` §2.1).
 - T7.4 Apple Developer ID, notarization, payment provider, pricing. Release env vars for `scripts/release.sh` are listed in ADR-037 (signing identity, notarytool profile or API key, Sparkle keypair + feed URL); `--dry-run` builds a local-only DMG.
 - T5.2 Model-dependent embed tests pass as no-ops without `models/` (weights not in git); run `scripts/fetch-models.sh` on any machine that runs check.sh, so the embed stage is actually exercised.
 - T7.5 Release: `sonar license keygen --out <secret file>` (keep the secret file private), set `SONAR_LICENSE_PUBLIC_KEY` (+ `SONAR_PURCHASE_URL`, the https store page) for `scripts/release.sh`; the payment provider's webhook mints keys with `sonar license issue` (ADR-038).
@@ -48,6 +47,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-20 — T12.0 (founder + Claude, design canvas): Visual v2 approved in light/dark mockups (`design/reference/sonar-v2/`, 14 PNGs). DESIGN.md v2 (blue accent + amber signal, card surfaces, one hue per filter section, Logic-style waveform well with ruler and stereo lanes, Gain knob, coloured knob faces, §4.12 Tags), ADR-043, M12 T12.1–T12.9. Docs only.
 - 2026-11-20 — T11.3: macOS 27 platform pass over all 66 snapshots. Fixed: inspector attached to the split view with its toggle over the inspector column (in the detail toolbar while hidden) + View > Show Inspector ⌃⌘I; no custom background behind the inspector; Duplicates Reveal uses `folder`; waveform More uses `ellipsis`. UI only, no eval. check.sh green; reviewer APPROVE r2. Later: 7 T11.3 items. M11 done.
 - 2026-11-20 — T11.2: removable tag chips in the inspector and the Edit Tags sheet use `SonarChip(hue: .tag)` (`facetTag`), like the panel's Tags section; tag editor list rows unchanged. `main` snapshot now shows inspector tags. UI only, no eval. check.sh green; reviewer APPROVE r1 (NIT fixed).
-- 2026-11-20 — T11.1: one Filters button + system popover panel (Category by family, Key mode Any/Major/Minor + 12 roots + include toggles, Tempo/Duration min–max + single-select quick ranges, Tags) as hued chip clouds with counts and Show More; bar shows one hued active chip per value with ×. 10 colour sets (facet hues + 8 deep fills, white ≥ 4.5:1 tested), `SonarChip(hue:)`, `FilterPanelModel` + 8 tests, snapshots `main-filter-panel` / `main-filters`. UI only, no eval. check.sh green; reviewer APPROVE r1. Later: 5 T11.1 items.

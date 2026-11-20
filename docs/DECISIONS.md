@@ -1347,3 +1347,43 @@ the engine fails to open).
   dark-only theme like Logic's (light and dark stay equal, §1); Figma or
   Claude Design (the UI is SwiftUI; there is no design-to-code path, and
   agents verify with `ui-snapshots.sh`).
+
+## ADR-043 — Visual v2: flat Logic-style look, blue/amber, section hues, tags UX (founder request)
+- **Why**: the founder (2026-11-20) found the v1 look weak (teal everywhere,
+  groups split by lines, a rainbow of per-category hues, an amateur tag
+  editor) and the first glassy concepts "too liquid". With Claude he
+  reviewed and approved mockups on a design canvas ("Sonar — Arayüz
+  Konsepti", light + dark); PNG exports are in `design/reference/sonar-v2/`
+  (local, git-ignored like the other references).
+- **Decision**: (1) Tokens v2 (DESIGN §2): blue `accent`/`controlAccent`
+  replace teal; amber `signal` for on-state toggles and waveform readout
+  values; opaque surfaces `surfaceGroup` (cards), `chipBase`, `waveWell`,
+  `waveStrip`, `wave`. (2) Groups are cards, not lines (inspector, filter
+  panel). (3) One hue per filter section (Category magenta, Key indigo,
+  Tempo/Duration cyan, Tags orange, Library red); per-category hues and the
+  table's category dots are removed. (4) Player header: Logic-sampler-style
+  waveform well with a ruler (bars.beats / seconds), stereo lanes (needs
+  per-channel peaks from core) and a readout strip; readouts leave the
+  transport row; a **Gain** knob (preview gain −24…+6 dB, preview engine
+  only) joins Pitch. (5) Knobs get coloured faces by parameter family
+  (hardware reference). (6) Tags: normalised in core (trim, collapse
+  spaces, case-insensitive unique, most-used spelling kept; existing
+  duplicates merged by a migration), similar-tag (typo) detection offered in
+  Manage Tags, never applied silently; UX in three layers — context/Edit
+  menu "Tags ›" tri-state submenu, a live-applying tag popover (⌘T) that
+  replaces the T10.9 sheet, a Manage Tags sheet (rename, merge, delete,
+  unused, similar pairs); a sidebar Tags section (scope + drop to tag).
+  "Edit Tags…" disappears as a name. (7) Filter panel gains a Library
+  section (multi-select; core already filters by several libraries).
+- **Similar-tag rule** (core): after normalisation, two tags are similar
+  when they are equal ignoring `-`, `_` and spaces; or both have ≥ 4
+  characters and a Damerau–Levenshtein distance of 1; or one is a prefix of
+  the other, the shorter has ≥ 5 characters and the longer adds ≤ 2
+  ("analog"/"analogue"). Pairs are suggestions with a reason; an ignored
+  pair is stored and never suggested again (false positives like
+  "dark"/"park").
+- **Not chosen**: Logic's dark-only theme (light and dark stay equal);
+  coloured tags per tag (colour must carry meaning; one tag hue); a modal
+  Save/Cancel tag sheet (popover with live apply + Undo is the macOS
+  pattern, Finder tags); "Sound character" chips and a "Recently added"
+  quick filter seen in a mockup (no core data yet → `## Later`).
