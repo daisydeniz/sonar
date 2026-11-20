@@ -94,6 +94,40 @@ final class FilterPanelModelTests: XCTestCase {
         XCTAssertNil(f.bpmMin)
     }
 
+    func testLibraryMultiSelectOrWithinSection() {
+        var f = FilterState()
+        FilterState.toggle(Int64(1), in: &f.libraryIds)
+        FilterState.toggle(Int64(2), in: &f.libraryIds)
+        XCTAssertEqual(f.libraryIds, [1, 2])
+        // any-of: both ids go to the core filter unchanged
+        XCTAssertEqual(f.apply(to: SearchFilters()).libraryIds, [1, 2])
+        FilterState.toggle(Int64(1), in: &f.libraryIds)
+        XCTAssertEqual(f.libraryIds, [2])
+    }
+
+    func testLibraryChipsUseFacetCountsAndKeepSelectedAtZero() {
+        let names: [Int64: String] = [1: "KSHMR", 2: "Drums", 3: "Gone"]
+        let facets = [LibraryFacet(libraryId: 2, count: 5), LibraryFacet(libraryId: 1, count: 9)]
+        let chips = FilterPanel.libraryChips(facets: facets, selected: [3], name: { names[$0] ?? "?" })
+        XCTAssertEqual(chips.map(\.title), ["KSHMR", "Drums", "Gone"])
+        XCTAssertEqual(chips.map(\.count), [9, 5, 0])
+        XCTAssertEqual(chips.map(\.selected), [false, false, true])
+    }
+
+    func testLibraryActiveChipsHueClearAndCount() {
+        var f = FilterState()
+        f.categories = ["kick"]
+        f.libraryIds = [2, 1]
+        f.favoritesOnly = true
+        let chips = FilterPanel.activeChips(f, libraryName: { "L\($0)" })
+        XCTAssertEqual(chips.map(\.title), ["Kick", "L1", "L2"])
+        XCTAssertEqual(chips.last?.hue, .library)
+        XCTAssertEqual(FilterPanel.filterCount(f), 4)  // 3 chips + favorites
+        FilterPanel.clear(chips[1], in: &f)
+        XCTAssertEqual(f.libraryIds, [2])
+        XCTAssertEqual(FilterPanel.filterCount(f), 3)
+    }
+
     func testShowMoreKeepsSelectedChipsVisible() {
         let chips = (0..<20).map { FacetChip(value: "t\($0)", count: 1, selected: $0 == 17) }
         XCTAssertEqual(FilterPanel.visible(chips, limit: 12, expanded: false).count, 13)

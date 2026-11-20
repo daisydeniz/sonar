@@ -88,6 +88,7 @@ final class UISnapshotTests: XCTestCase {
         model.filters.bpmMin = 110
         model.filters.bpmMax = 128
         model.filters.tags = ["dark"]
+        model.filters.libraryIds = [1]
         model.filters.favoritesOnly = true
         try snapshot("main-filters", contentView(model), dir: dir, emphasis: true, selectRow: 2)
     }
@@ -103,6 +104,7 @@ final class UISnapshotTests: XCTestCase {
         model.filters.bpmMin = 110
         model.filters.bpmMax = 128
         model.filters.tags = ["dark"]
+        model.filters.libraryIds = [1]
         let card = FilterPanelView(model: model, keyMode: .constant(.major))
             .fixedSize(horizontal: false, vertical: true)
             .background(Theme.Color.surfaceRaised, in: RoundedRectangle(cornerRadius: Theme.Radius.large))

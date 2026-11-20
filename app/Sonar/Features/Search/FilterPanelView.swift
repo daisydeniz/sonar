@@ -18,28 +18,72 @@ struct FilterPanelView: View {
             header
             ScrollView {
                 VStack(spacing: Theme.Space.s8) {
+                    quickCard
                     categorySection
                     keySection
                     tempoSection
                     durationSection
                     tagSection
+                    librarySection
                 }
-                .padding([.horizontal, .bottom], Theme.Space.s12)
+                .padding(.horizontal, Theme.Space.s12)
             }
             .frame(maxHeight: Theme.Size.filterPanelMaxHeight)
+            footer
         }
         .frame(width: Theme.Size.filterPanelWidth)
     }
 
     private var header: some View {
-        HStack {
-            Text("Filters").font(Theme.Font.title)
-            Spacer()
-            Button(action: onClose) { Image(systemName: "xmark").imageScale(.small) }
-                .buttonStyle(.borderless)
+        ZStack {
+            Text("Filters").font(Theme.Font.body.bold())
+                .accessibilityAddTraits(.isHeader)
+            HStack {
+                Spacer()
+                Button(action: onClose) {
+                    Image(systemName: "xmark").imageScale(.small)
+                        .frame(width: Theme.Size.panelCloseButton, height: Theme.Size.panelCloseButton)
+                }
+                .buttonStyle(.plain)
+                .background(Theme.Color.surfaceGroup, in: Circle())
                 .keyboardShortcut(.cancelAction)
                 .accessibilityLabel("Close filters")
                 .help("Close")
+            }
+        }
+        .padding(Theme.Space.s12)
+    }
+
+    /// Quick toggles card (DESIGN §3): Favorites only.
+    private var quickCard: some View {
+        HStack {
+            let on = model.filters.favoritesOnly
+            Toggle(isOn: $model.filters.favoritesOnly) {
+                Label(
+                    "Favorites", systemImage: on ? "heart.fill" : "heart")
+                    .foregroundStyle(on ? Theme.Color.favorite : Color.primary)
+            }
+            .toggleStyle(.button)
+            .controlSize(.small)
+            .accessibilityLabel("Favorites only")
+            Spacer()
+        }
+        .padding(Theme.Space.s12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.Color.surfaceGroup, in: RoundedRectangle(cornerRadius: Theme.Radius.large))
+    }
+
+    private var footer: some View {
+        HStack {
+            let n = FilterPanel.filterCount(model.filters)
+            Text("\(model.resultCount.formatted()) results · \(n) \(n == 1 ? "filter" : "filters")")
+                .font(Theme.Font.captionNumeric).foregroundStyle(.secondary)
+            Spacer()
+            Button("Clear all") { model.clearFilters() }
+                .buttonStyle(.plain)
+                .font(Theme.Font.row)
+                .foregroundStyle(Theme.Color.accent)
+                .disabled(!model.filters.isActive)
         }
         .padding(Theme.Space.s12)
     }
@@ -47,11 +91,14 @@ struct FilterPanelView: View {
     // MARK: Sections
 
     private func section<Content: View>(
-        _ title: String, moreKey: String? = nil, total: Int = 0, @ViewBuilder content: () -> Content
+        _ title: String, hue: Theme.Hue, moreKey: String? = nil, total: Int = 0, @ViewBuilder content: () -> Content
     ) -> some View {
         VStack(alignment: .leading, spacing: Theme.Space.s8) {
             HStack {
-                Text(title).sonarLabelStyle().foregroundStyle(.secondary)
+                Rectangle().fill(hue.fill)
+                    .frame(width: Theme.Size.hueSquare, height: Theme.Size.hueSquare)
+                    .accessibilityHidden(true)
+                Text(title).font(Theme.Font.body.weight(.semibold))
                     .accessibilityAddTraits(.isHeader)
                 Spacer()
                 if let moreKey, total > Self.collapsedLimit {
@@ -83,7 +130,7 @@ struct FilterPanelView: View {
         let all = FilterPanel.categoryChips(
             FacetChip.chips(facets: model.facets?.categories ?? [], selected: model.filters.categories))
         let shown = FilterPanel.visible(all, limit: Self.collapsedLimit, expanded: expanded.contains("category"))
-        return section("Category", moreKey: "category", total: all.count) {
+        return section("Category", hue: .category, moreKey: "category", total: all.count) {
             if all.isEmpty {
                 emptyHint("No categories yet")
             } else {
@@ -102,7 +149,7 @@ struct FilterPanelView: View {
 
     private var keySection: some View {
         let facets = model.facets?.keys ?? []
-        return section("Key") {
+        return section("Key", hue: .key) {
             Picker("Mode", selection: $keyMode) {
                 ForEach(KeyMode.allCases) { Text($0.title).tag($0) }
             }
@@ -134,14 +181,14 @@ struct FilterPanelView: View {
     }
 
     private var tempoSection: some View {
-        section("Tempo") {
-            rangeFields(title: "BPM", unit: "", min: $model.filters.bpmMin, max: $model.filters.bpmMax)
+        section("Tempo", hue: .property) {
+            rangeFields(title: "BPM", unit: "BPM", min: $model.filters.bpmMin, max: $model.filters.bpmMax)
             rangeChips(FilterPanel.tempoRanges, unit: "", min: $model.filters.bpmMin, max: $model.filters.bpmMax)
         }
     }
 
     private var durationSection: some View {
-        section("Duration") {
+        section("Duration", hue: .property) {
             rangeFields(
                 title: "Duration", unit: "s", min: $model.filters.durationMinSec, max: $model.filters.durationMaxSec)
             rangeChips(
@@ -153,7 +200,7 @@ struct FilterPanelView: View {
     private var tagSection: some View {
         let all = FacetChip.chips(facets: model.facets?.tags ?? [], selected: model.filters.tags)
         let shown = FilterPanel.visible(all, limit: Self.collapsedLimit, expanded: expanded.contains("tags"))
-        return section("Tags", moreKey: "tags", total: all.count) {
+        return section("Tags", hue: .tag, moreKey: "tags", total: all.count) {
             if all.isEmpty {
                 emptyHint("No tags yet")
             } else {
@@ -163,6 +210,25 @@ struct FilterPanelView: View {
                             t.value, count: Int(t.count), selected: t.selected, hue: .tag, disabled: t.count == 0,
                             label: "Tag \(t.value), \(t.count) results"
                         ) { FilterState.toggle(t.value, in: &model.filters.tags) }
+                    }
+                }
+            }
+        }
+    }
+
+    private var librarySection: some View {
+        let chips = FilterPanel.libraryChips(
+            facets: model.facets?.libraries ?? [], selected: model.filters.libraryIds, name: model.libraryName)
+        return section("Library", hue: .library) {
+            if chips.isEmpty {
+                emptyHint("No libraries yet")
+            } else {
+                FlowLayout {
+                    ForEach(chips) { l in
+                        chip(
+                            l.title, count: Int(l.count), selected: l.selected, hue: .library, disabled: l.count == 0,
+                            label: "Library \(l.title), \(l.count) results"
+                        ) { FilterState.toggle(l.id, in: &model.filters.libraryIds) }
                     }
                 }
             }

@@ -143,7 +143,7 @@ enum FilterPanel {
 
     /// What an active chip in the filter bar stands for.
     enum ActiveKind: Equatable, Sendable {
-        case category(String), key(root: String), tempo, duration, tag(String)
+        case category(String), key(root: String), tempo, duration, tag(String), library(Int64)
     }
 
     /// One removable chip of the filter bar.
@@ -158,6 +158,7 @@ enum FilterPanel {
             case .tempo: return "tempo"
             case .duration: return "duration"
             case .tag(let v): return "tag-\(v)"
+            case .library(let v): return "library-\(v)"
             }
         }
     }
@@ -170,7 +171,7 @@ enum FilterPanel {
     /// One chip per selected value, in section order: categories (by
     /// family), keys (one per root: `A`, `Am`, or `A any` when both), tempo,
     /// duration, tags.
-    static func activeChips(_ f: FilterState) -> [ActiveChip] {
+    static func activeChips(_ f: FilterState, libraryName: (Int64) -> String = { "Library \($0)" }) -> [ActiveChip] {
         var chips: [ActiveChip] = []
         let cats = f.categories.sorted {
             (CategoryFamily.of($0).rawValue, $0) < (CategoryFamily.of($1).rawValue, $1)
@@ -192,7 +193,41 @@ enum FilterPanel {
             chips.append(ActiveChip(kind: .duration, title: s, hue: .property))
         }
         for t in f.tags.sorted() { chips.append(ActiveChip(kind: .tag(t), title: t, hue: .tag)) }
+        for id in f.libraryIds.sorted() {
+            chips.append(ActiveChip(kind: .library(id), title: libraryName(id), hue: .library))
+        }
         return chips
+    }
+
+    /// "m filters" of the panel footer and the Filters button: one per bar
+    /// chip, plus Favorites and a Kind restriction.
+    static func filterCount(_ f: FilterState) -> Int {
+        activeChips(f).count + (f.favoritesOnly ? 1 : 0) + (f.kinds.isEmpty ? 0 : 1)
+    }
+
+    // MARK: Library
+
+    /// A Library chip of the panel.
+    struct LibraryChip: Identifiable, Equatable, Sendable {
+        let id: Int64
+        let title: String
+        let count: UInt64
+        let selected: Bool
+    }
+
+    /// One Library chip per facet entry (count from the core), plus selected
+    /// libraries the facet no longer lists (count 0). Largest first.
+    static func libraryChips(
+        facets: [LibraryFacet], selected: Set<Int64>, name: (Int64) -> String
+    ) -> [LibraryChip] {
+        var chips = facets.map {
+            LibraryChip(id: $0.libraryId, title: name($0.libraryId), count: $0.count, selected: selected.contains($0.libraryId))
+        }
+        let listed = Set(facets.map(\.libraryId))
+        for id in selected.subtracting(listed).sorted() {
+            chips.append(LibraryChip(id: id, title: name(id), count: 0, selected: true))
+        }
+        return chips.sorted { ($0.count, $1.title) > ($1.count, $0.title) }
     }
 
     /// Removes what `chip` stands for (the chip's own `×`). Removing the last
@@ -206,6 +241,7 @@ enum FilterPanel {
         case .tempo: f.bpmMin = nil; f.bpmMax = nil
         case .duration: f.durationMinSec = nil; f.durationMaxSec = nil
         case .tag(let v): f.tags.remove(v)
+        case .library(let v): f.libraryIds.remove(v)
         }
     }
 }

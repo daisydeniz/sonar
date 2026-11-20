@@ -157,6 +157,8 @@ right-aligned in columns. No other font family, no italic, no extra weights.
   `TransportButtonStyle`, `TransportToggleStyle` (DesignSystem/Components).
   The two zoom buttons are menus (horizontal: in / out / whole file;
   vertical: amplitude ×2 / ÷2 / reset, display only).
+- Also tokens (T12.5): `hueSquare` 8 (section hue square in the filter
+  panel), `panelCloseButton` 24 (round close button in the panel title).
 - **Hairlines** are 1 physical pixel (`Theme.hairlineWidth`).
 
 ### 2.4 Motion

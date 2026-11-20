@@ -100,6 +100,11 @@ final class AppModel {
     /// Clears every filter chip and re-queries.
     func clearFilters() { filters = FilterState() }
 
+    /// Display name of a library: its folder name (as in the sidebar).
+    func libraryName(_ id: Int64) -> String {
+        libraries.first { $0.id == id }.map { URL(fileURLWithPath: $0.rootPath).lastPathComponent } ?? "Library \(id)"
+    }
+
     /// Space in the table (wired to `AudioPreview.toggle`).
     func togglePreview() { keyboard.togglePreview() }
     /// Return in the table: reveal the selected file in Finder.

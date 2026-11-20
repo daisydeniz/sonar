@@ -85,6 +85,10 @@ enum Theme {
         static let filterPanelWidth: CGFloat = 480
         static let filterPanelMaxHeight: CGFloat = 640
         static let rangeField: CGFloat = 64
+        /// Hue square before a filter-panel section title.
+        static let hueSquare: CGFloat = 8
+        /// Round close button of the panel header.
+        static let panelCloseButton: CGFloat = 24
         /// Tag editor sheet (DESIGN §4.11): width, token-box minimum height,
         /// inline field width, suggestion list height, checkmark column.
         static let tagEditorWidth: CGFloat = 420

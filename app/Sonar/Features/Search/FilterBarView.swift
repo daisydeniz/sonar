@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The filter bar (DESIGN §3): one 36 pt row on `surfaceRaised`. Kind as a
+/// The filter bar (DESIGN §3): one 44 pt row on `surfaceRaised`. Kind as a
 /// segmented control, one Filters button (popover panel), one hued active
 /// chip per selected value with its own `×`, a Favorites icon toggle,
 /// "Clear all" and the result count. Changing anything re-queries the core
@@ -17,7 +17,7 @@ struct FilterBarView: View {
             filtersButton
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: Theme.Space.s4) {
-                    ForEach(FilterPanel.activeChips(model.filters)) { chip in
+                    ForEach(FilterPanel.activeChips(model.filters, libraryName: model.libraryName)) { chip in
                         SonarChip(
                             title: chip.title, isActive: true, hue: chip.hue,
                             onClear: { clear(chip) }, clearLabel: "Remove \(chip.title) filter"
@@ -77,11 +77,16 @@ struct FilterBarView: View {
 
     private var filtersButton: some View {
         Button { panelShown.toggle() } label: {
-            Label("Filters", systemImage: "line.3.horizontal.decrease")
-                .foregroundStyle(model.filters.isActive ? Theme.Color.accent : Color.secondary)
+            let count = FilterPanel.filterCount(model.filters)
+            Label(count > 0 ? "Filters \(count)" : "Filters", systemImage: "line.3.horizontal.decrease")
+                .monospacedDigit()
+                .foregroundStyle(count > 0 ? Theme.Color.accent : Color.secondary)
         }
+        .background(
+            FilterPanel.filterCount(model.filters) > 0 ? Theme.Color.selection : Color.clear,
+            in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
         .help("Filters")
-        .accessibilityLabel("Filters")
+        .accessibilityLabel("Filters, \(FilterPanel.filterCount(model.filters)) active")
         .popover(isPresented: $panelShown, arrowEdge: .bottom) {
             FilterPanelView(model: model, keyMode: $keyMode) { panelShown = false }
         }

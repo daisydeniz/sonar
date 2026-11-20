@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M12 Visual v2 and tags UX (founder request 2026-11-20, ADR-043); human-only: T3.7, T7.4, T8.1
-- Next task: T12.5 Filter bar and Filters panel v2
+- Next task: T12.6 Results table, toolbar and inspector v2
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (updated 2026-11-20; T0.1 was macOS 26.7.2 / Xcode 26.5)
@@ -48,6 +48,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-20 — T12.5: filter bar v2 (Filters button with active count on `selection`, active chips in section hues incl. Library) and panel v2 (centred title + round close, Favorites quick card, `surfaceGroup` cards with hue squares, new Library section from the `libraries` facet, multi-select OR, footer "n results · m filters" + Clear all). No core change (library ids already in `SearchFilters`). Tokens `hueSquare`, `panelCloseButton`. UI only, no eval. check.sh green; reviewer APPROVE r1. Later: 3 T12.5 items.
 - 2026-11-20 — T12.4: player header v2 — transport row (30 pt play circle, Loop/AUTO in `signal`, name + extension, Pitch/Gain knobs), waveform well with ruler (bars.beats with BPM, seconds without; follows zoom/pan), one lane per channel, readout strip (BPM/Key/Length/Format in `signal`, zoom menus); preview gain −24…+6 dB (engine only, persisted); Swift waveform path now `[[WaveformPeak]]`, envelope merge removed. New `main-oneshot` snapshot. UI only, no eval. check.sh green; reviewer APPROVE r1. Later: 4 T12.4 items.
 - 2026-11-20 — T12.3: `waveform_peaks` returns one peak list per channel (mono → 1, > 2 channels → first two; decoder split-channel mode, each lane resampled separately); FFI `[[WaveformPeak]]`; `sonar wave` prints per channel; Swift merges lanes into one envelope until T12.4. Stereo 30 s peaks ~9.7 ms (was 10.34). Waveform only, no analysis/search change, no eval. check.sh green; reviewer APPROVE r1. Later: 1 T12.3 item; cache NIT moved into T12.4.
-- 2026-11-20 — T12.2: tags normalised on every write (trim, collapse spaces), case-insensitive unique (migration 0005 merges case duplicates into the most-used spelling, tie oldest; `tag_ignored_pairs`); store/engine/FFI `rename_tag`, `merge_tags`, `delete_tag`, `similar_tags` (ADR-043 rule with reason), `ignore_similar_tags`, each returning affected file ids; CLI `sonar tags list|rename|merge|delete|similar|ignore`. similar over 5,000 tags 82.5 ms release. No ranking change, no eval. check.sh green; reviewer APPROVE r1. Later: 3 T12.2 items.
