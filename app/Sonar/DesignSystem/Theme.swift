@@ -91,12 +91,14 @@ enum Theme {
         static let hueSquare: CGFloat = 8
         /// Round close button of the panel header.
         static let panelCloseButton: CGFloat = 24
-        /// Tag editor sheet (DESIGN §4.11): width, token-box minimum height,
-        /// inline field width, suggestion list height, checkmark column.
-        static let tagEditorWidth: CGFloat = 420
+        /// Tag popover (DESIGN §4.12): width, token-box minimum height,
+        /// inline field width, list height, checkmark column; the 24 pt `+`
+        /// button of the inspector Tags card.
+        static let tagPopoverWidth: CGFloat = 340
+        static let tagAddButton: CGFloat = 24
         static let tagBoxMinHeight: CGFloat = 56
         static let tagFieldWidth: CGFloat = 96
-        static let tagListHeight: CGFloat = 200
+        static let tagListHeight: CGFloat = 248
         static let tagCheckWidth: CGFloat = 14
         /// Progress bar of the toolbar indexing status.
         static let indexingProgressWidth: CGFloat = 80

@@ -33,7 +33,7 @@ final class AppModel {
     private(set) var libraries: [LibraryInfo] = []
     private(set) var collections: [CollectionInfo] = []
     /// Lazily paged results behind the table (latest-wins via its generations).
-    let pager = ResultsPager()
+    let pager: ResultsPager
     /// Audio preview (auto-play, cache, pitch, loop).
     let preview: AudioPreview
     /// Waveform of the selected row (peaks from the core, zoom viewport).
@@ -162,10 +162,11 @@ final class AppModel {
     /// opens the default home in `start()`.
     init(
         engine: SonarEngine? = nil, preview: AudioPreview = AudioPreview(), activePollMs: UInt64 = 250,
-        idlePollMs: UInt64 = 1000, settings: AppSettings = AppSettings(),
+        idlePollMs: UInt64 = 1000, settings: AppSettings = AppSettings(), pager: ResultsPager = ResultsPager(),
         opener: @escaping @Sendable () async throws -> CoreBridge = { try await CoreBridge.openDefault() }
     ) {
         self.settings = settings
+        self.pager = pager
         self.opener = opener
         self.preview = preview
         bridge = engine.map(CoreBridge.init(engine:))

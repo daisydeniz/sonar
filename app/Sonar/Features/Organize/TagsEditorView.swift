@@ -1,57 +1,65 @@
 import SwiftUI
 
-/// Inspector "Tags" section: the focused row's tags (with several rows
-/// selected, the tags every selected row has) as removable chips (removal
-/// applies to the whole selection) and a field to add comma-separated tags.
+/// Inspector "Tags" card (DESIGN §4.12): the tags of the selection as chips
+/// with `×` (a tag on only some selected files is the dashed "n/m" chip) and
+/// the `+` that opens the tag popover. All edits apply to the whole selection.
 @MainActor
 struct TagsEditorView: View {
     @Bindable var model: AppModel
     let row: FileRow
-    @State private var draft = ""
 
-    /// Tags shown as chips: the intersection across a multi-selection.
-    private var shownTags: [String] {
-        guard model.selectedFileIDs.count > 1 else { return row.tags }
-        let rows = model.organizeTargetRows
-        // Unloaded selected rows cannot be compared: show nothing uncertain.
-        guard rows.count >= model.selectedFileIDs.count else { return [] }
-        let common = commonTags(rows.map(\.tags))
-        return row.tags.filter(common.contains)
+    private var popoverShown: Binding<Bool> {
+        Binding(
+            get: { model.organizeState.tagPopover?.anchor == .inspector },
+            set: { if !$0 { model.organizeState.tagPopover = nil } })
     }
 
     var body: some View {
+        let state = model.tagState(for: model.organizeTargetIDs)
         InspectorCard("Tags") {
-            Button { model.editTags() } label: { Image(systemName: "tag").imageScale(.small) }
-                .buttonStyle(.borderless).foregroundStyle(.secondary)
-                .help("Edit tags")
-                .accessibilityLabel("Edit tags")
+            Button { model.showTagPopover(anchor: .inspector) } label: {
+                Image(systemName: "plus").imageScale(.small)
+                    .frame(width: Theme.Size.tagAddButton, height: Theme.Size.tagAddButton)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless).foregroundStyle(.secondary)
+            .help("Add or remove tags (⌘T)")
+            .accessibilityLabel("Add tag")
+            .popover(isPresented: popoverShown, arrowEdge: .bottom) {
+                if let request = model.organizeState.tagPopover {
+                    TagPopoverHost(model: model, ids: request.ids)
+                }
+            }
         } content: {
-            if !shownTags.isEmpty {
+            if state.chips.isEmpty {
+                Text("No tags").font(Theme.Font.caption).foregroundStyle(.tertiary)
+            } else {
                 FlowLayout {
-                    ForEach(shownTags, id: \.self) { tag in
-                        SonarChip(title: tag, hue: .tag, trailingSymbol: "xmark") {
-                            Task { await model.removeTag(tag) }
-                        }
-                        .help("Remove tag")
-                        .accessibilityLabel("Remove tag \(tag)")
+                    ForEach(state.chips, id: \.name) { chip in
+                        TagChipView(
+                            chip: chip, mixedCaption: state.mixedCaption(chip.mark),
+                            onAdd: { Task { await model.addTags(names: [chip.name]) } },
+                            onRemove: { Task { await model.removeTag(chip.name) } })
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
-            HStack(spacing: Theme.Space.s4) {
-                TextField("Add tag", text: $draft)
-                    .textFieldStyle(.roundedBorder)
-                    .controlSize(.small)
-                    .onSubmit(commit)
-                    .onChange(of: row.fileId) { draft = "" }
-                    .accessibilityLabel("Add tag")
-            }
         }
     }
+}
 
-    private func commit() {
-        let text = draft
-        draft = ""
-        Task { await model.addTags(text) }
+/// Owns the popover model for one presentation (inspector `+` or row anchor).
+@MainActor
+struct TagPopoverHost: View {
+    let model: AppModel
+    @State private var popover: TagPopoverModel
+
+    init(model: AppModel, ids: [Int64]) {
+        self.model = model
+        _popover = State(initialValue: TagPopoverModel(app: model, ids: ids))
+    }
+
+    var body: some View {
+        TagPopoverView(model: popover, onClose: { model.organizeState.tagPopover = nil })
     }
 }

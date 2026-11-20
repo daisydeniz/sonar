@@ -11,7 +11,7 @@ final class OrganizeTests: XCTestCase {
         (0..<model.resultCount).compactMap { model.pager.peek($0) }
     }
 
-    private func indexedModel() async throws -> AppModel {
+    private func indexedModel(pager: ResultsPager = ResultsPager()) async throws -> AppModel {
         let env = ProcessInfo.processInfo.environment
         guard let fixtures = env["SONAR_FIXTURES_DIR"], !fixtures.isEmpty else {
             if env["SONAR_REQUIRE_FIXTURES"] == "1" { throw FixturesMissing() }
@@ -22,7 +22,7 @@ final class OrganizeTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(at: home) }
         let path = home.path
         let engine = try await Task.detached { try SonarEngine.open(home: path) }.value
-        let model = AppModel(engine: engine, activePollMs: 20, idlePollMs: 50)
+        let model = AppModel(engine: engine, activePollMs: 20, idlePollMs: 50, pager: pager)
         addTeardownBlock { @MainActor in model.stop() }
         await model.start()
         model.stop()
@@ -152,6 +152,52 @@ final class OrganizeTests: XCTestCase {
         await model.removeTag("snare")
         XCTAssertTrue(rows(model).filter { ids.contains($0.fileId) }.allSatisfy { $0.tags == ["punchy"] })
         XCTAssertEqual(AppModel.parseTags(" a,b , ,a"), ["a", "b"])
+    }
+
+    /// Live popover edits: several changes applied together are ONE Undo step;
+    /// Undo then Redo go through the core and the rows follow.
+    func testTagChangesAreOneUndoStep() async throws {
+        let model = try await indexedModel()
+        let ids = select(model, 2)
+        let manager = UndoManager()
+        manager.groupsByEvent = false
+        model.organizeState.undoManager = manager
+        manager.beginUndoGrouping()
+        await model.applyTagChanges([
+            TagChange(kind: .add, tag: "warm", fileIds: ids), TagChange(kind: .add, tag: "dark", fileIds: [ids[0]]),
+        ])
+        manager.endUndoGrouping()
+        func tagged() -> [[String]] { rows(model).filter { ids.contains($0.fileId) }.map { $0.tags.sorted() } }
+        XCTAssertEqual(tagged(), [["dark", "warm"], ["warm"]])
+
+        manager.undo()
+        await model.settle()
+        XCTAssertEqual(tagged(), [[], []], "one undo reverts every change")
+        XCTAssertFalse(manager.canUndo)
+        XCTAssertTrue(manager.canRedo)
+
+        manager.redo()
+        await model.settle()
+        XCTAssertEqual(tagged(), [["dark", "warm"], ["warm"]])
+    }
+
+    /// A selection spanning pages the pager evicted still tags every file.
+    func testAddTagReachesFilesOutsideThePagerCache() async throws {
+        let model = try await indexedModel(pager: ResultsPager(pageSize: 4, maxCachedPages: 2))
+        let total = model.resultCount
+        guard total > 12 else { throw XCTSkip("fixture library too small") }
+        // Touch the last page so the earliest ones are evicted.
+        _ = model.pager.peek(total - 1)
+        try await Task.sleep(nanoseconds: 300_000_000)
+        let ids = (0..<total).compactMap { model.pager.peek($0)?.fileId }
+        let selection = try await XCTUnwrap(model.bridge).rows(fileIds: Array(1...Int64(total + 50))).map(\.fileId)
+        model.selectedFileIDs = selection
+        XCTAssertLessThan(model.tagState(for: selection).total, selection.count, "some rows are evicted")
+        await model.addTags("everywhere")
+        let after = try await XCTUnwrap(model.bridge).rows(fileIds: selection)
+        XCTAssertEqual(after.count, selection.count)
+        XCTAssertTrue(after.allSatisfy { $0.tags.contains("everywhere") })
+        _ = ids
     }
 
     // MARK: Collections

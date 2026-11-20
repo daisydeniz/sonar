@@ -7,7 +7,9 @@ struct ContentView: View {
     let license: LicenseManager
     @State private var showInspector = true
     @State private var searchMonitor = SearchKeyMonitor()
+    @State private var tagPopoverPresenter = TagPopoverPresenter()
     @State private var dropTargeted = false
+    @Environment(\.undoManager) private var undoManager
 
     var body: some View {
         Group {
@@ -72,20 +74,12 @@ struct ContentView: View {
         } message: {
             Text(model.organizeState.prompt?.message ?? "")
         }
-        .sheet(isPresented: Binding(
-            get: { model.organizeState.tagEditorTargets != nil },
-            set: { if !$0 { model.organizeState.tagEditorTargets = nil } })
-        ) {
-            let ids = model.organizeState.tagEditorTargets ?? []
-            TagEditorView(
-                state: model.tagEditorState(for: ids), fileCount: ids.count,
-                onSave: { added, removed in
-                    model.organizeState.tagEditorTargets = nil
-                    Task { await model.applyTagEdit(ids: ids, added: added, removed: removed) } },
-                onCancel: { model.organizeState.tagEditorTargets = nil })
-        }
+        .onChange(of: model.organizeState.tagPopover) { tagPopoverPresenter.sync(model: model) }
         .onSubmit(of: .search) { _ = model.keyboard.focusResults?() }
-        .onAppear { searchMonitor.install(actions: model.keyboard) }
+        .onAppear {
+            searchMonitor.install(actions: model.keyboard)
+            if let undoManager { model.organizeState.undoManager = undoManager }
+        }
         .onDisappear { searchMonitor.remove() }
         .alert("Sonar", isPresented: errorShown) {
             Button("OK") { model.errorMessage = nil }
@@ -177,6 +171,8 @@ struct ContentView: View {
                 menuEntries: { model.rowMenuEntries(for: $0) },
                 register: { controller in
                     model.keyboard.focusResults = { [weak controller] in controller?.focusTable() ?? false }
+                    model.keyboard.popoverAnchor = { [weak controller] id in
+                        controller?.popoverAnchor(forFileId: id)                    }
                 })
         }
     }

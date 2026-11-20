@@ -1,10 +1,16 @@
 import Foundation
 
+/// Check mark of a menu entry: ✓ (`on`), – (`mixed`), none (`off`).
+enum MenuMark: Equatable, Sendable { case off, on, mixed }
+
 /// Platform-neutral description of a context-menu item, so the model decides
 /// what the menu offers (and tests can inspect it) while the table controller
 /// only turns entries into `NSMenuItem`s.
 struct RowMenuEntry {
     var title: String
+    var mark: MenuMark = .off
+    /// Key equivalent shown with ⌘ (display; the shortcut itself lives in the menu bar).
+    var shortcut: String?
     var isSeparator = false
     var children: [RowMenuEntry] = []
     var action: (@MainActor () -> Void)?
@@ -25,8 +31,7 @@ extension AppModel {
         entries.append(RowMenuEntry(
             title: unhide ? "Unhide" : "Hide",
             action: { [weak self] in Task { await self?.setHidden(fileIds: ids, on: !unhide) } }))
-        entries.append(RowMenuEntry(
-            title: "Edit Tags…", action: { [weak self] in self?.editTags(ids: ids) }))
+        entries.append(tagMenuEntry(for: ids))
         var collectionItems = collections.map { c in
             RowMenuEntry(
                 title: c.name,

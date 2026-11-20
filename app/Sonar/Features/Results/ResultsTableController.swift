@@ -154,6 +154,17 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         return true
     }
 
+    /// Where a popover for `id` attaches: the row's rect, or the top of the
+    /// visible area when the row is not on screen.
+    func popoverAnchor(forFileId id: Int64?) -> (view: NSView, rect: NSRect) {
+        if let id, let row = pager.index(ofFileId: id) {
+            let rect = tableView.rect(ofRow: row)
+            if rect.intersects(tableView.visibleRect) { return (tableView, rect) }
+        }
+        let visible = tableView.visibleRect
+        return (tableView, NSRect(x: visible.midX, y: visible.minY, width: 1, height: Self.rowHeight))
+    }
+
     /// Makes the header indicator match the model's sort (it changes
     /// without a header click when a similarity search starts). No `onSort`.
     func showSort(_ key: SortKey, descending: Bool) {
@@ -255,7 +266,13 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
 
     private func makeItem(_ entry: RowMenuEntry) -> NSMenuItem {
         if entry.isSeparator { return .separator() }
-        let item = NSMenuItem(title: entry.title, action: nil, keyEquivalent: "")
+        let item = NSMenuItem(title: entry.title, action: nil, keyEquivalent: entry.shortcut ?? "")
+        if entry.shortcut != nil { item.keyEquivalentModifierMask = .command }
+        switch entry.mark {
+        case .off: item.state = .off
+        case .on: item.state = .on
+        case .mixed: item.state = .mixed
+        }
         if !entry.children.isEmpty {
             let sub = NSMenu(title: entry.title)
             for child in entry.children { sub.addItem(makeItem(child)) }

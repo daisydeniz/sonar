@@ -40,8 +40,9 @@ struct SonarApp: App {
                 Button("Hide / Unhide") { Task { await model.toggleHiddenOfSelection() } }
                     .keyboardShortcut("h", modifiers: [.command, .shift])
                     .disabled(model.selectedRow == nil)
-                Button("Edit Tags…") { model.editTags() }
-                    .disabled(model.selectedRow == nil)
+            }
+            CommandGroup(after: .pasteboard) {
+                TagsCommandMenu(model: model)
             }
             CommandGroup(after: .toolbar) {
                 Toggle("Show Hidden Samples", isOn: Bindable(model.organizeState).showHidden)

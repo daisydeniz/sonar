@@ -144,6 +144,8 @@ v1.x: record-to-search, 2D map, tempo-synced preview, kit builder, `.als` projec
 v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).
 
 ## Later (not picked by the loop — founder triages after M8)
+- (from T12.7 review) Tag undo step is registered after the core write returns; ⌘Z pressed before that undoes the previous step.
+- (from T12.7 review) `testAddTagReachesFilesOutsideThePagerCache`: assert fixture size instead of XCTSkip; drop the no-op `peek` + sleep.
 - (from T12.6) Inspector File card: Bit depth and Size rows once core `FileRow` exposes them (core/FFI work).
 - (from T12.6 review) Playing-row speaker uses `model.selectedRow`, not the row `AudioPreview` loaded; expose a read-only `playingFileID` on `AudioPreview` if they can diverge.
 - (from T12.5 review) With a sidebar library scope, the panel's Library chips stay selected and counted but are ignored (`FilterState.swift:50`); hide/disable the section while a sidebar library is in scope.

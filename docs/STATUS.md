@@ -4,7 +4,7 @@ Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
 - Milestone: M12 Visual v2 and tags UX (founder request 2026-11-20, ADR-043); human-only: T3.7, T7.4, T8.1
-- Next task: T12.7 Tags menu and tag popover
+- Next task: T12.8 Manage Tags sheet and sidebar Tags section
 - Loop state: RUNNING   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (updated 2026-11-20; T0.1 was macOS 26.7.2 / Xcode 26.5)
@@ -14,6 +14,7 @@ rustc/cargo 1.100.0 · cargo-deny 0.21.0 · claude 2.1.328 · gh: not installed 
 ## Needs human
 _(Agents list anything that requires the founder: decisions, credentials,
 manual tests, labeled data. Keep each item one line with the task id.)_
+- T12.7 Manual check: select a row → right-click Tags › shows ✓/– and toggles; ⌘T opens the tag popover at the row, type + Return creates/adds, Esc closes, ⌘Z (also inside the popover) undoes one change; ⌘A in a large library + add tag reaches all rows; inspector Tags `+` opens it.
 - T12.6 Manual check (toolbar not in snapshots): window title shows the scope ("All Samples") with the libraries in scope as subtitle; trial badge amber; playing a row shows the speaker symbol in its status column.
 - T12.4 Manual check: play a loop → playhead runs from the ruler down; Gain knob at −24 and +6 dB is audible, double-click resets, value survives relaunch; zoom menus and pinch zoom move the ruler; region drag still works below the ruler.
 - T11.3 Manual check (snapshots have no window toolbar): the inspector toggle sits at the trailing edge over the inspector, stays reachable when the inspector is hidden, and ⌃⌘I / View > Show Inspector toggles it; the inspector background matches with and without a selection.
@@ -22,7 +23,6 @@ manual tests, labeled data. Keep each item one line with the task id.)_
 - T0.1 (optional) For `cargo` in a normal terminal / hand-started `claude`, add to ~/.zprofile: `export PATH="/opt/homebrew/opt/rustup/bin:$HOME/.cargo/bin:$PATH"` (scripts and autopilot already handle it). Optional: `brew install gh`.
 - T3.7 (optional) Golden set: `eval/golden/labels.csv` (299 files from `Samples/`) was pre-filled from the pack's own file/folder labels, not by ear; a 5-minute skim to fix or blank wrong cells makes it real golden. `scripts/eval-real.sh` runs silver + golden.
 - T8.1 End-to-end test by the founder (after M7)
-- T10.9 Manual check: right-click samples → Edit Tags…: type "x" + Return creates a chip; ↓/↑ + Return toggles an existing tag; ⌫ on the empty field removes the last chip; ⌘Return saves → table/inspector tags and Tags filter counts update; Esc cancels (onKeyPress keys not covered by tests).
 - T10.8 Manual check: click the inspector Key on a one-shot → field opens focused; type a key + Return → table/readout show it (not the note); revert brings E2⁺³⁵ back; ⇧-select mixed keys → table keeps keyboard focus.
 - T9.8 Manual check: on the welcome screen and the trial-ended gate, Return triggers the primary button; drop folders on the welcome screen → overlay; Settings tabs (Libraries online/offline badges, License, About) look right in light/dark.
 - T9.6 Manual check: Find Similar on a sample (also with a waveform region) → 72 pt target well above the selected waveform, its play button plays the target (region only), Space stops it; Esc/× removes the well; drag a .wav from Finder → overlay readable.
@@ -49,6 +49,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-21 — T12.7: Tags › submenu (row context menu with real tri-state NSMenuItems, Edit menu with ✓/– icons; 8 most used, Add Tag… ⌘T, Manage Tags… disabled until T12.8); live tag popover (`NSPopover`, mixed n/m chips → all, Most used, prefix-then-contains matches, Create tag last) replaces `TagEditorView`/"Edit Tags…"; inspector Tags `+` opens it; each change one Undo step; selections beyond the pager cache fetch missing rows from core. Tokens `tagPopoverWidth`, `tagAddButton`, `tagListHeight` 248. UI only, no eval. check.sh green; reviewer APPROVE r2. Later: 2 T12.7 items.
 - 2026-11-20 — T12.6: results table v2 (selection inset 6, tertiary header, playing row shows `speaker.wave.2` in `accent`), toolbar title = scope + libraries subtitle (`ScopeLabel`), trial badge `signal` on `signalSoft`; inspector header with three equal actions and `InspectorCard`s Analysis / Tags / File (token `cardPaddingVertical`). Bit depth/size not in core → Later. UI only, no eval. check.sh green; reviewer APPROVE r1. Later: 2 T12.6 items.
 - 2026-11-20 — T12.5: filter bar v2 (Filters button with active count on `selection`, active chips in section hues incl. Library) and panel v2 (centred title + round close, Favorites quick card, `surfaceGroup` cards with hue squares, new Library section from the `libraries` facet, multi-select OR, footer "n results · m filters" + Clear all). No core change (library ids already in `SearchFilters`). Tokens `hueSquare`, `panelCloseButton`. UI only, no eval. check.sh green; reviewer APPROVE r1. Later: 3 T12.5 items.
-- 2026-11-20 — T12.4: player header v2 — transport row (30 pt play circle, Loop/AUTO in `signal`, name + extension, Pitch/Gain knobs), waveform well with ruler (bars.beats with BPM, seconds without; follows zoom/pan), one lane per channel, readout strip (BPM/Key/Length/Format in `signal`, zoom menus); preview gain −24…+6 dB (engine only, persisted); Swift waveform path now `[[WaveformPeak]]`, envelope merge removed. New `main-oneshot` snapshot. UI only, no eval. check.sh green; reviewer APPROVE r1. Later: 4 T12.4 items.

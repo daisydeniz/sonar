@@ -32,6 +32,8 @@ final class KeyboardActions {
     /// Registered by the table: focus it (selecting row 0 if nothing is
     /// selected). Returns false when there is nothing to focus (no rows).
     var focusResults: (() -> Bool)?
+    /// Registered by the table: view and rect a popover for a file attaches to.
+    var popoverAnchor: ((Int64?) -> (view: NSView, rect: NSRect)?)?
     /// Focus the toolbar search field (⌘F, Esc in the table).
     var focusSearch: () -> Void = { SearchFieldFocus.focus() }
 

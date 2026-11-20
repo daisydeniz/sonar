@@ -346,17 +346,36 @@ final class UISnapshotTests: XCTestCase {
         try snapshot("license-enter", sheet, dir: dir, size: CGSize(width: 440, height: 260))
     }
 
-    /// Tag editor sheet: two chips, text "a" filtering the library list.
-    func testTagEditor() async throws {
+    private static let snapshotTagLibrary = [
+        ("warm", 58), ("dark", 50), ("club", 50), ("groove", 44), ("analog", 30), ("house", 26),
+        ("lofi", 12), ("low end", 7), ("loose", 3),
+    ].map { TagInfo(name: $0.0, files: UInt64($0.1)) }
+
+    /// Tag popover, one file: three chips, text "lo" with matches and "Create tag" last.
+    func testTagsPopover() async throws {
         let dir = try outputDir()
-        let library = [("dark", 42), ("club", 31), ("analog", 18), ("acid", 12), ("ambient", 9), ("punchy", 7), ("vintage", 5)]
-            .map { TagInfo(name: $0.0, files: UInt64($0.1)) }
-        var state = TagEditorState(library: library, common: ["dark", "analog"])
-        state.text = "a"
-        state.moveHighlight(by: 1)
-        let sheet = TagEditorView(state: state, fileCount: 3, onSave: { _, _ in }, onCancel: {})
+        let model = try await populated(rows: loopRows())
+        let id = try XCTUnwrap(model.selectedFileId)
+        var state = TagPopoverState(
+            library: Self.snapshotTagLibrary, files: [(id: id, tags: ["warm", "groove", "analog"])])
+        state.text = "lo"
+        let view = TagPopoverView(model: TagPopoverModel(app: model, ids: [id], state: state), onClose: {})
             .background(Color(nsColor: .windowBackgroundColor))
-        try snapshot("tag-editor", sheet, dir: dir, size: CGSize(width: 460, height: 440))
+        try snapshot("tags-popover", view, dir: dir, size: CGSize(width: 380, height: 360))
+    }
+
+    /// Tag popover, three files: mixed chips (2/3, 1/3) and "Most used" with ✓ / –.
+    func testTagsPopoverMulti() async throws {
+        let dir = try outputDir()
+        let model = try await populated(rows: loopRows())
+        var state = TagPopoverState(
+            library: Self.snapshotTagLibrary,
+            files: [(id: 1, tags: ["warm", "groove", "analog"]), (id: 2, tags: ["warm", "groove"]), (id: 3, tags: ["warm"])])
+        state.moveHighlight(by: 1)
+        state.moveHighlight(by: 1)
+        let view = TagPopoverView(model: TagPopoverModel(app: model, ids: [1, 2, 3], state: state), onClose: {})
+            .background(Color(nsColor: .windowBackgroundColor))
+        try snapshot("tags-popover-multi", view, dir: dir, size: CGSize(width: 380, height: 440))
     }
 
     /// Key display (ADR-041): the first eight rows show high / medium / low /
