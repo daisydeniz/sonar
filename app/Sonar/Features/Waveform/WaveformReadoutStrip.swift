@@ -15,11 +15,11 @@ struct WaveformReadoutStrip: View {
 
     var body: some View {
         HStack(spacing: Theme.Space.s16) {
-            Readout("BPM", value: row?.bpm.map(Format.bpm))
+            Readout("BPM", value: row?.bpm.map(Format.bpm), reserving: ["000.0"])
             divider
             Readout("Key", key: row.flatMap { KeyLabel.parts($0) })
             divider
-            Readout("Length", value: row?.durationMs.map { Format.duration(ms: $0) })
+            Readout("Length", value: row?.durationMs.map { Format.duration(ms: $0) }, reserving: ["00:00.000"])
             divider
             Readout(
                 "Format", value: row.flatMap { Format.audioFormat(path: $0.path, sampleRate: $0.sampleRate, channels: $0.channels) },

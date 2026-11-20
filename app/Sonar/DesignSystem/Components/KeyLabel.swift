@@ -72,15 +72,17 @@ enum KeyLabel {
         return result
     }
 
+    /// The widest values a key / note can show (see `widestWidth`).
+    static let widestSamples = [
+        Parts(main: "G#4", superscript: "+50"), Parts(main: "A#4", superscript: "\u{2212}45"),
+        Parts(main: "C#m", superscript: nil),
+    ]
+
     /// Width of the widest value (`G#4` + `+50`, `A#4` + `−45`, `C#m`) in `font`, rounded
     /// up: the results table's Key column never gets narrower than this
     /// plus its cell insets, so a detuned note always fits on one line.
     static func widestWidth(font: NSFont = Theme.NSFonts.row) -> CGFloat {
-        let samples = [
-            Parts(main: "G#4", superscript: "+50"), Parts(main: "A#4", superscript: "\u{2212}45"),
-            Parts(main: "C#m", superscript: nil),
-        ]
-        return samples.map { attributed($0, font: font).size().width }.max().map { $0.rounded(.up) } ?? 0
+        widestSamples.map { attributed($0, font: font).size().width }.max().map { $0.rounded(.up) } ?? 0
     }
 
     /// SwiftUI rendering as one `Text` (so it truncates and aligns like text).

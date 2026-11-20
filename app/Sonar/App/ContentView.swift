@@ -36,7 +36,14 @@ struct ContentView: View {
                 .navigationTitle(model.scopeTitle)
                 .navigationSubtitle(model.scopeSubtitle)
                 .toolbar {
-                    ToolbarItem { TrialBadgeView(license: license) }
+                    // macOS 26 wraps toolbar items in a shared glass capsule;
+                    // the badge is its own capsule, so it opts out (no pill in a pill).
+                    if #available(macOS 26, *) {
+                        ToolbarItem { TrialBadgeView(license: license) }
+                            .sharedBackgroundVisibility(.hidden)
+                    } else {
+                        ToolbarItem { TrialBadgeView(license: license) }
+                    }
                     if #available(macOS 26, *) { ToolbarSpacer(.fixed) }
                     ToolbarItem { IndexingStatusView(model: model) }
                     // While the inspector is hidden its toolbar is gone, so the
