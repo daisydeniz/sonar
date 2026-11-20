@@ -65,9 +65,10 @@ final class OrganizeState {
     /// Undo stack of tag edits: the window's manager once `ContentView`
     /// has it (Edit > Undo), else a private one.
     var undoManager = UndoManager()
-    /// "Manage Tags…" (menus, popover footer). The sheet comes with T12.8;
-    /// until it sets this, the items are shown disabled.
-    var manageTags: (() -> Void)?
+    /// The Manage Tags sheet is open (T12.8).
+    var showsManageTags = false
+    /// "Manage Tags…" (menus, popover footer): opens the sheet.
+    var manageTags: (() -> Void)? { { [self] in showsManageTags = true } }
     /// Last override rejection from the core, shown inline in the inspector.
     var overrideError: String?
     /// Every tag in the library with its file count (suggestions).

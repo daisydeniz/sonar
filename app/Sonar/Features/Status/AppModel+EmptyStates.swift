@@ -24,6 +24,7 @@ extension AppModel {
         if isLoadingResults { return nil }
         if case .collection = sidebarSelection { return .emptyCollection }
         if hasQueryOrFilters { return .noResults }
+        if case .tag = sidebarSelection { return .noResults }
         switch sidebarSelection {
         case .favorites: return .noFavorites
         default: return .emptyLibrary

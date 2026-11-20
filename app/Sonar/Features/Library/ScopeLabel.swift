@@ -18,6 +18,7 @@ enum ScopeLabel {
         case .duplicates: "Duplicates"
         case .library(let id): libraries.first { $0.id == id }?.name ?? "Library"
         case .collection(let id): collections.first { $0.id == id }?.name ?? "Collection"
+        case .tag(let name): name
         }
     }
 

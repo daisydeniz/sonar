@@ -107,7 +107,7 @@ extension AppModel {
 
     /// "Tags ›" for a context menu or the Edit menu: the 8 most used tags
     /// with a tri-state mark for `ids` (✓ all, – some), a separator, Add Tag…
-    /// (⌘T) and Manage Tags… (disabled until the sheet exists).
+    /// (⌘T) and Manage Tags… (opens the sheet).
     func tagMenuEntry(for ids: [Int64]) -> RowMenuEntry {
         let state = tagState(for: ids)
         let complete = state.total == ids.count
@@ -126,11 +126,8 @@ extension AppModel {
         children.append(RowMenuEntry(
             title: "Add Tag…", shortcut: "t",
             action: { [weak self] in self?.showTagPopover(ids: ids) }))
-        var manage = RowMenuEntry(title: "Manage Tags…")
-        if organizeState.manageTags != nil {
-            manage.action = { [weak self] in self?.organizeState.manageTags?() }
-        }
-        children.append(manage)
+        children.append(RowMenuEntry(
+            title: "Manage Tags…", action: { [weak self] in self?.organizeState.manageTags?() }))
         return RowMenuEntry(title: "Tags", children: children)
     }
 

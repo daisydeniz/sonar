@@ -162,6 +162,10 @@ right-aligned in columns. No other font family, no italic, no extra weights.
 - Also tokens (T12.7): `tagPopoverWidth` 340 (replaces `tagEditorWidth`),
   `tagListHeight` 248 (8 rows), `tagAddButton` 24 (`+` in the inspector Tags
   card); `tagBoxMinHeight`/`tagFieldWidth`/`tagCheckWidth` kept.
+- Also tokens (T12.8): `manageTagsWidth` 580, `manageTagsMinHeight` 420,
+  `manageTagsMaxHeight` 640, `manageTagsCountWidth` 48 (count column),
+  `manageTagsFilterWidth` 200 (filter field in the sheet header),
+  `manageTagsPairsMaxHeight` 136 (the similar-tags card scrolls past 4 pairs).
 - Also tokens (T12.6): `cardPaddingVertical` 10 (inspector card; horizontal
   is `s12`). Component `InspectorCard` (title row with optional trailing
   accessory + content) is the one card of the inspector (Analysis, Tags,

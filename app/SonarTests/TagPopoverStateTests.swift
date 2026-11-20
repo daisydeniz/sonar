@@ -123,6 +123,7 @@ final class TagPopoverStateTests: XCTestCase {
         let tail = tags.children.suffix(3).map(\.title)
         XCTAssertEqual(tail, ["", "Add Tag…", "Manage Tags…"])
         XCTAssertEqual(tags.children.first { $0.title == "Add Tag…" }?.shortcut, "t")
-        XCTAssertNil(tags.children.last?.action, "Manage Tags… disabled until T12.8")
+        tags.children.last?.action?()
+        XCTAssertTrue(model.organizeState.showsManageTags, "Manage Tags… opens the sheet")
     }
 }

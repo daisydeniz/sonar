@@ -75,6 +75,7 @@ struct ContentView: View {
             Text(model.organizeState.prompt?.message ?? "")
         }
         .onChange(of: model.organizeState.tagPopover) { tagPopoverPresenter.sync(model: model) }
+        .sheet(isPresented: Bindable(model.organizeState).showsManageTags) { TagManageSheet(app: model) }
         .onSubmit(of: .search) { _ = model.keyboard.focusResults?() }
         .onAppear {
             searchMonitor.install(actions: model.keyboard)

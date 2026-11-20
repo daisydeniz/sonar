@@ -129,7 +129,7 @@ extension AppModel {
             if case .library(let id) = sidebarSelection { base.libraryIds = [id] }
             let query = SimilarQuery(
                 seed: target.seed, weights: try similarity.sliders.weights(),
-                filters: filters.apply(to: base), limit: Self.similarLimit,
+                filters: Self.scoped(filters.apply(to: base), to: sidebarSelection), limit: Self.similarLimit,
                 sort: sortKey == .relevance ? nil : sortKey, descending: sortDescending,
                 region: similarity.region)
             let page = try await Self.searchRetryingCancelled(query, search) { mine == self.generation }

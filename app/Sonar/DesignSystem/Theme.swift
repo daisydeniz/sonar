@@ -100,6 +100,14 @@ enum Theme {
         static let tagFieldWidth: CGFloat = 96
         static let tagListHeight: CGFloat = 248
         static let tagCheckWidth: CGFloat = 14
+        /// Manage Tags sheet (DESIGN §2.3, T12.8): width, height range, the
+        /// right-aligned count column of the list.
+        static let manageTagsWidth: CGFloat = 580
+        static let manageTagsMinHeight: CGFloat = 420
+        static let manageTagsMaxHeight: CGFloat = 640
+        static let manageTagsCountWidth: CGFloat = 48
+        static let manageTagsFilterWidth: CGFloat = 200
+        static let manageTagsPairsMaxHeight: CGFloat = 136
         /// Progress bar of the toolbar indexing status.
         static let indexingProgressWidth: CGFloat = 80
     }

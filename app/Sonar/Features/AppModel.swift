@@ -7,6 +7,8 @@ enum SidebarItem: Hashable, Sendable {
     case favorites
     case library(Int64)
     case collection(Int64)
+    /// Results scoped to one tag (sidebar Tags section, DESIGN §3).
+    case tag(String)
     /// Duplicate finder (T6.9b): its own view, not a result list.
     case duplicates
 }
@@ -87,6 +89,7 @@ final class AppModel {
     /// Library chips are redundant while the sidebar picks one library.
     var showsLibraryChips: Bool {
         if case .allSamples = sidebarSelection { return true }
+        if case .tag = sidebarSelection { return true }
         return sidebarSelection == .favorites
     }
     /// Filters do not apply to a collection's own contents.
@@ -95,6 +98,14 @@ final class AppModel {
         case .collection, .duplicates: return false
         default: return true
         }
+    }
+
+    /// `filters` plus the sidebar's tag scope (AND with the tag chips).
+    static func scoped(_ filters: SearchFilters, to selection: SidebarItem) -> SearchFilters {
+        guard case .tag(let name) = selection else { return filters }
+        var scoped = filters
+        if !scoped.tags.contains(where: { $0.caseInsensitiveCompare(name) == .orderedSame }) { scoped.tags.append(name) }
+        return scoped
     }
 
     /// Clears every filter chip and re-queries.
@@ -360,7 +371,7 @@ final class AppModel {
                 loader = ArrayResultLoader(rows: rows)
             case .duplicates:
                 return
-            case .allSamples, .favorites, .library:
+            case .allSamples, .favorites, .library, .tag:
                 var filters = SearchFilters()
                 if selection == .favorites { filters.favoritesOnly = true }
                 filters.includeHidden = organizeState.showHidden
@@ -368,7 +379,7 @@ final class AppModel {
                 loader = EngineResultLoader(
                     bridge: bridge,
                     query: SearchQuery(
-                        text: text, filters: chips.apply(to: filters),
+                        text: text, filters: Self.scoped(chips.apply(to: filters), to: selection),
                         sort: key == .relevance ? nil : key, descending: descending),
                     wantsFacets: true)
             }

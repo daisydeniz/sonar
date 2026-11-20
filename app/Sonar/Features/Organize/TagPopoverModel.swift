@@ -29,10 +29,13 @@ final class TagPopoverModel {
         return name
     }
 
-    /// Manage Tags… is available once T12.8's sheet registered itself.
     var canManage: Bool { app.organizeState.manageTags != nil }
 
-    func manage() { app.organizeState.manageTags?() }
+    /// Closes the popover and opens the Manage Tags sheet.
+    func manage() {
+        app.organizeState.tagPopover = nil
+        app.organizeState.manageTags?()
+    }
 
     /// Fresh tags after the core refresh (or an Undo from outside); the
     /// typed text stays.

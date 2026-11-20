@@ -44,6 +44,7 @@ struct SidebarView: View {
                     model.organizeState.ask(.newCollection([]))
                 }
             }
+            SidebarTagsSection(model: model)
         }
         .listStyle(.sidebar)
         .confirmationDialog(

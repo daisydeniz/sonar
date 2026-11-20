@@ -46,6 +46,7 @@ final class UISnapshotTests: XCTestCase {
         model.waveform.provider = SnapshotWaveformProvider(lanes: lanes)
         model.installStaticState(libraries: SnapshotFixtures.libraries, collections: SnapshotFixtures.collections)
         _ = try await model.pager.reset(loader: SnapshotPageLoader(rows: rows))
+        model.organizeState.tags = Self.snapshotTagLibrary
         model.select(rows.count > 2 ? rows[2] : nil)
         await model.waveform.settle()
         return model
@@ -376,6 +377,32 @@ final class UISnapshotTests: XCTestCase {
         let view = TagPopoverView(model: TagPopoverModel(app: model, ids: [1, 2, 3], state: state), onClose: {})
             .background(Color(nsColor: .windowBackgroundColor))
         try snapshot("tags-popover-multi", view, dir: dir, size: CGSize(width: 380, height: 440))
+    }
+
+    /// Manage Tags sheet: similar-pairs card, list with an unused tag, one row selected.
+    func testTagsManage() async throws {
+        let dir = try outputDir()
+        let tags = [
+            ("warm", 58), ("club", 53), ("dark", 50), ("groove", 44), ("analog", 30), ("lofi", 12),
+            ("lo-fi", 5), ("grove", 2), ("amen", 0),
+        ].map { TagInfo(name: $0.0, files: UInt64($0.1)) }
+        let pairs = [
+            SimilarTagPair(a: "groove", aFiles: 44, b: "grove", bFiles: 2, reason: .typo),
+            SimilarTagPair(a: "lofi", aFiles: 12, b: "lo-fi", bFiles: 5, reason: .separators),
+            SimilarTagPair(a: "analog", aFiles: 30, b: "analogue", bFiles: 3, reason: .prefix),
+        ]
+        let model = TagManageModel(app: makeModel(), tags: tags, pairs: pairs)
+        model.selection = ["grove"]
+        let view = TagManageView(model: model, onDone: {}).background(Color(nsColor: .windowBackgroundColor))
+        try snapshot("tags-manage", view, dir: dir, size: CGSize(width: 580, height: 640))
+    }
+
+    /// Manage Tags with no tags yet (empty state).
+    func testTagsManageEmpty() async throws {
+        let dir = try outputDir()
+        let model = TagManageModel(app: makeModel(), tags: [], pairs: [])
+        let view = TagManageView(model: model, onDone: {}).background(Color(nsColor: .windowBackgroundColor))
+        try snapshot("tags-manage-empty", view, dir: dir, size: CGSize(width: 580, height: 420))
     }
 
     /// Key display (ADR-041): the first eight rows show high / medium / low /
