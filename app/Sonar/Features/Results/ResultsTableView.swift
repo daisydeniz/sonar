@@ -6,6 +6,8 @@ import SwiftUI
 struct ResultsTableView: NSViewRepresentable {
     let pager: ResultsPager
     let libraryNames: [Int64: String]
+    /// The file being auditioned (speaker symbol in the status column).
+    var playingFileID: Int64?
     /// The model's sort, shown as the header indicator.
     let sortKey: SortKey
     let sortDescending: Bool
@@ -32,6 +34,7 @@ struct ResultsTableView: NSViewRepresentable {
         controller.onToggleFavorite = onToggleFavorite
         controller.menuEntries = menuEntries
         controller.libraryNames = libraryNames
+        controller.playingFileID = playingFileID
         controller.showSort(sortKey, descending: sortDescending)
         register(controller)
         return controller.scrollView
@@ -47,6 +50,7 @@ struct ResultsTableView: NSViewRepresentable {
         controller.onToggleFavorite = onToggleFavorite
         controller.menuEntries = menuEntries
         controller.libraryNames = libraryNames
+        controller.playingFileID = playingFileID
         controller.showSort(sortKey, descending: sortDescending)
     }
 }

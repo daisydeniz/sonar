@@ -70,6 +70,11 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         didSet { if libraryNames != oldValue { reloadVisibleRows() } }
     }
 
+    /// The file whose preview is playing (speaker symbol in the status column).
+    var playingFileID: Int64? {
+        didSet { if playingFileID != oldValue { reloadStatusColumn() } }
+    }
+
     /// The focused file id (what `onSelect` last reported).
     private(set) var selectedID: Int64?
     /// Selected loaded file ids in table order (ids, not rows, so a pager
@@ -198,6 +203,15 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         }
     }
 
+    private func reloadStatusColumn() {
+        let visible = tableView.rows(in: tableView.visibleRect)
+        let column = tableView.column(withIdentifier: NSUserInterfaceItemIdentifier(Self.favoriteColumnID))
+        guard visible.length > 0, column >= 0 else { return }
+        tableView.reloadData(
+            forRowIndexes: IndexSet(integersIn: visible.location..<visible.location + visible.length),
+            columnIndexes: IndexSet(integer: column))
+    }
+
     private func reloadVisibleRows() {
         let visible = tableView.rows(in: tableView.visibleRect)
         guard visible.length > 0 else { return }
@@ -288,7 +302,8 @@ final class ResultsTableController: NSObject, NSTableViewDataSource, NSTableView
         if id.rawValue == Self.favoriteColumnID {
             let cell = (tableView.makeView(withIdentifier: id, owner: nil) as? FavoriteCellView)
                 ?? FavoriteCellView(identifier: id, target: self, action: #selector(favoriteClicked(_:)))
-            cell.show(pager.row(at: row))
+            let file = pager.row(at: row)
+            cell.show(file, playing: file != nil && file?.fileId == playingFileID)
             return cell
         }
         let cell = (tableView.makeView(withIdentifier: id, owner: nil) as? ResultCellView) ?? makeCell(identifier: id)

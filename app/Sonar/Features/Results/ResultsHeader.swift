@@ -17,7 +17,7 @@ final class ResultsHeaderCell: NSTableHeaderCell {
         let size = symbol?.size ?? .zero
         return NSImage(size: size, flipped: false) { rect in
             symbol?.draw(in: rect)
-            NSColor.secondaryLabelColor.set()
+            NSColor.tertiaryLabelColor.set()
             rect.fill(using: .sourceAtop)
             return true
         }
@@ -44,7 +44,7 @@ final class ResultsHeaderCell: NSTableHeaderCell {
             string: stringValue.uppercased(),
             attributes: [
                 .font: Theme.NSFonts.label, .kern: Theme.NSFonts.labelKern,
-                .foregroundColor: NSColor.secondaryLabelColor, .paragraphStyle: paragraph,
+                .foregroundColor: NSColor.tertiaryLabelColor, .paragraphStyle: paragraph,
             ])
         let chevron = ascending.flatMap { Self.chevrons[$0] }
         let chevronWidth = chevron.map { $0.size.width + Theme.Space.s4 } ?? 0

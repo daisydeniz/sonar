@@ -31,6 +31,8 @@ struct ContentView: View {
                 .navigationSplitViewColumnWidth(min: 180, ideal: 220)
         } detail: {
             detail
+                .navigationTitle(model.scopeTitle)
+                .navigationSubtitle(model.scopeSubtitle)
                 .toolbar {
                     ToolbarItem { TrialBadgeView(license: license) }
                     if #available(macOS 26, *) { ToolbarSpacer(.fixed) }
@@ -154,6 +156,7 @@ struct ContentView: View {
             ResultsTableView(
                 pager: model.pager,
                 libraryNames: Dictionary(uniqueKeysWithValues: model.libraries.map { ($0.id, URL(fileURLWithPath: $0.rootPath).lastPathComponent) }),
+                playingFileID: model.preview.isPlaying && !model.preview.isTargetPlaying ? model.selectedRow?.fileId : nil,
                 sortKey: model.sortKey, sortDescending: model.sortDescending,
                 onSelect: { model.select($0) },
                 onSort: { key, descending in Task { await model.setSort(key, descending: descending) } },

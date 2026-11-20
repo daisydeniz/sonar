@@ -20,8 +20,12 @@ struct TagsEditorView: View {
     }
 
     var body: some View {
-        VStack(spacing: Theme.Space.s6) {
-            SectionLabel("Tags")
+        InspectorCard("Tags") {
+            Button { model.editTags() } label: { Image(systemName: "tag").imageScale(.small) }
+                .buttonStyle(.borderless).foregroundStyle(.secondary)
+                .help("Edit tags")
+                .accessibilityLabel("Edit tags")
+        } content: {
             if !shownTags.isEmpty {
                 FlowLayout {
                     ForEach(shownTags, id: \.self) { tag in
@@ -41,10 +45,6 @@ struct TagsEditorView: View {
                     .onSubmit(commit)
                     .onChange(of: row.fileId) { draft = "" }
                     .accessibilityLabel("Add tag")
-                Button { model.editTags() } label: { Image(systemName: "tag") }
-                    .buttonStyle(.borderless).controlSize(.small)
-                    .help("Edit tags")
-                    .accessibilityLabel("Edit tags")
             }
         }
     }

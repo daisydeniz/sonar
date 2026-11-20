@@ -78,6 +78,8 @@ enum Theme {
         static let emptyStateSymbol: CGFloat = 28
         /// Label column of `PropertyRow` (inspector grids).
         static let propertyLabelWidth: CGFloat = 72
+        /// Vertical padding of an inspector card (horizontal is `Space.s12`).
+        static let cardPaddingVertical: CGFloat = 10
         /// Maximum text width of `EmptyStateView`.
         static let emptyStateTextWidth: CGFloat = 360
         /// Filter panel (DESIGN §3): popover width, height it scrolls past,
@@ -97,7 +99,7 @@ enum Theme {
         static let tagListHeight: CGFloat = 200
         static let tagCheckWidth: CGFloat = 14
         /// Progress bar of the toolbar indexing status.
-        static let indexingProgressWidth: CGFloat = 100
+        static let indexingProgressWidth: CGFloat = 80
     }
 
     /// Opacity of the unplayed part of the waveform (played = full accent).

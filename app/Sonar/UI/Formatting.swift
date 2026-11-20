@@ -44,6 +44,16 @@ enum Format {
         ByteCountFormatter.string(fromByteCount: Int64(clamping: n), countStyle: .file)
     }
 
+    /// "44,100 Hz" (grouped, for the inspector).
+    static func sampleRate(_ hz: UInt32?) -> String? {
+        hz.map { "\($0.formatted(.number.grouping(.automatic).locale(Locale(identifier: "en_US")))) Hz" }
+    }
+
+    /// "Mono" / "Stereo" / the channel count.
+    static func channels(_ n: UInt16?) -> String? {
+        n.map { $0 == 1 ? "Mono" : $0 == 2 ? "Stereo" : "\($0)" }
+    }
+
     /// Value or "-".
     static func text(_ s: String?) -> String {
         guard let s, !s.isEmpty else { return "-" }

@@ -159,6 +159,11 @@ right-aligned in columns. No other font family, no italic, no extra weights.
   vertical: amplitude ×2 / ÷2 / reset, display only).
 - Also tokens (T12.5): `hueSquare` 8 (section hue square in the filter
   panel), `panelCloseButton` 24 (round close button in the panel title).
+- Also tokens (T12.6): `cardPaddingVertical` 10 (inspector card; horizontal
+  is `s12`). Component `InspectorCard` (title row with optional trailing
+  accessory + content) is the one card of the inspector (Analysis, Tags,
+  File). The inspector has no Bit depth / Size rows until the core exposes
+  them (ROADMAP `## Later`). Text fields inside a card sit on `surfaceContent`.
 - **Hairlines** are 1 physical pixel (`Theme.hairlineWidth`).
 
 ### 2.4 Motion

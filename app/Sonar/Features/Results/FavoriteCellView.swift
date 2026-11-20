@@ -1,12 +1,13 @@
 import AppKit
 
-/// Heart cell of the results table: a filled heart in the favourite colour
+/// Status cell of the results table. The playing row shows a `speaker.wave.2`
+/// symbol in `accent` instead of the heart (DESIGN §4.1). Otherwise: a filled heart in the favourite colour
 /// when the file is a favourite; otherwise an outline that is visible only
 /// while the pointer is over the row. The button stays clickable either way
 /// (hidden = alpha 0, not `isHidden`). The controller is the click target.
 final class FavoriteCellView: NSTableCellView {
     private let button = NSButton()
-    private static var images: [Bool: NSImage] = [:]
+    private static var images: [String: NSImage] = [:]
     private var rowHovered = false
     private var loaded = false
 
@@ -34,27 +35,37 @@ final class FavoriteCellView: NSTableCellView {
     /// Whether the cell currently shows a filled heart (tests).
     private(set) var isFavorite = false
 
+    /// Whether the cell currently shows the playing speaker (tests).
+    private(set) var isPlaying = false
+
     /// Whether the outline / heart is currently visible (tests).
     var isHeartVisible: Bool { !button.isHidden && button.alphaValue > 0 }
 
-    private static func image(filled: Bool) -> NSImage? {
-        if let image = images[filled] { return image }
+    private static func image(_ name: String) -> NSImage? {
+        if let image = images[name] { return image }
         let config = NSImage.SymbolConfiguration(pointSize: Theme.NSFonts.row.pointSize, weight: .regular)
-        let image = NSImage(systemSymbolName: filled ? "heart.fill" : "heart", accessibilityDescription: nil)?
+        let image = NSImage(systemSymbolName: name, accessibilityDescription: nil)?
             .withSymbolConfiguration(config)
-        images[filled] = image
+        images[name] = image
         return image
     }
 
     /// Shows `row`'s state; nil (page still loading) hides the heart.
-    func show(_ row: FileRow?) {
+    /// `playing`: this row is the one being auditioned.
+    func show(_ row: FileRow?, playing: Bool = false) {
         loaded = row != nil
         button.isHidden = row == nil
         guard let row else { return }
         isFavorite = row.favorite
+        isPlaying = playing
         let label = row.favorite ? "Unfavorite" : "Favorite"
-        button.image = Self.image(filled: row.favorite)
-        button.contentTintColor = row.favorite ? Theme.NS.favorite : .tertiaryLabelColor
+        if playing {
+            button.image = Self.image("speaker.wave.2")
+            button.contentTintColor = Theme.NS.accent
+        } else {
+            button.image = Self.image(row.favorite ? "heart.fill" : "heart")
+            button.contentTintColor = row.favorite ? Theme.NS.favorite : .tertiaryLabelColor
+        }
         button.toolTip = label
         button.setAccessibilityLabel(label)
         rowHovered = (superview as? ResultsRowView)?.isHovered ?? rowHovered
@@ -68,6 +79,6 @@ final class FavoriteCellView: NSTableCellView {
     }
 
     private func updateVisibility() {
-        button.alphaValue = loaded && (isFavorite || rowHovered) ? 1 : 0
+        button.alphaValue = loaded && (isPlaying || isFavorite || rowHovered) ? 1 : 0
     }
 }

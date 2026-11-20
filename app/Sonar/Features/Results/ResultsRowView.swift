@@ -29,7 +29,7 @@ final class ResultsRowView: NSTableRowView {
 
     override func drawSelection(in dirtyRect: NSRect) {
         (isEmphasized ? Theme.NS.selection : Theme.NS.selectionInactive).setFill()
-        let rect = bounds.insetBy(dx: Theme.Space.s4, dy: 0)
+        let rect = bounds.insetBy(dx: Theme.Space.s6, dy: 0)
         NSBezierPath(roundedRect: rect, xRadius: Theme.Radius.small, yRadius: Theme.Radius.small).fill()
     }
 

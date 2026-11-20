@@ -47,8 +47,7 @@ struct OverrideFieldsView: View {
     }
 
     var body: some View {
-        VStack(spacing: Theme.Space.s2) {
-            SectionLabel("Analysis")
+        InspectorCard("Analysis") {
             textRow("BPM", text: $bpmDraft, field: .bpm, mixed: bpm.isMixed)
             keyRow
             if single { keyDetailRows }
@@ -120,7 +119,7 @@ struct OverrideFieldsView: View {
                     .multilineTextAlignment(.trailing)
                     .padding(.horizontal, Theme.Space.s6)
                     .padding(.vertical, Theme.Space.s2)
-                    .background(Theme.Color.surfaceGroup, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
+                    .background(Theme.Color.surfaceContent, in: RoundedRectangle(cornerRadius: Theme.Radius.medium))
                     .modifier(OptionalFocus(focus: focus))
                     .onSubmit {
                         commit(field, text.wrappedValue)
