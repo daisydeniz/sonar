@@ -191,7 +191,7 @@ fn similar_to_a_region_of_a_loop() {
     assert!(text.contains("[0.000–2.000 s]"), "{text}");
 
     for (start, end, why) in [
-        ("1", "1.04", "shorter than 50 ms"),
+        ("1", "1.00001", "shorter than one sample"),
         ("5", "6", "past the end"),
         ("-1", "1", "negative"),
     ] {

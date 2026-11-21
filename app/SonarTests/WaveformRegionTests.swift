@@ -15,21 +15,68 @@ final class WaveformRegionTests: XCTestCase {
         XCTAssertFalse(r.contains(0.9))
     }
 
-    func testRegionShorterThan50msIsNil() {
-        // 0.02 of 2 s = 40 ms
-        XCTAssertNil(WaveformRegion(from: 0.5, to: 0.52, duration: 2))
-        XCTAssertNotNil(WaveformRegion(from: 0.5, to: 0.53, duration: 2))  // 60 ms
+    func testShortRegionsAreRegions() throws {
+        // 1 ms of a 0.125 s sample
+        let r = try XCTUnwrap(WaveformRegion(from: 0.2, to: 0.208, duration: 0.125))
+        XCTAssertEqual(r.length(duration: 0.125), 0.001, accuracy: 1e-9)
+        XCTAssertNil(WaveformRegion(from: 0.5, to: 0.5, duration: 2))  // empty
+        // Below one analysis sample (22.05 kHz) is empty too.
+        XCTAssertNil(WaveformRegion(from: 0.5, to: 0.5 + 0.5 / 22050 / 2, duration: 2))
+        XCTAssertNotNil(WaveformRegion(from: 0.5, to: 0.5 + 1.5 / 22050 / 2, duration: 2))
         XCTAssertNil(WaveformRegion(from: 0.1, to: 0.9, duration: 0))
         XCTAssertNil(WaveformRegion(from: .nan, to: 0.9, duration: 1))
+        let p = try XCTUnwrap(r.playback(totalFrames: 5512, sampleRate: 44100))
+        XCTAssertGreaterThanOrEqual(p.range.count, 1)
     }
 
-    func testResizeKeepsMinimumLengthAndBounds() throws {
+    // MARK: Click vs drag
+
+    func testPressUnderThresholdIsAClickThatSeeks() {
+        var g = RegionGesture(anchor: 0.4, startX: 100, threshold: 4)
+        XCTAssertEqual(g.dragged(toX: 104, fraction: 0.41, duration: 2), .none)
+        XCTAssertEqual(g.dragged(toX: 97, fraction: 0.39, duration: 2), .none)
+        XCTAssertEqual(g.released(region: nil), .seek(fraction: 0.4, clearRegion: false))
+    }
+
+    func testJustPastThresholdMakesAShortRegionWhenZoomedIn() throws {
+        // 0.125 s sound across 800 px: 5 px is under 1 ms.
+        let duration = 0.125
+        var g = RegionGesture(anchor: 0.5, startX: 100, threshold: 4)
+        let fraction = 0.5 + 5.0 / 800  // 5 px right
+        guard case .region(let made?) = g.dragged(toX: 105, fraction: fraction, duration: duration) else {
+            return XCTFail("a drag past the threshold makes a region")
+        }
+        XCTAssertGreaterThan(made.length(duration: duration), 0)
+        XCTAssertLessThan(made.length(duration: duration), 0.05)
+        XCTAssertEqual(g.released(region: made), .keep)
+    }
+
+    func testClickOutsideRegionClearsInsideKeeps() throws {
+        let region = try XCTUnwrap(WaveformRegion(from: 0.2, to: 0.6, duration: 2))
+        let outside = RegionGesture(anchor: 0.8, startX: 10, threshold: 4)
+        XCTAssertEqual(outside.released(region: region), .seek(fraction: 0.8, clearRegion: true))
+        let inside = RegionGesture(anchor: 0.4, startX: 10, threshold: 4)
+        XCTAssertEqual(inside.released(region: region), .seek(fraction: 0.4, clearRegion: false))
+    }
+
+    func testResizeGoesDownToTheFloorAndKeepsBounds() throws {
         let r = try XCTUnwrap(WaveformRegion(from: 0.25, to: 0.75, duration: 2))
         let moved = r.resized(.start, to: 0.9, duration: 2)  // dragged past the end
         XCTAssertEqual(moved.end, 0.75)
-        XCTAssertEqual(moved.length(duration: 2), WaveformRegion.minDuration, accuracy: 1e-9)
+        XCTAssertEqual(moved.end - moved.start, WaveformRegion.minGap(duration: 2), accuracy: 1e-12)
+        XCTAssertEqual(moved.length(duration: 2), 1.0 / 22050, accuracy: 1e-9)  // one analysis sample
+        XCTAssertLessThan(moved.length(duration: 2), 0.001)
+        let tiny = r.resized(.end, to: 0.2505, duration: 2)  // 1 ms long
+        XCTAssertEqual(tiny.length(duration: 2), 0.001, accuracy: 1e-9)
         XCTAssertEqual(r.resized(.end, to: 3, duration: 2).end, 1)
         XCTAssertEqual(r.resized(.start, to: -1, duration: 2).start, 0)
+    }
+
+    func testReadoutShortLengths() throws {
+        let r = try XCTUnwrap(WaveformRegion(from: 0.2, to: 0.232, duration: 0.125))
+        XCTAssertEqual(r.readout(duration: 0.125), "0:00.025  +0.004 s")
+        let t = try XCTUnwrap(WaveformRegion(from: 0.2, to: 0.2032, duration: 0.125))
+        XCTAssertEqual(t.readout(duration: 0.125), "0:00.025  +0.40 ms")
     }
 
     func testReadoutShowsStartAndLength() throws {

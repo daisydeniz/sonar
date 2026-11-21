@@ -203,6 +203,11 @@ aspect vectors, in memory.
   weights and L1/L2 per-aspect distance (never baselined; cannot combine
   with `--check` / `--write-baseline`). Use it, on golden when available,
   before changing the default weights (ADR-024).
+- `sonar eval --short-regions` (with any tier; `scripts/eval-real.sh
+  --short-regions` for silver/golden) replaces the usual report with a
+  table of 10/20/30 ms region seeds per widening strategy: source file in
+  top 10 and same-category share of the top 10 (report only, T13.1,
+  ADR-040 addendum).
 - Fixture numbers measure the aspect features on synthetic sounds; the
   target (P@10 ≥ 70 %) is only meaningful on golden.
 

@@ -35,13 +35,16 @@
 //! with the library stats. An external copy of a library file therefore
 //! finds that file first at distance ≈ 0. A region seed (ADR-040: a time
 //! range of a library or external file) is analyzed the same way over that
-//! range only ([`region::analyze_region`]); the whole file it was cut from
-//! stays a candidate, so a region of a library file can find that file.
+//! range only ([`region::analyze_region`]; any non-empty range, one
+//! shorter than 50 ms widened for analysis by [`widen`]); the whole file it
+//! was cut from stays a candidate, so a region of a library file can find
+//! that file.
 
 pub mod region;
 mod score;
 pub mod seed;
 mod weights;
+pub mod widen;
 
 #[cfg(test)]
 mod region_tests;

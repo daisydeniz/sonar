@@ -15,20 +15,31 @@ struct RegionPlayback: Equatable, Sendable {
 /// so it follows zoom and pan like the playhead. Pure display/transport math:
 /// similarity of the region is computed by the core (ADR-040).
 struct WaveformRegion: Equatable, Sendable {
-    /// Shortest region (seconds): shorter drags are clicks. Matches the core's
-    /// minimum for a region seed.
-    static let minDuration = 0.05
+    /// Smallest gap between the edges, as a fraction of the duration. Only keeps
+    /// a region from being empty: click vs drag is decided by the view's pixel
+    /// threshold, so a region of a few ms is valid. The core widens short
+    /// regions itself for similarity.
+    static let minFraction = 1e-6
+
+    /// The core's region minimum is one analysis sample at 22.05 kHz.
+    static let analysisSampleRate = 22_050.0
+
+    /// Smallest gap between the edges for a sound of `duration` seconds: never
+    /// below one analysis sample, so a region always covers at least a sample.
+    static func minGap(duration: Double) -> Double {
+        max(minFraction, 1.0 / analysisSampleRate / duration)
+    }
 
     let start: Double
     let end: Double
 
     /// Region between two fractions (any order, clamped to 0...1); nil when
-    /// shorter than `minDuration` for a sound of `duration` seconds.
+    /// the edges coincide (below `minFraction`) or `duration` is not positive.
     init?(from a: Double, to b: Double, duration: Double) {
         guard a.isFinite, b.isFinite, duration.isFinite, duration > 0 else { return nil }
         let lo = min(max(min(a, b), 0), 1)
         let hi = min(max(max(a, b), 0), 1)
-        guard (hi - lo) * duration >= Self.minDuration else { return nil }
+        guard hi - lo >= Self.minGap(duration: duration) else { return nil }
         start = lo
         end = hi
     }
@@ -50,10 +61,10 @@ struct WaveformRegion: Equatable, Sendable {
     }
 
     /// This region with `edge` moved to `fraction`, keeping at least
-    /// `minDuration` between the edges and staying inside 0...1.
+    /// `minFraction` between the edges and staying inside 0...1.
     func resized(_ edge: RegionEdge, to fraction: Double, duration: Double) -> WaveformRegion {
         guard duration > 0 else { return self }
-        let minGap = Self.minDuration / duration
+        let minGap = Self.minGap(duration: duration)
         switch edge {
         case .start:
             let s = min(max(fraction, 0), end - minGap)
@@ -84,6 +95,9 @@ struct WaveformRegion: Equatable, Sendable {
     func readout(duration: Double) -> String {
         let s = seconds(duration: duration).start
         let ms = UInt64((s * 1000).rounded())
-        return "\(Format.duration(ms: ms))  +\(String(format: "%.3f", length(duration: duration))) s"
+        let len = length(duration: duration)
+        // Below 1 ms seconds would read "+0.000 s": show milliseconds instead.
+        let lenText = len < 0.001 ? String(format: "%.2f ms", len * 1000) : String(format: "%.3f s", len)
+        return "\(Format.duration(ms: ms))  +\(lenText)"
     }
 }

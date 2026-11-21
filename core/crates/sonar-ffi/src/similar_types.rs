@@ -75,8 +75,10 @@ pub struct SimilarQuery {
 }
 
 /// A time range of the seed, in seconds from the file's start. Must be
-/// finite, `start >= 0`, `end - start >= 0.05` and `end <= duration`
-/// (+10 ms, clamped); otherwise `FfiError.InvalidInput`.
+/// finite, `start >= 0`, `end > start` (at least one 22.05 kHz sample, so
+/// any visible selection) and `end <= duration` (+10 ms, clamped);
+/// otherwise `FfiError.InvalidInput`. A region shorter than 50 ms is
+/// analysed with the file's audio around it (ADR-040, T13.1).
 #[derive(Debug, Clone, Copy, PartialEq, uniffi::Record)]
 pub struct SimilarRegion {
     /// Start (s).

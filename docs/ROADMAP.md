@@ -141,6 +141,9 @@ Every T12 UI task: DESIGN.md first (whole file), then the target mockups `design
 - [x] T12.8 (swift-ui) Manage Tags sheet and sidebar Tags section (DESIGN §3 Sidebar, §4.12 layer 3; deps T12.2, T12.7): tag list with counts and "unused", inline rename, Merge…, delete with confirmation, similar-pairs card (Merge into, Merge All, Ignore); sidebar Tags (5 most used + Show All, click scopes the results, dropping rows adds the tag, Undo). AC: snapshot `tags-manage` light/dark compared with `tags-manage-*.png`, sidebar visible in `main`; tests for rename/merge/delete/ignore through FFI and for drop-to-tag; manual check in "Needs human". (c37873a)
 - [x] T12.9 (reviewer) Design pass v2: re-run `scripts/ui-snapshots.sh`, compare every screen with `design/reference/sonar-v2/` and DESIGN §6; swift-ui fixes BLOCKING findings, the rest go to `## Later`. AC: reviewer APPROVE on the full snapshot set. (ef2e41b)
 
+## M13 — Short regions (founder request 2026-11-21: zoomed-in selections/loops under 50 ms are impossible; Sononym has no such limit)
+- [ ] T13.1 (dsp-analysis + swift-ui) Short regions: the waveform selection and loop have no time minimum (click vs drag by pixels only); "Find Similar to Selection" works on any selection — a region shorter than one analysis window is widened for analysis only, with the strategy (context from the file, centred and shifted at file edges / zero-pad / none) chosen by a measured short-crop eval. AC: core accepts any non-empty region; eval of 10/20/30 ms crops (fixtures + real) reports source-in-top-10 and same-category@10 for the three strategies, the winner is used and recorded in ADR-040; UI tests: 1 ms region creates/resizes, a press under the drag threshold is a click; check.sh green.
+
 ## Future (do not start)
 v1.x: record-to-search, 2D map, tempo-synced preview, kit builder, `.als` project map.
 v2: preset search (JUCE sidecar, ADR-007). Windows (~1 year).

@@ -81,8 +81,8 @@ fn first_hit_of_a_loop_ranks_the_kick_one_shot_first() {
     }
 }
 
-/// Library regions resolve through the engine only; out-of-range, too
-/// short and malformed regions are `InvalidQuery`, never a panic.
+/// Library regions resolve through the engine only; out-of-range, empty
+/// and malformed regions are `InvalidQuery`, never a panic.
 #[test]
 fn bad_regions_are_error_values() {
     let lib = lib();
@@ -93,7 +93,7 @@ fn bad_regions_are_error_values() {
         Err(Error::InvalidQuery { reason }) => reason,
         other => panic!("{seed:?}: {other:?}"),
     };
-    assert!(invalid(region(rel, 1.0, 1.04)).contains("shorter than 50 ms"));
+    assert!(invalid(region(rel, 1.0, 1.00001)).contains("shorter than one sample"));
     assert!(invalid(region(rel, 6.0, 7.5)).contains("past the end"));
     assert!(invalid(region(rel, 7.0, 8.0)).contains("past the end"));
     assert!(invalid(region(rel, -0.5, 1.0)).contains("negative"));
@@ -101,8 +101,10 @@ fn bad_regions_are_error_values() {
     assert!(invalid(region(rel, f64::NAN, 1.0)).contains("finite"));
     // An end a few ms past the file (waveform rounding) is clamped.
     assert!(similar(&vs, &lib.index, &region(rel, 6.0, 6.865), &o).is_ok());
-    // Clamping 6.83–6.865 to 6.857 leaves 27 ms.
-    assert!(invalid(region(rel, 6.83, 6.865)).contains("shorter"));
+    // Clamping 6.83–6.865 to 6.857 leaves 27 ms: a (widened) seed.
+    assert!(similar(&vs, &lib.index, &region(rel, 6.83, 6.865), &o).is_ok());
+    // Clamping 6.86–6.865 to 6.857 leaves nothing.
+    assert!(invalid(region(rel, 6.86, 6.865)).contains("not after"));
     let file_region = Seed::FileRegion {
         file_id: lib.id_of(rel),
         range: TimeRange::new(0.0, 1.0),
@@ -147,4 +149,59 @@ fn two_second_region_analysis_is_not_slower_than_the_whole_file() {
     // 1.5× slack: parallel tests can load one batch more than the other
     // (measured margin is ~2.5× the other way).
     assert!(part <= whole * 3 / 2, "region {part:?} vs whole {whole:?}");
+}
+
+/// A 1 ms and a 10 ms selection (T13.1) are seeds, at the start and in
+/// the middle of a loop: each returns a full page of finite distances
+/// (how good they are is measured by `sonar eval --short-regions`).
+#[test]
+fn one_and_ten_ms_regions_return_results() {
+    let o = opts(10, AspectWeights::default());
+    let rel = "loops/loop_000.wav";
+    for (start, end) in [(0.0, 0.001), (0.0, 0.01), (3.0, 3.001), (3.0, 3.01)] {
+        let r = run(region(rel, start, end), &o);
+        assert_eq!(r.hits.len(), 10, "{rel} {start}..{end}");
+        assert!(r.hits.iter().all(|h| h.distance.is_finite()));
+    }
+}
+
+/// Aspects of the analysis-rate samples `lo..hi` of `path`, analysed as
+/// is.
+fn span_aspects(path: &std::path::Path, lo: usize, hi: Option<usize>) -> AspectVectors {
+    crate::jobs::work::with_workers(|w| {
+        let mut d = w
+            .decoder
+            .decode(path, &crate::decode::DecodeOptions::default())
+            .expect("decode");
+        let hi = hi.unwrap_or(d.samples.len());
+        d.samples = d.samples[lo..hi].to_vec();
+        crate::jobs::work::window_aspects(w, &d).expect("aspects")
+    })
+}
+
+/// Strategy A ("context") widens a region at the very start of a file to
+/// the right only and one at the very end to the left only: the analysed
+/// samples are exactly the first / last `W`.
+#[test]
+fn context_widens_inward_at_the_file_edges() {
+    use super::widen::{widen_samples, Widen};
+    let path = lib().root.join("loops/loop_000.wav");
+    let w = widen_samples(crate::decode::ANALYSIS_RATE);
+    let at_start =
+        region::analyze_region_with(&path, TimeRange::new(0.0, 0.01), None, Widen::Context)
+            .expect("start region");
+    assert_eq!(at_start, span_aspects(&path, 0, Some(w)));
+    let n = crate::decode::decode_file(&path, &crate::decode::DecodeOptions::default())
+        .expect("decode")
+        .samples
+        .len();
+    let dur = n as f64 / f64::from(crate::decode::ANALYSIS_RATE);
+    let at_end =
+        region::analyze_region_with(&path, TimeRange::new(dur - 0.01, dur), None, Widen::Context)
+            .expect("end region");
+    assert_eq!(at_end, span_aspects(&path, n - w, None));
+    // The other strategies analyse something else.
+    let none = region::analyze_region_with(&path, TimeRange::new(0.0, 0.01), None, Widen::None)
+        .expect("none");
+    assert_ne!(none, at_start);
 }

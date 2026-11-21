@@ -1262,6 +1262,33 @@ the engine fails to open).
   the same. Layout look stays Sonar's own tokens (DESIGN §2), no copying.
 - **Not chosen**: keeping the bottom dock (waveform too small for region
   editing); region similarity in Swift (product logic belongs in core).
+- **T13.1 addendum (short regions)**: any non-empty region (≥ 1 sample at
+  22.05 kHz) is a seed; the 50 ms minimum is gone. A region shorter than
+  **W = 50 ms** (the old minimum, ≈ the 46 ms STFT half-window, so every
+  region accepted before is analysed exactly as before) is widened for
+  analysis only. Measured with `sonar eval --short-regions` (onset + later
+  crop per file, region seed excludes nothing; src = source file in top 10,
+  cat = same-category share of top 10), context / zeropad / none:
+
+  | tier (seeds) | crop | src@10 | cat@10 |
+  |---|---|---|---|
+  | fixtures (210–212) | 10 ms | **47.2** / 14.2 / 13.7 | **11.1** / 5.6 / 4.0 |
+  | | 20 ms | **46.2** / 24.8 / 29.0 | **10.8** / 6.3 / 7.3 |
+  | | 30 ms | **46.7** / 30.5 / 38.1 | **11.3** / 8.3 / 9.3 |
+  | silver (2390) | 10 ms | **11.5** / 4.7 / 4.3 | **15.0** / 12.1 / 11.1 |
+  | | 20 ms | **11.6** / 5.6 / 5.4 | **14.9** / 12.3 / 12.1 |
+  | | 30 ms | **11.7** / 6.9 / 7.0 | **15.0** / 12.6 / 12.8 |
+  | golden (556) | 10 ms | **23.9** / 10.3 / 10.6 | 17.0 / 16.9 / **18.8** |
+  | | 20 ms | **24.3** / 13.1 / 12.9 | 16.9 / 15.5 / **19.3** |
+  | | 30 ms | **24.8** / 16.7 / 17.3 | 17.0 / 14.9 / **17.8** |
+
+  **Chosen: context** (the file's audio around the selection, centred,
+  shifted inward at the file edges, whole file if shorter than W). It wins
+  src@10 everywhere (2–3×) and cat@10 on fixtures and silver (+2–4 pts,
+  3.6× the golden seeds); golden alone prefers "none" on cat@10 by
+  0.8–2.4 pts. Zeropad is never best. src@10 is partly self-retrieval
+  (context analyses the source's own audio, so it wins it by construction);
+  cat@10 is the deciding metric.
 
 
 ## ADR-041 — Key: always a best guess, graded and honest (founder request)

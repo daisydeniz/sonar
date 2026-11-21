@@ -44,6 +44,11 @@ pub struct EvalArgs {
     /// similarity (report only, never recorded in the baseline).
     #[arg(long, conflicts_with_all = ["check", "write_baseline"])]
     pub similar_sweep: bool,
+    /// Instead of the usual metrics, measure "find similar" for 10/20/30 ms
+    /// selections with each short-region widening strategy (T13.1; report
+    /// only, never recorded in the baseline).
+    #[arg(long, conflicts_with_all = ["check", "write_baseline", "similar_sweep"])]
+    pub short_regions: bool,
     /// Score categories without CLAP even when the model is available
     /// (DSP only, as on a machine without `models/`).
     #[arg(long)]
@@ -95,6 +100,55 @@ pub fn run(args: &EvalArgs) -> Result<()> {
         .clone()
         .unwrap_or_else(|| root.join("eval/reports/BASELINE.md"));
 
+    let mut datasets = Vec::new();
+    // Keeps the generated fixtures alive until the end of the run.
+    let mut _fixture_dir = None;
+    if args.fixtures {
+        let tmp = tempfile::tempdir().context("creating a temp dir for the fixtures")?;
+        eprintln!("generating fixtures...");
+        let ds = eval::fixtures_dataset(tmp.path(), !args.skip_long)
+            .context("generating the fixtures")?;
+        datasets.push(ds);
+        _fixture_dir = Some(tmp);
+    }
+    if let Some(dir) = &args.silver {
+        let ds = eval::silver_dataset(dir)
+            .with_context(|| format!("reading the silver set {}", dir.display()))?;
+        if ds.items.is_empty() {
+            bail!(
+                "silver set {}: no audio file with a label in its name ({} files without)",
+                dir.display(),
+                ds.unlabeled
+            );
+        }
+        datasets.push(ds);
+    }
+    if args.golden {
+        let dir = golden_dir(args.golden_dir.as_deref())?;
+        let ds = eval::golden_dataset(&dir)
+            .with_context(|| format!("reading the golden set {}", dir.display()))?;
+        if ds.items.is_empty() {
+            bail!(
+                "golden set {}: no labeled file found ({} rows without labels, {} missing files)",
+                dir.display(),
+                ds.unlabeled,
+                ds.missing.len()
+            );
+        }
+        datasets.push(ds);
+    }
+    if args.short_regions {
+        for ds in &datasets {
+            eprintln!(
+                "short regions {}: {} files...",
+                ds.tier.as_str(),
+                ds.items.len()
+            );
+            println!("{}", eval::short_regions::evaluate(ds).to_markdown());
+        }
+        return Ok(());
+    }
+
     let clap = if args.no_clap { None } else { load_clap() };
     // The text tower for the (report-only) CLAP / hybrid text-search numbers.
     let text_encoder = clap.as_ref().and_then(|_| {
@@ -110,43 +164,10 @@ pub fn run(args: &EvalArgs) -> Result<()> {
         tempo_dump: args.tempo_dump.clone(),
         text_encoder,
     };
-    let mut tiers = Vec::new();
-    // Keeps the generated fixtures alive until the end of the run.
-    let mut _fixture_dir = None;
-    if args.fixtures {
-        let tmp = tempfile::tempdir().context("creating a temp dir for the fixtures")?;
-        eprintln!("generating fixtures...");
-        let ds = eval::fixtures_dataset(tmp.path(), !args.skip_long)
-            .context("generating the fixtures")?;
-        tiers.push(analyse(&ds, opts.clone()));
-        _fixture_dir = Some(tmp);
-    }
-    if let Some(dir) = &args.silver {
-        let ds = eval::silver_dataset(dir)
-            .with_context(|| format!("reading the silver set {}", dir.display()))?;
-        if ds.items.is_empty() {
-            bail!(
-                "silver set {}: no audio file with a label in its name ({} files without)",
-                dir.display(),
-                ds.unlabeled
-            );
-        }
-        tiers.push(analyse(&ds, opts.clone()));
-    }
-    if args.golden {
-        let dir = golden_dir(args.golden_dir.as_deref())?;
-        let ds = eval::golden_dataset(&dir)
-            .with_context(|| format!("reading the golden set {}", dir.display()))?;
-        if ds.items.is_empty() {
-            bail!(
-                "golden set {}: no labeled file found ({} rows without labels, {} missing files)",
-                dir.display(),
-                ds.unlabeled,
-                ds.missing.len()
-            );
-        }
-        tiers.push(analyse(&ds, opts));
-    }
+    let tiers: Vec<_> = datasets
+        .iter()
+        .map(|ds| analyse(ds, opts.clone()))
+        .collect();
 
     let report = EvalReport::new(&git_sha(&root), tiers);
     let old = read_baseline(&baseline_path);

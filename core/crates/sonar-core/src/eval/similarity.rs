@@ -190,7 +190,7 @@ fn aspect_distance(a: &[f32], b: &[f32], l1: bool) -> f32 {
 }
 
 /// Combined distance of two normalized entries (module docs).
-fn distance(a: &[Vec<f32>; 4], b: &[Vec<f32>; 4], cfg: &Config) -> f32 {
+pub(super) fn distance(a: &[Vec<f32>; 4], b: &[Vec<f32>; 4], cfg: &Config) -> f32 {
     let w = cfg.weights.as_array();
     let total: f32 = w.iter().sum();
     (0..4)

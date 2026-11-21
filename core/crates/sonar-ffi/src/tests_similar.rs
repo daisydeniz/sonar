@@ -68,7 +68,8 @@ fn region_seeds_find_the_loop_and_its_kick() {
             .iter()
             .position(|r| !kick(r) && !r.path.contains("/loops/"));
         assert!(unrelated.is_some_and(|p| p >= 3), "{unrelated:?}");
-        for (s, e) in [(1.0, 1.04), (5.0, 6.0), (-1.0, 1.0), (2.0, 1.0)] {
+        assert!(engine.similar_to(region(seed.clone(), 1.0, 1.01)).is_ok());
+        for (s, e) in [(1.0, 1.00001), (5.0, 6.0), (-1.0, 1.0), (2.0, 1.0)] {
             assert!(
                 matches!(
                     engine.similar_to(region(seed.clone(), s, e)),

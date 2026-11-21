@@ -34,7 +34,8 @@ pub struct SimilarArgs {
         allow_negative_numbers = true
     )]
     pub start: Option<f64>,
-    /// End (s) of the region (with `--start`; at least 50 ms after it).
+    /// End (s) of the region (with `--start`; after it; under 50 ms the
+    /// surrounding audio is analysed too).
     #[arg(
         long,
         value_name = "E",

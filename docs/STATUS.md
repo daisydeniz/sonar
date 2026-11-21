@@ -3,8 +3,8 @@
 Living log maintained by the agents. Newest entries on top in "Log".
 
 ## Current
-- Milestone: M12 Visual v2 and tags UX (founder request 2026-11-20, ADR-043); human-only: T3.7, T7.4, T8.1
-- Next task: none — M12 done (`m12-done`); only [HUMAN] tasks remain (T3.7, T7.4, T8.1)
+- Milestone: M13 Short regions (founder request 2026-11-21); human-only: T3.7, T7.4, T8.1
+- Next task: none — M13 done (`m13-done`); only [HUMAN] tasks remain (T3.7, T7.4, T8.1)
 - Loop state: ROADMAP COMPLETE   <!-- RUNNING | BLOCKED | ROADMAP COMPLETE -->
 
 ## Toolchain (updated 2026-11-20; T0.1 was macOS 26.7.2 / Xcode 26.5)
@@ -14,6 +14,7 @@ rustc/cargo 1.100.0 · cargo-deny 0.21.0 · claude 2.1.328 · gh: not installed 
 ## Needs human
 _(Agents list anything that requires the founder: decisions, credentials,
 manual tests, labeled data. Keep each item one line with the task id.)_
+- T13.1 Manual check: zoom into a 125 ms sample, drag a 2–10 ms region (appears at once, readout `+0.004 s`), resize an edge below 50 ms, loop it; Find Similar to Selection on it returns results.
 - T12.8 Manual check: open Manage Tags… from Edit › Tags, the row menu and the tag popover; rename a tag inline, merge a similar pair, delete a tag, ⌘Z after each; drag rows onto a sidebar tag (tag added, ⌘Z removes it); click a sidebar tag → results and toolbar title scope to it.
 - T12.7 Manual check: select a row → right-click Tags › shows ✓/– and toggles; ⌘T opens the tag popover at the row, type + Return creates/adds, Esc closes, ⌘Z (also inside the popover) undoes one change; ⌘A in a large library + add tag reaches all rows; inspector Tags `+` opens it.
 - T12.6 Manual check (toolbar not in snapshots): window title shows the scope ("All Samples") with the libraries in scope as subtitle; trial badge amber; playing a row shows the speaker symbol in its status column.
@@ -50,6 +51,6 @@ _(Filled by eval runs; see eval/reports/BASELINE.md.)_
 - Fixtures (2026-11-11, 120 files, names hidden): kind 100 %, BPM ±1 97.06 % (1 octave error / 34 loops), one-shots with BPM 0, key exact/MIREX 100 %, note PC/MIDI 100 %, unexpected decode errors 0. Similarity (2026-11-12, 75 seeds): P@10 81.51 %, MRR 99.33 %, pitch-only P@10 72.84 %. Category (2026-11-12, 56 labelled, audio only): DSP top-1 33.93 % / macro-F1 50.72 % (tracked), CLAP+DSP 53.6 %. Text/NL search (2026-11-12, 19 queries): NDCG@10 BM25 28.96 % (tracked), hybrid 91.28 %. Silver (T5.3, 7818 files): category CLAP+DSP 76.0 %. Golden: not run.
 
 ## Log
+- 2026-11-21 — T13.1: short regions — waveform selection/loop has no 50 ms minimum (floor one 22.05 kHz sample; click vs drag by pixel threshold, `RegionGesture`); core accepts any non-empty region and widens regions < 50 ms for analysis only with the file's own context (ADR-040 addendum). `sonar eval --short-regions` (10/20/30 ms crops) cat@10 context/zeropad/none: silver 15.0/12.1/11.1, fixtures 11.1/5.6/4.0, golden 17.0/16.9/18.8 (10 ms). check.sh green; reviewer APPROVE r2.
 - 2026-11-21 — T12.9: design pass v2 — regenerated all 70 snapshots (35 screens × light/dark), reviewer compared them with `design/reference/sonar-v2/` + DESIGN §6: APPROVE r1, no BLOCKING findings, so no code change. 10 NITs → Later (T12.9 items: inspector BPM field, sidebar counts/link, popover bold, locale formatting, …). M12 complete (`m12-done`).
 - 2026-11-21 — T12.8: Manage Tags sheet (filter, similar-pairs card on `signalSoft` with Merge into / Merge All / Ignore, tag list with counts + "unused", inline rename, Merge…, delete with confirmation, + / − bar) opened from both Tags menus and the popover; sidebar Tags section (5 most used + Show All, click scopes results incl. toolbar title, drop rows adds tag). Rename/merge/delete/drop are one Undo step each (affected files snapshotted via paged tag search, capped pages handled). Tokens `manageTags*`. UI only, no eval. check.sh green; reviewer APPROVE r2. Later: 7 T12.8 items.
-- 2026-11-21 — T12.7: Tags › submenu (row context menu with real tri-state NSMenuItems, Edit menu with ✓/– icons; 8 most used, Add Tag… ⌘T, Manage Tags… disabled until T12.8); live tag popover (`NSPopover`, mixed n/m chips → all, Most used, prefix-then-contains matches, Create tag last) replaces `TagEditorView`/"Edit Tags…"; inspector Tags `+` opens it; each change one Undo step; selections beyond the pager cache fetch missing rows from core. Tokens `tagPopoverWidth`, `tagAddButton`, `tagListHeight` 248. UI only, no eval. check.sh green; reviewer APPROVE r2. Later: 2 T12.7 items.

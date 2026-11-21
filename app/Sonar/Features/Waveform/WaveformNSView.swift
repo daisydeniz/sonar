@@ -23,7 +23,7 @@ final class WaveformNSView: NSView {
     var onSeek: ((Double) -> Void)?
     /// Selected region (drawn in time coordinates, so it follows zoom/pan).
     var region: WaveformRegion? { didSet { if region != oldValue { placeRegion() } } }
-    /// Duration (s) of the sound; regions need it for their 50 ms minimum.
+    /// Duration (s) of the sound; regions are fractions of it.
     var duration: Double? { didSet { if duration != oldValue { relayout() } } }
     /// A drag created, resized or (nil) cleared the region.
     var onRegion: ((WaveformRegion?) -> Void)?
@@ -62,7 +62,6 @@ final class WaveformNSView: NSView {
     private let regionHandles = [CALayer(), CALayer()]
     private var drag: Drag?
     /// The current drag has produced a region (SwiftUI applies it a beat later).
-    private var dragMadeRegion = false
     private var displayLink: CADisplayLink?
     private var playheadFraction: Double?
 
@@ -294,7 +293,7 @@ final class WaveformNSView: NSView {
     /// Mouse gesture in progress.
     private enum Drag {
         /// Might become a new region; a click when it stays short.
-        case pending(anchor: Double, startX: CGFloat, moved: Bool)
+        case pending(RegionGesture)
         case edge(RegionEdge)
     }
 
@@ -317,9 +316,9 @@ final class WaveformNSView: NSView {
         if let edge = edge(atX: x) {
             drag = .edge(edge)
         } else {
-            drag = .pending(anchor: viewport.fraction(atX: x, width: bounds.width), startX: x, moved: false)
+            drag = .pending(RegionGesture(
+                anchor: viewport.fraction(atX: x, width: bounds.width), startX: x, threshold: Self.dragThreshold))
         }
-        dragMadeRegion = false
     }
 
     override func mouseDragged(with event: NSEvent) {
@@ -328,13 +327,10 @@ final class WaveformNSView: NSView {
         switch drag {
         case .edge(let edge):
             if let region, let duration { onRegion?(region.resized(edge, to: fraction, duration: duration)) }
-        case .pending(let anchor, let startX, let moved):
-            guard moved || abs(x - startX) > Self.dragThreshold else { return }
-            drag = .pending(anchor: anchor, startX: startX, moved: true)
-            // Shorter than 50 ms: no region yet (a release there is a click).
-            let made = duration.flatMap { WaveformRegion(from: anchor, to: fraction, duration: $0) }
-            dragMadeRegion = made != nil
-            onRegion?(made)
+        case .pending(var gesture):
+            let result = gesture.dragged(toX: x, fraction: fraction, duration: duration)
+            drag = .pending(gesture)
+            if case .region(let made) = result { onRegion?(made) }
         case nil:
             break
         }
@@ -342,12 +338,15 @@ final class WaveformNSView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         defer { drag = nil }
-        guard case .pending(let anchor, _, let moved) = drag else { return }
-        // A click (or a drag too short to be a region): seek. A click outside
+        guard case .pending(let gesture) = drag else { return }
+        // A click (a press that never passed the drag threshold): seek. A click outside
         // the region clears it; inside, the region keeps playing from there.
-        if moved && dragMadeRegion { return }
-        if let region, !region.contains(anchor) { onRegion?(nil) }
-        onSeek?(anchor)
+        switch gesture.released(region: region) {
+        case .keep: return
+        case .seek(let fraction, let clear):
+            if clear { onRegion?(nil) }
+            onSeek?(fraction)
+        }
     }
 
     override func resetCursorRects() {

@@ -208,7 +208,7 @@ impl SonarEngine {
     /// set: then only that time range of the seed file is decoded and
     /// analyzed like an external file (ADR-040). Errors: `NotFound` (seed
     /// not analyzed or unknown), `InvalidInput` (weights, filters, region
-    /// out of range or < 50 ms), `Audio`/`Io`
+    /// out of range or empty), `Audio`/`Io`
     /// (external file), `Internal` (no analysis has run yet: "no vector
     /// store yet").
     pub fn similar_to(&self, query: SimilarQuery) -> Result<SimilarPage, FfiError> {

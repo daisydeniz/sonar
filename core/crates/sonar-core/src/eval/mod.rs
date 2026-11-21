@@ -8,6 +8,8 @@
 //! - [`category`]: category top-1, macro-F1, confusion, calibration (T5.3);
 //! - [`similarity`]: P@10 / MRR of the aspect-weighted `similar` ranking
 //!   (fixture families, golden `similar.jsonl`);
+//! - [`short_regions`]: which widening of 10–30 ms region seeds works best
+//!   (T13.1, `--short-regions`, report only);
 //! - [`text_search`] / [`text_queries`]: NDCG@10 / recall@50 of text,
 //!   semantic and hybrid search (T5.4; fixture queries judged from truth,
 //!   golden `text_queries.jsonl`);
@@ -24,6 +26,7 @@ pub mod key_calib;
 pub mod metrics;
 pub mod report;
 pub mod run;
+pub mod short_regions;
 pub mod similarity;
 pub mod text_queries;
 pub mod text_search;
