@@ -12,6 +12,8 @@ The autonomous loop works top to bottom. Rules:
   not delete or reorder existing ones. Scope changes → ADR in DECISIONS.md.
 - Split/add only what the AC or the MVP really needs. Follow-ups, extra perf,
   rare edge cases and non-trivial NITs go to `## Later` (end of file, one line
+- (from waveform-latency fix) Prefetch re-decodes failed/corrupt neighbours each time; remember failures and skip them.
+- (from waveform-latency fix) Native-rate peaks copy each lane once (`resample.rs` from==to `to_vec`); move instead, or stream peaks, if long hi-res files matter.
   each, no checkbox). The loop never picks Later items.
 
 Owner tags map to subagents in `.claude/agents/`.

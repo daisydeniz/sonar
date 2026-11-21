@@ -7,7 +7,7 @@
 
 use super::{lock, Engine};
 use crate::decode::source::{MAX_SAMPLE_RATE, MIN_SAMPLE_RATE};
-use crate::decode::{decode_file, probe_sample_rate, DecodeOptions, Decoder, ANALYSIS_RATE};
+use crate::decode::{decode_file, probe_sample_rate, DecodeOptions, Decoder};
 use crate::{Error, Result};
 
 /// Most buckets [`Engine::waveform_peaks`] accepts.
@@ -71,7 +71,7 @@ impl Engine {
 
     /// Waveform peaks of file `id`: one list of `buckets` min/max pairs
     /// (see [`waveform_peaks`]) per channel, over the whole file at the
-    /// analysis rate. A mono file gives one list, stereo two (left, right);
+    /// file's own rate. A mono file gives one list, stereo two (left, right);
     /// files with more channels give their first [`MAX_PEAK_CHANNELS`].
     /// Blocking (decodes the file once).
     ///
@@ -86,8 +86,11 @@ impl Engine {
             });
         }
         let path = self.existing_path(id)?;
+        // Native rate: min/max peaks need no resampling, which was most of
+        // the cost (a rubato FFT pass per channel on every call).
+        let rate = probe_sample_rate(&path)?.clamp(MIN_SAMPLE_RATE, MAX_SAMPLE_RATE);
         let opts = DecodeOptions {
-            target_rate: ANALYSIS_RATE,
+            target_rate: rate,
             max_analysis_secs: None,
             cancel: None,
         };

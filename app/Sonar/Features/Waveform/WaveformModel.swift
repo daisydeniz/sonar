@@ -39,6 +39,9 @@ final class WaveformCache {
         return v
     }
 
+    /// Like `get` without counting as a use (prefetch checks).
+    func peek(_ id: Int64) -> [[WaveformPeak]]? { items[id] }
+
     func put(_ id: Int64, _ peaks: [[WaveformPeak]]) {
         items[id] = peaks
         touch(id)
@@ -86,6 +89,15 @@ final class WaveformModel {
     @ObservationIgnored private let cache: WaveformCache
     @ObservationIgnored private var generation = 0
     @ObservationIgnored private var task: Task<Void, Never>?
+    @ObservationIgnored private var graceTask: Task<Void, Never>?
+    @ObservationIgnored private var prefetchTask: Task<Void, Never>?
+    /// Fetches in flight by file id, shared by `load` and `prefetch`.
+    @ObservationIgnored private var inflight: [Int64: Task<[[WaveformPeak]]?, Never>] = [:]
+
+    /// How long the previous waveform stays up while the next one loads
+    /// before the well goes blank: a fast load swaps old → new directly,
+    /// without an empty frame in between (no "blink" when arrowing).
+    static let loadingGrace: Duration = .milliseconds(150)
 
     init(provider: WaveformProviding? = nil, cache: WaveformCache = WaveformCache()) {
         self.provider = provider
@@ -93,11 +105,17 @@ final class WaveformModel {
     }
 
     /// The selection changed (nil = none). Resets zoom; a result for an
-    /// older selection is cached but never shown.
+    /// older selection is cached but never shown. On a cache miss the
+    /// previous waveform stays up for at most `loadingGrace`.
     func load(fileId: Int64?) {
         generation += 1
         task?.cancel()
         task = nil
+        // Arrowing on while the old waveform is already stale: blank now
+        // rather than restart the grace and keep it up indefinitely.
+        let alreadyStale = graceTask != nil
+        graceTask?.cancel()
+        graceTask = nil
         viewport = WaveformViewport()
         amplitudeZoom = 1
         guard let fileId else {
@@ -108,24 +126,67 @@ final class WaveformModel {
             state = .ready(cached)
             return
         }
-        guard let provider else {
+        guard provider != nil else {
             state = .failed
             return
         }
-        state = .loading
         let mine = generation
-        task = Task { [weak self] in
-            let result: [[WaveformPeak]]?
-            do {
-                result = try await provider.peaks(fileId: fileId, buckets: Self.bucketCount)
-            } catch {
-                result = nil
+        if case .ready = state, !alreadyStale {
+            graceTask = Task { [weak self] in
+                try? await Task.sleep(for: Self.loadingGrace)
+                guard let self, !Task.isCancelled, mine == self.generation else { return }
+                self.state = .loading
             }
-            guard let self else { return }
-            if let result, Self.hasPeaks(result) { self.cache.put(fileId, result) }
-            guard mine == self.generation else { return }
-            if let result, Self.hasPeaks(result) { self.state = .ready(result) } else { self.state = .failed }
+        } else {
+            state = .loading
         }
+        guard let fetch = fetch(fileId) else { return }
+        task = Task { [weak self] in
+            let result = await fetch.value
+            guard let self, mine == self.generation else { return }
+            self.graceTask?.cancel()
+            self.graceTask = nil
+            if let result { self.state = .ready(result) } else { self.state = .failed }
+        }
+    }
+
+    /// Loads the peaks of `fileIds` (nearest neighbours first) into the cache
+    /// one at a time, so arrowing to them is instant. A new call replaces the
+    /// previous queue; a fetch already running finishes and is cached.
+    func prefetch(_ fileIds: [Int64]) {
+        prefetchTask?.cancel()
+        let ids = fileIds.filter { cache.peek($0) == nil }
+        guard !ids.isEmpty, provider != nil else {
+            prefetchTask = nil
+            return
+        }
+        let current = task
+        prefetchTask = Task { [weak self] in
+            await current?.value  // the selected file's peaks come first
+            for id in ids {
+                guard !Task.isCancelled, let self, self.cache.peek(id) == nil,
+                      let fetch = self.fetch(id) else { continue }
+                _ = await fetch.value
+            }
+        }
+    }
+
+    /// The shared fetch of `fileId` (cached on success; nil result = no
+    /// usable peaks). Nil without a provider.
+    private func fetch(_ fileId: Int64) -> Task<[[WaveformPeak]]?, Never>? {
+        if let running = inflight[fileId] { return running }
+        guard let provider else { return nil }
+        let fetch = Task { [weak self] () -> [[WaveformPeak]]? in
+            let result = try? await provider.peaks(fileId: fileId, buckets: Self.bucketCount)
+            let usable = result.flatMap { Self.hasPeaks($0) ? $0 : nil }
+            if let self {
+                if let usable { self.cache.put(fileId, usable) }
+                self.inflight[fileId] = nil
+            }
+            return usable
+        }
+        inflight[fileId] = fetch
+        return fetch
     }
 
     /// At least one lane with at least one bucket.
@@ -134,7 +195,10 @@ final class WaveformModel {
     }
 
     /// Waits for the pending load (tests).
-    func settle() async { await task?.value }
+    func settle() async {
+        await task?.value
+        await prefetchTask?.value
+    }
 
     // MARK: Region
 

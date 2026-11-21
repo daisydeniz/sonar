@@ -142,8 +142,10 @@ final class AppModel {
         if row?.fileId != selectedRow?.fileId { waveform.clearRegion() }
         selectedRow = row
         waveform.duration = row?.durationMs.map { Double($0) / 1000 }
-        preview.select(row, neighbours: explicit ?? neighbours(of: row))
+        let near = explicit ?? neighbours(of: row)
+        preview.select(row, neighbours: near)
         waveform.load(fileId: row?.fileId)
+        waveform.prefetch(near.map(\.fileId))
     }
 
     /// Cached rows within `AudioPreview.neighbourReach` of `row` (no fetches).

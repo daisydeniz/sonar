@@ -106,6 +106,37 @@ final class WaveformModelTests: XCTestCase {
         XCTAssertEqual(provider.requests, [1, 2])
     }
 
+    func testPrefetchFillsCacheAndLoadIsInstant() async {
+        let provider = FakeWaveformProvider()
+        let model = WaveformModel(provider: provider)
+        model.load(fileId: 1)
+        model.prefetch([2, 3, 1])
+        await model.settle()
+        XCTAssertEqual(model.state, .ready([[pk(-1, 1)]]))
+        XCTAssertEqual(provider.requests, [1, 2, 3])  // selected first, no duplicate
+        model.load(fileId: 3)
+        XCTAssertEqual(model.state, .ready([[pk(-3, 3)]]))  // no loading frame
+        XCTAssertEqual(provider.requests, [1, 2, 3])
+    }
+
+    func testPreviousWaveformStaysDuringShortLoad() async {
+        let provider = FakeWaveformProvider()
+        let model = WaveformModel(provider: provider)
+        model.load(fileId: 1)
+        await model.settle()
+        provider.delays[2] = 20_000_000  // well under the grace
+        model.load(fileId: 2)
+        XCTAssertEqual(model.state, .ready([[pk(-1, 1)]]))  // no blank frame
+        await model.settle()
+        XCTAssertEqual(model.state, .ready([[pk(-2, 2)]]))
+        provider.delays[3] = 2_000_000_000  // longer than the grace: goes blank
+        model.load(fileId: 3)
+        try? await Task.sleep(nanoseconds: 300_000_000)
+        XCTAssertEqual(model.state, .loading)
+        await model.settle()
+        XCTAssertEqual(model.state, .ready([[pk(-3, 3)]]))
+    }
+
     func testLatestSelectionWins() async {
         let provider = FakeWaveformProvider()
         provider.delays[1] = 100_000_000
