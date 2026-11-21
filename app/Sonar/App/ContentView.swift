@@ -60,8 +60,12 @@ struct ContentView: View {
                 onFindSimilar: { model.findSimilar(to: $0) })
             .inspectorColumnWidth(min: 240, ideal: 280, max: 400)
             .toolbar {
-                if #available(macOS 26, *) { ToolbarSpacer(.flexible) }
-                ToolbarItem { inspectorToggle }
+                // macOS 26+ keeps the inspector's toolbar items in the window
+                // toolbar after it collapses; gate them so only one toggle shows.
+                if showInspector {
+                    if #available(macOS 26, *) { ToolbarSpacer(.flexible) }
+                    ToolbarItem { inspectorToggle }
+                }
             }
         }
         .searchable(text: $model.searchText, prompt: "Search samples")
